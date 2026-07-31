@@ -13,7 +13,12 @@ import { StationPlacement } from './ui/StationPlacement.js'
 import { Timetable } from './ui/Timetable.js'
 import { TopBar } from './ui/TopBar.js'
 
-const REGION = import.meta.env['VITE_REGION'] ?? 'bavaria'
+/**
+ * Gespielt wird Deutschland. Bayern bleibt als kleinerer Datensatz erhalten und
+ * ist mit `VITE_REGION=bavaria` erreichbar — für die Entwicklung ist ein Netz,
+ * das in einen Bildschirm passt, oft das schnellere Werkzeug.
+ */
+const REGION = import.meta.env['VITE_REGION'] ?? 'germany'
 
 const TABS: { readonly id: Tab; readonly label: string }[] = [
   { id: 'rail', label: 'Schiene' },

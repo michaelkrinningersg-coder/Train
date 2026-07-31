@@ -6,16 +6,26 @@ Erzeugte Artefakte der Datenpipeline. Die App laedt sie zur Laufzeit unter `/see
 | Datei | Erzeugt durch | Im Repo? |
 |---|---|---|
 | `cities.<region>.json` | `pnpm data:cities` | ja — klein und die Grundlage jedes Spielstarts |
+| `elevation.<region>.{json,bin}` | `pnpm data:terrain` | ja — Grundlage der Baukosten |
 | `basemap/{z}/{x}/{y}.pbf` | `pnpm data:basemap` | nein — reproduzierbar und zu gross |
 | `*.parquet` (spaeter: Reisezeit- und Nachfragematrix) | Phase 1 / Phase 5 | nein |
 
 ## Neu erzeugen
 
 ```bash
-pnpm data:cities                    # Bayern (Standard)
-pnpm data:cities -- --region=dach   # groessere Ausbaustufe
-pnpm data:basemap                   # lokaler Kachelcache, macht die Entwicklung offline-faehig
+pnpm data:cities -- --region=germany      # gespielt wird Deutschland
+pnpm data:facilities -- --region=germany  # Einrichtungen aus Wikidata, schreibt dieselbe Datei
+pnpm data:terrain -- --region=germany     # Hoehenraster fuer die Baukosten
+pnpm data:cities                          # Bayern (kleiner Datensatz fuer die Entwicklung)
+pnpm data:basemap                         # lokaler Kachelcache, macht die Entwicklung offline-faehig
 ```
+
+Die Reihenfolge ist wichtig: `data:facilities` ergaenzt die von `data:cities` geschriebene
+Datei. Wer `data:cities` erneut laufen laesst, verliert die Einrichtungen und muss
+`data:facilities` nachziehen.
+
+Die Verzeichnisse `osm/` und `basemap/` sind reine Entwicklungscaches und werden **nicht** in
+den Build kopiert — allein der OSM-Cache ist 95 MB.
 
 Hinter einem Proxy liest Node's `fetch` `HTTPS_PROXY` nicht von selbst:
 

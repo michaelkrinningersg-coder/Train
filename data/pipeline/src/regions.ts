@@ -24,6 +24,25 @@ export const REGIONS: Readonly<Record<string, Region>> = {
     minPopulation: 20_000,
     view: { centre: [11.4, 48.9], zoom: 6.6 },
   },
+  /**
+   * Ganz Deutschland — die erste Stufe, in der das Netz nicht mehr in einen
+   * Bildschirm passt.
+   *
+   * Die Einwohnerschwelle bleibt bei 20 000, obwohl das aus 65 Staedten rund
+   * 600 macht. Sie anzuheben waere die einfache Antwort auf die Rechenzeit,
+   * aber die falsche: gerade die Mittelstaedte sind es, die ein Netz von einer
+   * Sammlung von Korridoren unterscheiden. Wer nur Grossstaedte verbindet,
+   * spielt kein Verkehrsnetz, sondern eine Punkt-zu-Punkt-Liste.
+   */
+  germany: {
+    id: 'germany',
+    label: 'Deutschland',
+    countries: ['DE'],
+    minPopulation: 20_000,
+    // Ausschnitt so gewaehlt, dass Flensburg und Konstanz zugleich sichtbar
+    // sind, ohne dass die Seitenleiste Berlin verdeckt.
+    view: { centre: [9.8, 51.2], zoom: 5.7 },
+  },
   dach: {
     id: 'dach',
     label: 'DACH',

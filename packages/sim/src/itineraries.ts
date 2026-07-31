@@ -130,14 +130,26 @@ function singleLeg(offer: LineOffer, a: number, b: number): ItineraryLeg {
   }
 }
 
+/**
+ * Angebote nach Linienkennung.
+ *
+ * Einmal gebaut und durchgereicht, nicht in jeder Hilfsfunktion neu: `combine`
+ * und `optionKey` laufen je Reisekette, und bei siebenhundert Relationen mit
+ * mehreren Ketten kostete das Wiederaufbauen dieser Tabelle mehr als die
+ * eigentliche Suche.
+ */
+export type OffersById = ReadonlyMap<LineId, LineOffer>
+
+export const offersById = (offers: readonly LineOffer[]): OffersById =>
+  new Map(offers.map((o) => [o.lineId, o]))
+
 function combine(
-  offers: readonly LineOffer[],
+  byId: OffersById,
   od: string,
   legs: readonly ItineraryLeg[],
   legWaits: readonly number[],
   legMisses: readonly number[],
 ): Itinerary {
-  const byId = new Map(offers.map((o) => [o.lineId, o]))
   const parts = legs.map((leg) => ({ leg, offer: byId.get(leg.lineId)! }))
 
   // Die Umsteigezeit steckt in `legWaits` und nicht in der Fahrzeit: Warten am
@@ -232,8 +244,7 @@ export function optionAlternative(option: ItineraryOption, ascOffset: number): A
 }
 
 /** Städtefolge und Verkehrsmittel — was zwei Ketten austauschbar macht. */
-function optionKey(offers: readonly LineOffer[], itinerary: Itinerary): string {
-  const byId = new Map(offers.map((o) => [o.lineId, o]))
+function optionKey(byId: OffersById, itinerary: Itinerary): string {
   return itinerary.legs
     .map((leg) => {
       const offer = byId.get(leg.lineId)!
@@ -255,13 +266,12 @@ function optionKey(offers: readonly LineOffer[], itinerary: Itinerary): string {
  * jedem Umsteigepunkt: wer am Bahnsteig steht, nimmt was zuerst kommt, und das
  * an jedem Punkt der Reise neu.
  */
-function mergeOptions(offers: readonly LineOffer[], chains: readonly Itinerary[]): ItineraryOption[] {
-  const byId = new Map(offers.map((o) => [o.lineId, o]))
+function mergeOptions(byId: OffersById, chains: readonly Itinerary[]): ItineraryOption[] {
   const frequency = (lineId: LineId): number => 60 / Math.max(1, byId.get(lineId)!.headwayMin)
 
   const groups = new Map<string, Itinerary[]>()
   for (const chain of chains) {
-    const key = optionKey(offers, chain)
+    const key = optionKey(byId, chain)
     const list = groups.get(key)
     if (list) list.push(chain)
     else groups.set(key, [chain])
@@ -339,9 +349,10 @@ export function buildOptions(
   offers: readonly LineOffer[],
   maxTransfers: number = MAX_TRANSFERS,
 ): Map<string, ItineraryOption[]> {
+  const byId = offersById(offers)
   const merged = new Map<string, ItineraryOption[]>()
   for (const [od, chains] of buildItineraries(state, offers, maxTransfers)) {
-    const options = mergeOptions(offers, chains)
+    const options = mergeOptions(byId, chains)
     if (options.length <= MAX_ITINERARIES_PER_OD) {
       merged.set(od, options)
       continue
@@ -375,13 +386,14 @@ export function buildItineraries(
 ): Map<string, Itinerary[]> {
   const result = new Map<string, Itinerary[]>()
   const boardings = boardingIndex(offers)
+  const byId = offersById(offers)
 
   for (const origin of boardings.keys()) {
-    for (const [destination, labels] of searchFrom(state, boardings, origin, maxTransfers)) {
+    for (const [destination, labels] of searchFrom(state, boardings, byId, origin, maxTransfers)) {
       const od = odKey(origin, destination)
       result.set(
         od,
-        labels.map((label) => combine(offers, od, label.legs, label.legWaits, label.legMisses)),
+        labels.map((label) => combine(byId, od, label.legs, label.legWaits, label.legMisses)),
       )
     }
   }
@@ -448,13 +460,12 @@ type Routes = Map<string, Label[]>
 function searchFrom(
   state: GameState,
   boardings: ReadonlyMap<CityId, readonly Boarding[]>,
+  byLineId: OffersById,
   origin: CityId,
   maxTransfers: number,
 ): Map<CityId, Label[]> {
   const reached = new Map<CityId, Routes>()
   let frontier: CityId[] = [origin]
-  const byLineId = new Map<LineId, LineOffer>()
-  for (const list of boardings.values()) for (const b of list) byLineId.set(b.offer.lineId, b.offer)
 
   for (let round = 0; round <= maxTransfers; round++) {
     const marked = new Set<CityId>()

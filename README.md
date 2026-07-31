@@ -309,6 +309,20 @@ nicht *wie voll ist meine Linie*, sondern *welcher Korridor ist voll und was lie
 | [docs/05-DATENPIPELINE.md](docs/05-DATENPIPELINE.md) | OSM/GeoNames/Routing-Aufbereitung |
 | [docs/06-ROADMAP.md](docs/06-ROADMAP.md) | Phasenplan bis zum spielbaren Prototyp |
 
+## Region
+
+Gespielt wird **Deutschland**: 694 Städte ab 20 000 Einwohnern, echte Einwohnerzahlen aus
+GeoNames, echte Einrichtungen aus Wikidata, echtes Gelände. Bayern bleibt als kleiner
+Datensatz für die Entwicklung erhalten:
+
+```bash
+VITE_REGION=bavaria pnpm dev
+```
+
+Die Einwohnerschwelle bleibt bei 20 000, obwohl das aus 65 Städten 694 macht. Sie anzuheben
+wäre die einfache Antwort auf die Rechenzeit, aber die falsche: gerade die Mittelstädte sind
+es, die ein Netz von einer Sammlung von Korridoren unterscheiden.
+
 ## Prüfen
 
 ```bash

@@ -162,15 +162,46 @@ die in der Anforderung gefordert war.
 
 **Nicht** mit Europa starten. Empfohlene Ausbaustufen des Datensatzes:
 
-| Stufe | Gebiet | Städte | Wozu |
-|---|---|---|---|
-| 0 | Bayern | ~80 | alles lokal, Iteration in Sekunden |
-| 1 | DACH | ~600 | Balancing, erste echte Netze |
-| 2 | Mitteleuropa | ~1800 | Grenzüberschreitung, Ländereffekte |
-| 3 | Europa | ~4500 | Release |
+| Stufe | Gebiet | Städte | Relationen | Wozu |
+|---|---|---|---|---|
+| 0 | Bayern | 65 | 3 857 | alles lokal, Iteration in Sekunden |
+| **1** | **Deutschland** | **694** | **141 146** | **gespielt wird das** |
+| 2 | DACH | ~900 | | Grenzüberschreitung, Ländereffekte |
+| 3 | Mitteleuropa | ~1800 | | |
+| 4 | Europa | ~4500 | | Release |
 
 Die Pipeline ist identisch, nur der Ausschnitt wächst. Das kostet nichts extra, spart aber
-in der Entwicklung sehr viel Wartezeit.
+in der Entwicklung sehr viel Wartezeit — Bayern bleibt deshalb erhalten und ist über
+`VITE_REGION=bavaria` erreichbar.
+
+### Was der Sprung auf Deutschland gekostet hat
+
+Elf Mal so viele Städte heißt **hundertzwanzig Mal so viele Relationen** — die Gravitation ist
+quadratisch. Zwei Stellen mussten dafür angefasst werden, beide ohne eine Ziffer am Ergebnis
+zu ändern:
+
+- **Der Matrixaufbau** (`gravity.ts`) dauerte 4,3 s und dauert jetzt 1,0 s. Die Abklingwerte
+  einer Zeile werden einmal statt zweimal gerechnet, der Potenzterm einmal je Städtepaar statt
+  einmal je Segment, und die Segmentparameter stehen als Zahlenfelder statt als Objektzugriff
+  in der innersten Schleife.
+- **Die Kartenschichten** rechneten die Nachfragebögen bei jedem simulierten Tag neu. Über
+  Bayerns 3 857 Relationen fiel das nicht auf, über 141 146 schon. Die Bögen hängen an der
+  Matrix, und die ändert sich während eines Spiels nie.
+
+**Was das Spiel jetzt kostet**, gemessen an einem Busnetz über deutsche Fernkorridore:
+
+| Netz | Relationen | Betriebstag |
+|---|---|---|
+| 8 Linien, 29 Halte | 726 | 36 ms |
+| 16 Linien, 50 Halte | 1 802 | 89 ms |
+
+Der Aufwand wächst mit dem **Netz**, nicht mit dem Datensatz — die Reisekettensuche läuft nur
+über bediente Städte. Bei 180 ms Taktung der schnellsten Spielgeschwindigkeit ist das
+spielbar, aber es läuft im Hauptthread. Ab etwa dreißig Linien ist der Web Worker keine
+Aufräumarbeit mehr, sondern Voraussetzung.
+
+Der Startaufwand liegt bei 2,1 bis 2,4 s bis zur bedienbaren Oberfläche, davon rund eine
+Sekunde Nachfragematrix.
 
 
 ---

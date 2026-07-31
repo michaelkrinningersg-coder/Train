@@ -391,6 +391,40 @@ und genau deshalb ist es eine Entscheidung.
 
 ---
 
+## Phase 5a — Deutschland (erledigt)
+
+**Ziel**: Raus aus Bayern. 65 Städte waren gut zum Bauen der Mechanik, aber ein Netz, in dem
+jede Stadt jede andere in zwei Stunden erreicht, stellt keine Netzfragen.
+
+Jetzt: **694 Städte ab 20 000 Einwohnern**, 141 146 Relationen, 49 Mio. Einwohner. Die
+Einwohnerschwelle blieb bewusst bei 20 000 — sie anzuheben wäre die einfache Antwort auf die
+Rechenzeit, aber gerade die Mittelstädte machen aus Korridoren ein Netz.
+
+Die Pipeline war dafür vorbereitet (`--region=germany`); Arbeit machte die Rechenzeit:
+
+| | vorher | nachher |
+|---|---|---|
+| Nachfragematrix aufbauen | 4,3 s | 1,0 s |
+| Start bis bedienbare Oberfläche | | 2,1–2,4 s |
+| Betriebstag, 8 Linien / 29 Halte | | 36 ms |
+| Betriebstag, 16 Linien / 50 Halte | | 89 ms |
+
+Beide Optimierungen ändern keine Ziffer am Ergebnis (der Kalibrierlauf gibt dieselben 338 161
+Reisen/Tag für Bayern aus). Details in docs/05 Abschnitt 8.
+
+Nebenbei: der Build lieferte den 95-MB-Entwicklungscache für OSM-Kacheln mit aus. Das
+Verzeichnis wird jetzt übersprungen — 108 MB → 13 MB.
+
+**Was das offenlegt:** Der Aufwand wächst mit dem **Netz**, nicht mit dem Datensatz. Bei
+180 ms Taktung der schnellsten Geschwindigkeit sind 89 ms spielbar, aber sie laufen im
+Hauptthread. Ab etwa dreißig Linien ist der Web Worker keine Aufräumarbeit mehr, sondern
+Voraussetzung — das ist jetzt gemessen und nicht mehr vermutet.
+
+Ein Versuch, die Nachfragezuordnung durch geteilte Ganglinien zu beschleunigen, brachte
+nichts (89 ms vorher, 92 ms nachher) und wurde zurückgenommen.
+
+---
+
 ## Phase 5 — Europa (2–3 Wochen)
 
 - Pipeline auf Mitteleuropa, dann Europa hochziehen

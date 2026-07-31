@@ -1,6 +1,6 @@
 import { createReadStream, existsSync } from 'node:fs'
 import { cp } from 'node:fs/promises'
-import { join, normalize, resolve } from 'node:path'
+import { join, normalize, resolve, sep } from 'node:path'
 import type { Plugin, ResolvedConfig } from 'vite'
 
 /**
@@ -11,6 +11,18 @@ import type { Plugin, ResolvedConfig } from 'vite'
  * zur Laufzeit austauschbar, was den Regionswechsel (Bayern -> DACH -> Europa)
  * ohne Rebuild ermoeglicht.
  */
+
+/**
+ * Verzeichnisse, die nur die Entwicklung offline-faehig machen und im Build
+ * nichts verloren haben.
+ *
+ * Der OSM-Kachelcache allein ist 95 MB — er lag bis hierher vollstaendig im
+ * ausgelieferten Verzeichnis, obwohl das Spiel seine Kacheln im Betrieb von
+ * OpenFreeMap holt. Beide Verzeichnisse sind ausserdem in `.gitignore` und
+ * jederzeit aus der Pipeline reproduzierbar.
+ */
+const DEV_ONLY = ['osm', 'basemap']
+
 export function seedData(seedDir: string): Plugin {
   let config: ResolvedConfig
 
@@ -47,7 +59,10 @@ export function seedData(seedDir: string): Plugin {
 
     async closeBundle() {
       if (config.command !== 'build' || !existsSync(seedDir)) return
-      await cp(seedDir, join(config.build.outDir, 'seed'), { recursive: true })
+      await cp(seedDir, join(config.build.outDir, 'seed'), {
+        recursive: true,
+        filter: (source) => !DEV_ONLY.some((dir) => source.includes(`${sep}${dir}`)),
+      })
     },
   }
 }

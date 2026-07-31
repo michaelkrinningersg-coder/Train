@@ -46,8 +46,28 @@ interface DemandArc {
   readonly trips: number
 }
 
+/**
+ * Einmal gerechnete Bögen je Nachfragematrix.
+ *
+ * Die Kartenschichten werden bei jeder Zustandsänderung neu gebaut, also bei
+ * jedem simulierten Tag. Über Bayerns 3 857 Relationen zu laufen war dabei
+ * nicht zu bemerken; über Deutschlands 141 146 schon. Die Matrix ändert sich
+ * während eines Spiels nie — sie wird beim Start gebaut und beim Laden ersetzt.
+ * Genau dafür ist die Identität des Objekts der richtige Schlüssel.
+ */
+const arcCache = new WeakMap<DemandMatrix, DemandArc[]>()
+
 /** Die staerksten Relationen, Hin- und Rueckrichtung zusammengefasst. */
 export function topDemandArcs(state: GameState, demand: DemandMatrix): DemandArc[] {
+  const cached = arcCache.get(demand)
+  if (cached) return cached
+
+  const arcs = computeDemandArcs(state, demand)
+  arcCache.set(demand, arcs)
+  return arcs
+}
+
+function computeDemandArcs(state: GameState, demand: DemandMatrix): DemandArc[] {
   const merged = new Map<string, { from: CityId; to: CityId; trips: number }>()
   for (const pair of demand.pairs) {
     const key = [pair.from, pair.to].sort().join('|')

@@ -1,0 +1,14 @@
+{
+  "region": "germany",
+  "bounds": {
+    "west": 5.483420000000001,
+    "east": 15.58853,
+    "south": 46.892089999999996,
+    "north": 55.38805
+  },
+  "cols": 1264,
+  "rows": 1062,
+  "stepDeg": 0.008,
+  "noData": -32768,
+  "source": "AWS Terrain Tiles (terrarium), abgeleitet aus SRTM und weiteren offenen Höhenmodellen"
+}
