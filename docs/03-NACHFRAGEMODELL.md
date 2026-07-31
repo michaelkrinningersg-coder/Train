@@ -170,21 +170,44 @@ Optimierungshebel neben der Kapazität.
 
 ## 6. Zuordnung auf konkrete Züge
 
-Wenn ein Zug einen Bahnhof erreicht:
+Umgesetzt in `packages/sim/src/assignment.ts`, gleich für Bus und Bahn:
 
 ```
-1. Nachfragepool der Relation (i,j,k,stunde) bestimmen
-2. Anteil der Bahn aus dem Logit-Modell
-3. × catchment(Quellbahnhof) × catchment(Zielbahnhof)
-4. Auf konkurrierende Zugläufe im Zeitfenster ±30 min aufteilen
-   (proportional zum Nutzen — ein schnellerer Zug bekommt mehr)
-5. Kapazität prüfen: passt nicht alles rein, bleiben Fahrgäste stehen
-   → Unzufriedenheit, die die ASC der Relation temporär senkt
+Je Haltepaar (a,b) der Linie und je Segment k:
+  1. Nachfragepool der Relation aus der Gravitationsmatrix
+  2. × Wochentag- und Monatsfaktor
+  3. × catchment(Haltestelle a) × catchment(Haltestelle b)
+  4. × Bahn-/Busanteil aus dem Logit-Modell
+     (Reisezeit inklusive mittlerer Verspätung, Wartezeit aus dem Takt)
+  5. auf die 24 Stunden verteilt über die Tagesganglinie des Segments
+
+Je Stunde und Fahrtrichtung:
+  6. belegung[abschnitt] = Σ aller Gruppen, die diesen Abschnitt durchfahren
+  7. faktor[abschnitt]   = min(1, sitzeInDieserStunde / belegung[abschnitt])
+  8. mitgenommen         = nachfrage · min über alle durchfahrenen Abschnitte
 ```
 
-Punkt 5 ist wichtig: Überfüllung darf nicht folgenlos bleiben. Ein „Zufriedenheitswert" je
-Relation, der bei Stehenbleiben und Verspätung sinkt und sich langsam erholt, modelliert
-Kundenbindung und bestraft Unterkapazität nachhaltig.
+Die Schritte 6–8 sind der Punkt, an dem sich das Modell von einer Pauschale unterscheidet:
+**ein Fahrgast besetzt nur die Abschnitte, die er wirklich fährt.** Am Zielhalt steigt er aus,
+der Platz wird frei und weiterverkauft. Ein Zug fährt also nicht mit fester Füllung durch,
+sondern wird unterwegs geleert und neu gefüllt — zwischen zwei Ballungsräumen überfüllt und
+auf dem Land halb leer. Rationiert wird nur dort, wo es eng ist; wer eine Station auf freier
+Strecke fährt, kommt mit, auch wenn zwei Abschnitte weiter niemand mehr zusteigt.
+
+Ausführlich mit Beispielen in
+[04-BETRIEBSSIMULATION §5a](04-BETRIEBSSIMULATION.md#5a-fahrgastzuordnung-der-zug-wird-unterwegs-geleert-und-neu-gefüllt).
+
+**Noch nicht umgesetzt** und bewusst aufgeschoben:
+
+- Die Aufteilung auf konkurrierende Zugläufe im Zeitfenster ±30 min proportional zum Nutzen.
+  Aktuell zählt die Summe der Sitzplätze einer Stunde. Bei einem Taktfahrplan mit gleichen
+  Zügen ist das dasselbe Ergebnis; interessant wird es erst, wenn Eil- und Nahverkehrszüge
+  auf derselben Linie fahren.
+- Ein **Zufriedenheitswert** je Relation, der bei Stehenbleiben und Verspätung sinkt und sich
+  langsam erholt. Überfüllung ist heute nur ein Umsatzverlust am selben Tag; sie sollte
+  Kundenbindung kosten und Unterkapazität nachhaltig bestrafen. Verspätung wirkt bereits auf
+  die Nachfrage, aber sofort und ohne Gedächtnis. Beides steht in Phase 4.
+- Die Reihenfolge am Bahnsteig: alle Gruppen eines Abschnitts werden gleich behandelt.
 
 ---
 
@@ -211,6 +234,9 @@ Optional später: **Klassen** (1./2.) mit getrennter Preissetzung, und Zeitkarte
 `pnpm calibrate` (Skript in `tools/calibrate.ts`) erzeugt einen Bericht über alle drei
 Stufen plus die Wirtschaftlichkeit. Er ist zum Lesen gedacht, nicht zum Bestehen: es gibt
 keine Sollgröße, sondern Größenordnungen, die man gegen die Wirklichkeit hält.
+
+Der Bericht hat fünf Abschnitte: Nachfrage, Verkehrsmittelwahl, Buswirtschaftlichkeit,
+Schieneninfrastrukturkosten und — seit Phase 3 — Bahnbetrieb.
 
 ### Stand nach Phase 1
 
@@ -255,6 +281,42 @@ den stärksten Korridor Bayerns gefunden zu haben.
 Der Abgleich mit echten Fahrgastzahlen von Referenzstrecken steht noch aus — dafür braucht es
 Zahlen, die frei verfügbar und vergleichbar sind. Bis dahin gilt: die *Verhältnisse* zwischen
 Korridoren sind belastbarer als die absoluten Zahlen.
+
+### Stand nach Phase 3 — Bahnbetrieb
+
+Abschnitt 5 des Berichts baut denselben Korridor München–Augsburg (56 km Schiene) in
+verschiedenen Ausbaustufen und Takten, jeweils an einem Dienstag mit Elektrotriebzügen
+(206 Sitze, 140 km/h), sofern nicht anders angegeben:
+
+| Ausbau | Takt | Züge/Ri | Pünktlichkeit | Ø Verspätung | Fahrgäste | schwächster Abschnitt |
+|---|---|---|---|---|---|---|
+| eingleisig 160 | 120′ | 9 | 50 % | 13,0 min | 2 894 | 392 % |
+| eingleisig 160 | 60′ | 17 | 50 % | 13,0 min | 5 971 | 463 % |
+| eingleisig 160 | 30′ | 33 | 11 % | 25,7 min | 9 262 | 251 % |
+| **+ eine Überholstelle** | 60′ | 17 | **100 %** | **0,2 min** | 6 133 | 488 % |
+| **+ eine Überholstelle** | 30′ | 33 | **100 %** | **0,2 min** | 9 872 | 280 % |
+| zweigleisig 160 | 30′ | 33 | 100 % | 0,0 min | 9 846 | 286 % |
+| zweigleisig 160 | 15′ | 65 | 100 % | 0,0 min | 13 927 | 152 % |
+| zweigl. 200 + ETCS L2, 250-km/h-Zug | 30′ | 33 | 100 % | 0,0 min | 14 427 | 97 % |
+
+Drei Dinge liest man daran ab, und alle drei sind so gewollt:
+
+1. **Auf durchgehend eingleisiger Strecke hilft ein dünnerer Takt nicht.** 120′ und 60′
+   liefern dieselbe Verspätung, weil jede einzelne Begegnung denselben Preis hat: ein Zug
+   wartet, bis der andere die ganzen 56 km geräumt hat. Erst die Überholstelle ändert die
+   Struktur, und sie kostet einen Bruchteil des zweigleisigen Ausbaus.
+2. **Ein Streckenausbau nützt nur dem Zug, der ihn nutzen kann.** Der 140-km/h-Triebzug
+   fährt auf dem 200-km/h-Gleis exakt dieselben Zahlen wie auf dem 160er. Wer die Trasse
+   ausbaut, ohne den Fuhrpark mitzunehmen, hat Geld verbrannt.
+3. **Über 100 % Abschnittsauslastung hilft ein größerer Zug mehr als ein dichterer Takt.**
+   Der Doppelstockzug bringt bei gleichem 30′-Takt 13 743 statt 9 846 Fahrgäste.
+
+**Ehrliche Einschränkung zum Bahnbetrieb:** die Auslastungswerte über 400 % sind kein
+Betriebszustand, den irgendjemand hinnähme — sie sagen nur, dass zwischen München und
+Augsburg vier- bis fünfmal so viel Nachfrage steht wie Sitzplätze angeboten werden. Weil
+Überfüllung heute weder die Haltezeit verlängert noch die Kundenbindung kostet, bleibt sie
+folgenlos außer im entgangenen Umsatz. Das ist die größte offene Schwäche des Modells und
+der erste Punkt der Phase-4-Liste.
 
 ### Vorgehen für die nächste Runde
 

@@ -19,10 +19,19 @@ import {
   trackBuildCost,
   trackBuildDays,
   trackDemolitionValue,
+  passingLoopCost,
+  passingLoopDays,
   trackUpgradeCost,
   trackUpgradeDays,
 } from '@game/economy'
-import { distanceKm, polylineLengthKm, terrainStats, type ElevationGrid } from '@game/geo'
+import {
+  distanceKm,
+  nearestPointOnPath,
+  polylineLengthKm,
+  splitPath,
+  terrainStats,
+  type ElevationGrid,
+} from '@game/geo'
 import { newStationId, withMap } from './state.js'
 
 /** Zusatzwissen, das die Befehle brauchen, aber nicht im Spielzustand steht. */
@@ -238,6 +247,72 @@ export function applyRailCommand(state: GameState, command: Command, ctx: Comman
         ok: true,
         cost: -value,
         state: book(next, { category: 'construction', amount: value, note: 'Rückbau' }),
+      }
+    }
+
+    case 'place_passing_loop': {
+      const track = state.network.tracks.get(command.trackId)
+      if (!track) return fail('Unbekannte Strecke.')
+      if (state.day < track.readyOnDay) return fail('Die Strecke ist noch im Bau.')
+      if (track.tracks > 1) return fail('Auf einer mehrgleisigen Strecke bringt eine Überholstelle nichts.')
+
+      const at = nearestPointOnPath(track.geometry, command.position)
+      if (!at) return fail('Kein Punkt auf der Strecke gefunden.')
+
+      // Zu dicht an einem Ende waere die Ueberholstelle wirkungslos - der
+      // Abschnitt dahinter bliebe genauso lang wie vorher.
+      const margin = Math.max(1, track.lengthKm * 0.1)
+      if (at.alongKm < margin || at.alongKm > track.lengthKm - margin) {
+        return fail('Zu nah an einem Streckenende — die Überholstelle brächte nichts.')
+      }
+
+      const capacity = Math.max(1, Math.min(4, Math.round(command.capacity)))
+      const cost = passingLoopCost(capacity)
+      if (state.cash < cost) return fail('Nicht genug Kapital.')
+
+      const [headGeometry, tailGeometry] = splitPath(track.geometry, at)
+      const loopId = brandNode(`n-loop${state.network.nodes.size + 1}`)
+      const loop: NetworkNode = {
+        id: loopId,
+        position: at.point,
+        kind: 'passing_loop',
+        sidingCapacity: capacity,
+      }
+
+      const ready = state.day + passingLoopDays(capacity)
+      const head: TrackSegment = {
+        ...track,
+        id: `${track.id}a` as TrackSegment['id'],
+        to: loopId,
+        geometry: headGeometry,
+        lengthKm: Number(polylineLengthKm(headGeometry).toFixed(3)),
+        readyOnDay: Math.max(track.readyOnDay, ready),
+      }
+      const tail: TrackSegment = {
+        ...track,
+        id: `${track.id}b` as TrackSegment['id'],
+        from: loopId,
+        geometry: tailGeometry,
+        lengthKm: Number(polylineLengthKm(tailGeometry).toFixed(3)),
+        readyOnDay: Math.max(track.readyOnDay, ready),
+      }
+
+      let tracks = withMap(state.network.tracks, track.id, undefined)
+      tracks = withMap(tracks, head.id, head)
+      tracks = withMap(tracks, tail.id, tail)
+
+      const next: GameState = {
+        ...state,
+        network: {
+          ...state.network,
+          nodes: withMap(state.network.nodes, loopId, loop),
+          tracks,
+        },
+      }
+      return {
+        ok: true,
+        cost,
+        state: book(next, { category: 'construction', amount: -cost, note: 'Überholstelle' }),
       }
     }
 

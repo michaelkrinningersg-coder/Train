@@ -9,6 +9,7 @@ import { Legend } from './ui/Legend.js'
 import { NetworkTab } from './ui/NetworkTab.js'
 import { RailTab } from './ui/RailTab.js'
 import { StationPlacement } from './ui/StationPlacement.js'
+import { Timetable } from './ui/Timetable.js'
 import { TopBar } from './ui/TopBar.js'
 
 const REGION = import.meta.env['VITE_REGION'] ?? 'bavaria'
@@ -33,6 +34,9 @@ export function App(): React.JSX.Element {
   const notify = useGame((s) => s.notify)
   const mapMode = useGame((s) => s.mapMode)
   const setElevation = useGame((s) => s.setElevation)
+  const selectedLineId = useGame((s) => s.selectedLineId)
+  const showTimetable = useGame((s) => s.showTimetable)
+  const state = useGame((s) => s.state)
 
   useEffect(() => {
     if (dataset.status === 'ready' && !ready) start(dataset.data.cities)
@@ -102,6 +106,10 @@ export function App(): React.JSX.Element {
             {tab === 'finance' && <FinanceTab />}
           </div>
         </aside>
+
+        {showTimetable && selectedLineId && state?.lines.get(selectedLineId)?.mode === 'rail' && (
+          <Timetable lineId={selectedLineId} />
+        )}
 
         {message && (
           <div className="toast" role="status">

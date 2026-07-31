@@ -3,20 +3,32 @@
  *
  *   pnpm calibrate
  *
- * Prueft in einem Durchlauf drei Dinge, die sich beim Balancing gegenseitig
+ * Prueft in einem Durchlauf die Dinge, die sich beim Balancing gegenseitig
  * beeinflussen und deshalb zusammen betrachtet werden muessen:
  *
  *   1. Sind die Nachfragegroessen je Relation plausibel?
  *   2. Reagieren die Verkehrsmittelanteile richtig auf Preis und Takt?
  *   3. Traegt sich eine Linie wirtschaftlich - und zwar nur dann, wenn sie
  *      zur Nachfrage passt?
+ *   4. Stehen die Baukosten einer Strecke im richtigen Verhaeltnis dazu?
+ *   5. Wo bricht welche Ausbaustufe unter welchem Takt zusammen?
  *
  * Die Ausgabe ist bewusst zum Lesen gedacht, nicht zum Bestehen: es gibt keine
  * feste Sollgroesse, sondern Groessenordnungen, die man gegen die Wirklichkeit
  * halten kann. Siehe docs/03-NACHFRAGEMODELL.md Abschnitt 8.
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { SEGMENTS, SEGMENT_IDS, trackUpkeepPerDay, type City, type CityId } from '@game/domain'
+import {
+  DAYS_ALL,
+  DEFAULT_RAIL_FARE,
+  DEFAULT_RUNTIME_RESERVE_RAIL,
+  SEGMENTS,
+  SEGMENT_IDS,
+  trackUpkeepPerDay,
+  type City,
+  type CityId,
+  type TrackSpec,
+} from '@game/domain'
 import {
   buildDemandMatrix,
   carAlternative,
@@ -27,7 +39,7 @@ import {
 } from '@game/demand'
 import { formatMoney, railStationCost, trackBuildCost } from '@game/economy'
 import { distanceKm, terrainStats, type ElevationGrid } from '@game/geo'
-import { advanceDays, applyCommand, createGame, lineMetrics } from '@game/sim'
+import { advanceDays, applyCommand, createGame, isMinor, lineMetrics, simulateRailDay } from '@game/sim'
 
 const data = JSON.parse(readFileSync('data/seed/cities.bavaria.json', 'utf8')) as { cities: City[] }
 const cities = withPotentials(data.cities)
@@ -214,4 +226,167 @@ console.log(
   '\nZur Einordnung: eine gut laufende Buslinie erwirtschaftet rund 5 000 €/Tag,\n' +
     'also etwa 1,8 Mio. €/Jahr. Die erste Bahnstrecke ist damit das Ziel mehrerer\n' +
     'Spieljahre Busbetrieb — genau so ist die Progression gedacht.',
+)
+
+console.log('\n═══ 5. Bahnbetrieb ═══\n')
+
+/**
+ * Baut eine Bahnlinie und meldet, was die Betriebssimulation daraus macht.
+ * Die interessante Zahl ist nicht der Gewinn, sondern das Verhaeltnis von Takt
+ * zu Puenktlichkeit: ab welcher Dichte bricht welche Ausbaustufe ein?
+ */
+function railCorridor(options: {
+  readonly names: string[]
+  readonly spec: TrackSpec
+  readonly headway: number
+  readonly trains: number
+  readonly classId?: string
+  readonly loop?: boolean
+  readonly label: string
+}): void {
+  let state = createGame({ cities, startingCash: 50_000_000_000_00 })
+
+  const chosen = options.names.map((n) => cities.find((c) => c.name === n))
+  if (chosen.some((c) => !c)) {
+    console.log(`  ${options.label}: Stadt nicht im Datensatz`)
+    return
+  }
+
+  for (const c of chosen) {
+    const r = applyCommand(state, { kind: 'place_station', cityId: c!.id, position: c!.centre, platforms: 4 })
+    if (!r.ok) throw new Error(r.reason)
+    state = r.state
+  }
+
+  const nodes = options.names.map((n) => [...state.network.stations.values()].find((s) => s.name === n)!.nodeId)
+  for (let i = 1; i < nodes.length; i++) {
+    const r = applyCommand(state, { kind: 'build_track', from: nodes[i - 1]!, to: nodes[i]!, geometry: [], spec: options.spec })
+    if (!r.ok) throw new Error(r.reason)
+    state = r.state
+  }
+
+  // Erst die Bauzeit abwarten: eine Ueberholstelle laesst sich nur auf einer
+  // fertigen Strecke setzen, und Zuege fahren ohnehin erst danach.
+  const ready = Math.max(...[...state.network.tracks.values()].map((t) => t.readyOnDay))
+  state = advanceDays(state, demand, Math.max(0, ready - state.day))
+
+  if (options.loop) {
+    for (const track of [...state.network.tracks.values()]) {
+      const g = track.geometry
+      const a = g[0]!
+      const b = g[g.length - 1]!
+      const middle: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+      const r = applyCommand(state, { kind: 'place_passing_loop', trackId: track.id, position: middle, capacity: 2 })
+      if (!r.ok) throw new Error(r.reason)
+      state = r.state
+    }
+    // Auch die Ueberholstelle hat Bauzeit, und solange sie laeuft, sind die
+    // beiden Teilstrecken gesperrt - dann faehrt gar nichts.
+    const loopReady = Math.max(...[...state.network.tracks.values()].map((t) => t.readyOnDay))
+    state = advanceDays(state, demand, Math.max(0, loopReady - state.day))
+  }
+
+  const bought = applyCommand(state, { kind: 'buy_vehicle', classId: options.classId ?? 'emu_regional', units: options.trains })
+  if (!bought.ok) throw new Error(bought.reason)
+  state = bought.state
+
+  const created = applyCommand(state, {
+    kind: 'create_line',
+    line: {
+      name: options.names.join(' – '),
+      mode: 'rail',
+      stops: options.names.map((n) => ({
+        stationId: [...state.network.stations.values()].find((s) => s.name === n)!.id,
+        dwellSeconds: 60,
+        serves: true,
+      })),
+      path: { kind: 'rail', tracks: [] },
+      fare: DEFAULT_RAIL_FARE,
+      runtimeReserve: DEFAULT_RUNTIME_RESERVE_RAIL,
+    },
+  })
+  if (!created.ok) throw new Error(created.reason)
+  state = created.state
+
+  const line = [...state.lines.values()][0]!
+  const patterned = applyCommand(state, {
+    kind: 'set_pattern',
+    pattern: {
+      lineId: line.id,
+      direction: 'forward',
+      vehicleIds: [...state.fleet.keys()],
+      days: DAYS_ALL,
+      headway: { everyMinutes: options.headway, firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 },
+    },
+  })
+  if (!patterned.ok) throw new Error(patterned.reason)
+
+  // Auf einen Dienstag stellen: der Wochentag veraendert die Pendlernachfrage so
+  // stark, dass ein Vergleich sonst nichts aussagt. Dieselbe Falle wie bei den
+  // Buskorridoren.
+  let final = patterned.state
+  while (new Date(Date.UTC(1990, 0, 1 + final.day)).getUTCDay() !== 2) final = advanceDays(final, demand, 1)
+
+  const result = simulateRailDay(final, demand, line.id, new Map())
+  if (!result) {
+    console.log(`  ${options.label}: keine Simulation moeglich`)
+    return
+  }
+
+  const serious = result.conflicts.filter((c) => !isMinor(c)).length
+  const worstLink = Math.max(0, ...result.linkLoadFactors ?? [])
+  const contribution = result.revenue - result.operatingCost
+
+  console.log(
+    `  ${options.label.padEnd(34)} ${String(options.headway).padStart(3)}′  ` +
+      `${result.departuresPerDirection.toString().padStart(2)} Züge/Ri  ` +
+      `Pünktl. ${(result.punctuality * 100).toFixed(0).padStart(3)} %  ` +
+      `Ø ${(result.averageDelaySec / 60).toFixed(1).padStart(5)} min  ` +
+      `${serious.toString().padStart(3)} Konfl.  ` +
+      `${Math.round(result.totalPassengers).toString().padStart(5)} Fg  ` +
+      `Abschn. ${(worstLink * 100).toFixed(0).padStart(3)} %  ` +
+      `${formatMoney(contribution, { compact: true }).padStart(10)}/Tag`,
+  )
+}
+
+const RAIL_SINGLE: TrackSpec = { maxSpeed: 160, electrified: true, tracks: 1, signalling: 'classic' }
+const RAIL_DOUBLE: TrackSpec = { maxSpeed: 160, electrified: true, tracks: 2, signalling: 'classic' }
+const RAIL_ETCS: TrackSpec = { maxSpeed: 200, electrified: true, tracks: 2, signalling: 'etcs_l2' }
+const MA = ['München', 'Augsburg']
+
+console.log('Eingleisig — hier soll der Takt an die Grenze stoßen:')
+railCorridor({ names: MA, spec: RAIL_SINGLE, headway: 120, trains: 4, label: 'München–Augsburg eingleisig' })
+railCorridor({ names: MA, spec: RAIL_SINGLE, headway: 60, trains: 4, label: 'München–Augsburg eingleisig' })
+railCorridor({ names: MA, spec: RAIL_SINGLE, headway: 30, trains: 6, label: 'München–Augsburg eingleisig' })
+
+console.log('\nDieselbe Strecke mit einer Überholstelle in Streckenmitte:')
+railCorridor({ names: MA, spec: RAIL_SINGLE, headway: 60, trains: 4, loop: true, label: '… + Überholstelle' })
+railCorridor({ names: MA, spec: RAIL_SINGLE, headway: 30, trains: 6, loop: true, label: '… + Überholstelle' })
+
+console.log('\nZweigleisig — die Gegenrichtung stört nicht mehr:')
+railCorridor({ names: MA, spec: RAIL_DOUBLE, headway: 30, trains: 6, label: 'München–Augsburg zweigleisig' })
+railCorridor({ names: MA, spec: RAIL_DOUBLE, headway: 15, trains: 10, label: 'München–Augsburg zweigleisig' })
+
+console.log('\nAusbau nützt nur dem Zug, der ihn nutzen kann:')
+railCorridor({ names: MA, spec: RAIL_DOUBLE, headway: 30, trains: 8, classId: 'emu_regional', label: 'Triebwagen 140 auf 160er Gleis' })
+railCorridor({ names: MA, spec: RAIL_ETCS, headway: 30, trains: 8, classId: 'emu_regional', label: 'Triebwagen 140 auf 200er Gleis' })
+railCorridor({ names: MA, spec: RAIL_ETCS, headway: 30, trains: 8, classId: 'hst_250', label: 'Hochgeschw. 250 auf 200er Gleis' })
+
+console.log('\nKapazität — dieselbe Trasse, mehr Sitzplätze je Zug:')
+railCorridor({ names: MA, spec: RAIL_ETCS, headway: 30, trains: 8, classId: 'push_pull_double', label: 'Doppelstock, 30′' })
+
+console.log('\nSchwacher Korridor — soll sich auch mit Bahn nicht tragen:')
+railCorridor({ names: ['Bayreuth', 'Hof'], spec: RAIL_SINGLE, headway: 120, trains: 2, label: 'Bayreuth–Hof eingleisig' })
+
+console.log(
+  '\nZu lesen ist die Tabelle über die Spalte Pünktlichkeit: solange sie bei 100 % steht,\n' +
+    'verträgt die Strecke den Takt. Auf einer durchgehend eingleisigen Strecke steht sie\n' +
+    'nie dort — jede Begegnung kostet Wartezeit, unabhängig vom Takt. Deshalb ändert der\n' +
+    'Sprung von 120′ auf 60′ nichts an der Verspätung, wohl aber die Überholstelle.\n' +
+    'Die Spalte Abschnitt zeigt den am stärksten belasteten Abschnitt: über 100 % bleiben\n' +
+    'Fahrgäste stehen, und dann hilft ein größerer Zug mehr als ein dichterer Takt.\n' +
+    'Die letzte Spalte ist Erlös minus Energie und Personal — ohne Fahrzeugunterhalt,\n' +
+    'Verwaltung und Infrastruktur. Bayreuth–Hof steht dort mit +717 €/Tag und ist\n' +
+    'trotzdem ein Verlustgeschäft: allein der Streckenunterhalt kostet 1 882 €/Tag\n' +
+    '(Abschnitt 4), von den 122 Mio. € Baukosten ganz zu schweigen.',
 )

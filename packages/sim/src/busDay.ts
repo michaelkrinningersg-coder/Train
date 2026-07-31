@@ -5,7 +5,6 @@ import {
   dayFactor,
   hourShare,
   modeShares,
-  incumbentTransit,
   noTravelAlternative,
   odKey,
   waitFromHeadway,
@@ -13,22 +12,14 @@ import {
   type DemandMatrix,
 } from '@game/demand'
 import { departureTimes, effectiveHeadwayMin, fleetSummary, lineMetrics, vehiclesNeeded } from './lineMetrics.js'
+import { railAlternativeFor, type RailServiceIndex } from './railDay.js'
+import { assignPassengers, type AssignmentFlow } from './assignment.js'
 
 const HOURS = 24
 const emptySegments = (): Record<SegmentId, number> => {
   const r = {} as Record<SegmentId, number>
   for (const s of SEGMENT_IDS) r[s] = 0
   return r
-}
-
-/** Eine Fahrgastgruppe zwischen zwei Halten derselben Linie. */
-interface Flow {
-  readonly fromIndex: number
-  readonly toIndex: number
-  /** Fahrgaeste je Stunde. */
-  readonly perHour: Float64Array
-  readonly farePerRider: number
-  readonly segment: SegmentId
 }
 
 /**
@@ -39,7 +30,12 @@ interface Flow {
  * Kapazitaet pruefen. Die Reihenfolge ist wichtig - wer zuerst deckelt, sieht
  * nie, wie viel Nachfrage er liegen laesst.
  */
-export function simulateBusDay(state: GameState, demand: DemandMatrix, lineId: LineId): LineDayResult | null {
+export function simulateBusDay(
+  state: GameState,
+  demand: DemandMatrix,
+  lineId: LineId,
+  services: RailServiceIndex = new Map(),
+): LineDayResult | null {
   const line = state.lines.get(lineId)
   if (!line || line.mode !== 'bus') return null
 
@@ -113,8 +109,8 @@ export function simulateBusDay(state: GameState, demand: DemandMatrix, lineId: L
     cumSec.push(cumSec[i]! + metrics.legTimesSec[i]!)
   }
 
-  const flowsForward: Flow[] = []
-  const flowsBackward: Flow[] = []
+  const flowsForward: AssignmentFlow[] = []
+  const flowsBackward: AssignmentFlow[] = []
 
   for (let a = 0; a < stopCount; a++) {
     for (let b = 0; b < stopCount; b++) {
@@ -154,7 +150,8 @@ export function simulateBusDay(state: GameState, demand: DemandMatrix, lineId: L
       const alternatives = [
         busAlt,
         carAlternative(greatCircle),
-        incumbentTransit(greatCircle, smallerPopulation),
+        // Eigene Bahnlinie, wenn es eine gibt - sonst der Bestandsverkehr.
+        railAlternativeFor(services, odKey(cityA, cityB), greatCircle, smallerPopulation),
         noTravelAlternative,
       ]
 
@@ -169,58 +166,20 @@ export function simulateBusDay(state: GameState, demand: DemandMatrix, lineId: L
         const perHour = new Float64Array(HOURS)
         for (let h = 0; h < HOURS; h++) perHour[h] = riders * hourShare(segment, h)
 
-        const flow: Flow = { fromIndex: a, toIndex: b, perHour, farePerRider: price, segment }
+        const flow: AssignmentFlow = { fromIndex: a, toIndex: b, perHour, fare: price, segment }
         if (a < b) flowsForward.push(flow)
         else flowsBackward.push(flow)
       }
     }
   }
 
-  // Kapazitaetspruefung je Stunde und Richtung ueber den staerkst belasteten
-  // Streckenabschnitt. Wer nicht mitkommt, bleibt stehen.
-  const passengers = emptySegments()
-  let revenue = 0
-  let leftBehind = 0
-  let peakLoadFactor = 0
+  const seatsPerHour = new Float64Array(HOURS)
+  for (let h = 0; h < HOURS; h++) seatsPerHour[h] = (departuresPerHour[h] ?? 0) * fleet.seats
 
-  for (const flows of [flowsForward, flowsBackward]) {
-    for (let h = 0; h < HOURS; h++) {
-      const capacity = (departuresPerHour[h] ?? 0) * fleet.seats
-      const linkLoad = new Float64Array(Math.max(1, stopCount - 1))
-      let demandThisHour = 0
+  const assignment = assignPassengers(flowsForward, flowsBackward, seatsPerHour, stopCount)
+  const { passengers, revenue, leftBehind, peakLoadFactor, linkLoadFactors } = assignment
 
-      for (const flow of flows) {
-        const value = flow.perHour[h] ?? 0
-        if (value <= 0) continue
-        demandThisHour += value
-        const lo = Math.min(flow.fromIndex, flow.toIndex)
-        const hi = Math.max(flow.fromIndex, flow.toIndex)
-        for (let link = lo; link < hi; link++) linkLoad[link] = (linkLoad[link] ?? 0) + value
-      }
-
-      if (demandThisHour <= 0) continue
-
-      const maxLink = Math.max(...linkLoad)
-      if (capacity <= 0) {
-        leftBehind += demandThisHour
-        continue
-      }
-
-      const load = maxLink / capacity
-      peakLoadFactor = Math.max(peakLoadFactor, load)
-      const scale = load > 1 ? 1 / load : 1
-      if (scale < 1) leftBehind += demandThisHour * (1 - scale)
-
-      for (const flow of flows) {
-        const value = (flow.perHour[h] ?? 0) * scale
-        if (value <= 0) continue
-        passengers[flow.segment] += value
-        revenue += value * flow.farePerRider
-      }
-    }
-  }
-
-  const totalPassengers = SEGMENT_IDS.reduce((s, seg) => s + passengers[seg], 0)
+  const totalPassengers = assignment.totalPassengers
   const vehicleKm = departures.length * 2 * metrics.lengthKm
   const drivingHours = (departures.length * 2 * metrics.oneWayTimeSec) / 3600
   const operatingCost = Math.round(vehicleKm * fleet.fuelCostPerKm + drivingHours * fleet.crewCostPerHour)
@@ -236,12 +195,14 @@ export function simulateBusDay(state: GameState, demand: DemandMatrix, lineId: L
     passengers,
     totalPassengers,
     leftBehind,
-    revenue: Math.round(revenue),
+    revenue,
     operatingCost,
     peakLoadFactor,
     vehicleKm,
     departuresPerDirection: departures.length,
     effectiveHeadwayMin: headway,
     warnings,
+    mode: 'bus',
+    linkLoadFactors,
   }
 }

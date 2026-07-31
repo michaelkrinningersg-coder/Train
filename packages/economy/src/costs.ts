@@ -1,4 +1,4 @@
-import { busClass, cityRadiusKm } from '@game/domain'
+import { busClass, cityRadiusKm, trainClass } from '@game/domain'
 import type { Money, Vehicle } from '@game/domain'
 
 /** Baukosten und laufende Kosten. Alle Betraege in Cent. */
@@ -17,9 +17,14 @@ export function resaleValue(vehicle: Vehicle, purchasePrice: Money): Money {
   return Math.round(purchasePrice * vehicle.units * 0.7 * Math.max(vehicle.condition, 0.15))
 }
 
+/** Katalogeintrag eines Fahrzeugs, gleich ob Bus oder Zug. */
+export function vehicleSpec(vehicle: Vehicle): { purchasePrice: Money; upkeepPerDay: Money } | undefined {
+  return vehicle.mode === 'rail' ? trainClass(vehicle.classId) : busClass(vehicle.classId)
+}
+
 /** Taeglicher Unterhalt eines Fahrzeugs. Alte Fahrzeuge kosten mehr. */
 export function vehicleUpkeepPerDay(vehicle: Vehicle): Money {
-  const cls = busClass(vehicle.classId)
+  const cls = vehicleSpec(vehicle)
   if (!cls) return 0
   // Bei Zustand 1,0 der Katalogwert, bei 0,0 das Doppelte.
   const wearFactor = 2 - Math.max(vehicle.condition, 0)

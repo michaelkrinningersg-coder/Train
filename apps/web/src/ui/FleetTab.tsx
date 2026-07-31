@@ -1,4 +1,5 @@
-import { availableBuses, busClass, toDate } from '@game/domain'
+import { availableBuses, availableTrains, busClass, toDate, trainClass } from '@game/domain'
+import { useState } from 'react'
 import { formatMoney, resaleValue } from '@game/economy'
 import { useGame } from '../game/store.js'
 
@@ -6,10 +7,12 @@ export function FleetTab(): React.JSX.Element | null {
   const state = useGame((s) => s.state)
   const dispatch = useGame((s) => s.dispatch)
   const selectLine = useGame((s) => s.selectLine)
+  const [mode, setMode] = useState<'bus' | 'rail'>('bus')
   if (!state) return null
 
   const year = toDate(state.day).year
-  const catalogue = availableBuses(year)
+  const buses = availableBuses(year)
+  const trains = availableTrains(year)
   const vehicles = [...state.fleet.values()]
 
   const assignmentOf = (vehicleId: string) => {
@@ -21,9 +24,56 @@ export function FleetTab(): React.JSX.Element | null {
     <div className="detail">
       <h2>Fuhrpark</h2>
 
+      <div className="segmented">
+        <button type="button" className={mode === 'bus' ? 'on' : ''} onClick={() => setMode('bus')}>
+          Busse
+        </button>
+        <button type="button" className={mode === 'rail' ? 'on' : ''} onClick={() => setMode('rail')}>
+          Züge
+        </button>
+      </div>
+
       <h3>Kaufen</h3>
+      {mode === 'rail' && (
+        <ul className="catalogue">
+          {trains.map((t) => (
+            <li key={t.id}>
+              <div className="catalogue__head">
+                <b>{t.displayName}</b>
+                <span className="num">{formatMoney(t.purchasePrice, { compact: true })}</span>
+              </div>
+              <div className="catalogue__specs muted num">
+                {t.seats.first + t.seats.second} Sitze · {t.topSpeedKmh} km/h ·{' '}
+                {t.traction === 'electric' ? 'elektrisch' : t.traction === 'diesel' ? 'Diesel' : 'Zweikraft'} · ab{' '}
+                {t.availableFrom}
+              </div>
+              <div className="catalogue__specs muted num">
+                {formatMoney(t.upkeepPerDay)}/Tag · {(t.energyCostPerKm / 100).toFixed(2)} €/km ·{' '}
+                {(t.crewCostPerHour / 100).toFixed(0)} €/h Personal · Komfort {Math.round(t.comfort * 100)} %
+              </div>
+              <div className="row">
+                <button
+                  type="button"
+                  disabled={state.cash < t.purchasePrice}
+                  onClick={() => dispatch({ kind: 'buy_vehicle', classId: t.id, units: 1 })}
+                >
+                  1 kaufen
+                </button>
+                <button
+                  type="button"
+                  disabled={state.cash < t.purchasePrice * 2}
+                  onClick={() => dispatch({ kind: 'buy_vehicle', classId: t.id, units: 2 })}
+                >
+                  2 kaufen
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {mode === 'bus' && (
       <ul className="catalogue">
-        {catalogue.map((bus) => (
+        {buses.map((bus) => (
           <li key={bus.id}>
             <div className="catalogue__head">
               <b>{bus.displayName}</b>
@@ -55,6 +105,7 @@ export function FleetTab(): React.JSX.Element | null {
           </li>
         ))}
       </ul>
+      )}
 
       <h3>
         Bestand <span className="muted num">{vehicles.length}</span>
@@ -73,7 +124,7 @@ export function FleetTab(): React.JSX.Element | null {
           </thead>
           <tbody>
             {vehicles.map((v) => {
-              const cls = busClass(v.classId)
+              const cls = v.mode === 'rail' ? trainClass(v.classId) : busClass(v.classId)
               const line = assignmentOf(v.id)
               return (
                 <tr key={v.id}>

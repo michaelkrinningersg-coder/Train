@@ -128,19 +128,64 @@ gedachte Progression. Zum Ausprobieren ohne Vorlauf gibt es die Entwicklungsopti
 
 ---
 
-## Phase 3 — Züge und Fahrpläne (3–4 Wochen)
+## Phase 3 — Züge und Fahrpläne ✅ abgeschlossen
 
 **Ziel**: Die Betriebssimulation.
 
-- `packages/sim`: Fahrzeitrechnung, Blockmodell, DES-Kern
-- Zugkatalog mit realen Kennwerten, Kauf, Verfügbarkeit nach Jahr
-- Linien- und Fahrplaneditor
-- **Bildfahrplan** mit Konfliktanzeige — das Schlüssel-UI
-- Verspätungssimulation und -ausbreitung
-- Kennzahlen: Pünktlichkeit, Auslastung, Deckungsbeitrag je Linie
+- [x] Fahrzeitrechnung aus Beschleunigung, Bremsverzögerung, Vmax und Steigung —
+      Vorwärtslauf für die Beschleunigung, Rückwärtslauf für die Bremskurve, daraus die
+      Zeit-Weg-Funktion des Zuges
+- [x] Wegsuche im Schienennetz (Dijkstra über die Fahrzeit des konkreten Zuges);
+      ein Elektrozug findet keinen Weg über eine nicht elektrifizierte Strecke
+- [x] Blockmodell mit vier Betriebsmitteln: Block (richtungsbezogen), Abschnitt
+      (eingleisige Gegenrichtung), Bahnsteig, Fahrzeug
+- [x] Zugkatalog: 8 reale Klassen von der Schienenbusgarnitur (1955) bis zum
+      300-km/h-Hochgeschwindigkeitszug (2000), Verfügbarkeit nach Baujahr
+- [x] Linien- und Fahrplaneditor: Halte wählen, Takt, Betriebszeit, Verkehrstage, Tarif
+- [x] **Bildfahrplan** mit Konfliktmarken am Kreuzungspunkt — das Schlüssel-UI
+- [x] Ereignisgesteuerte Verspätungssimulation über Belegungen in zeitlicher Reihenfolge
+- [x] **Überholstellen** bauen (`place_passing_loop`) — der Knotentyp aus Phase 2 wird nutzbar
+- [x] Abschnittsweise Fahrgastzuordnung: der Zug wird unterwegs geleert und neu gefüllt
+- [x] Kennzahlen: Pünktlichkeit, Ø-Verspätung, Auslastung je Abschnitt, Deckungsbeitrag
 
-**Abnahme**: Ich takte München–Nürnberg auf 30 min, sehe im Bildfahrplan einen Konflikt,
-baue eine Überholstelle, und der Konflikt verschwindet.
+**Abnahme erreicht** — am Korridor München–Augsburg statt München–Nürnberg, weil die
+kürzere Strecke denselben Konflikt bei kleinerem Bauaufwand zeigt:
+
+| | eingleisig, 60′ Takt | + eine Überholstelle in Streckenmitte |
+|---|---|---|
+| Konflikte im Bildfahrplan | 17 | 0 |
+| Pünktlichkeit | 18 % | **100 %** |
+| Ø Verspätung | 26,5 min | **0,2 min** |
+| Erlös/Tag | 45 732 € | 48 084 € |
+
+Im Bildfahrplan ist der Unterschied ohne jede Kennzahl zu sehen: vorher ein Sägezahnmuster
+aus Zügen, die einander den Abschnitt wegnehmen, nachher gleichmäßig versetzte Geraden, die
+sich sauber an der Überholstelle kreuzen.
+
+**Was aus Phase 3 offen blieb:**
+
+- **Kein Umsteigen zwischen eigenen Linien.** Jede Relation wird weiterhin nur direkt
+  bedient — der Punkt aus Phase 1 ist offen geblieben. Die Wegsuche im Schienennetz ist da,
+  aber sie sucht Wege für *Züge*, nicht für Fahrgäste. Ein Reiseketten-Router mit
+  Umsteigestrafe ist ein eigenes Stück Arbeit und gehört zu Phase 4.
+- **Keine Störungen.** Verspätung entsteht ausschließlich aus dem Fahrplan. Ein
+  überalterter Fuhrpark auf einer maroden Strecke fährt bislang genauso pünktlich wie ein
+  neuer. Die Ereignisschleife nimmt Störungen ohne Umbau auf.
+- **Keine Haltezeitverlängerung durch Andrang.** Die Haltezeit ist mit 60 s fest, obwohl
+  800 aussteigende Fahrgäste real länger brauchen.
+- **Die Reihenfolge am Bahnsteig fehlt.** Bei Überfüllung werden alle Gruppen eines
+  Abschnitts gleich behandelt; real bekommt der den Platz, der zuerst da war.
+- **Keine Streckenauslastungs-Heatmap.** Die Auslastung je Abschnitt wird berechnet und im
+  Linienpanel gezeigt, aber noch nicht über die Karte gelegt.
+- **Ein Fahrzeugtyp je Linie.** Gemischte Umläufe rechnen mit dem ersten zugeteilten Zug.
+- Die Simulation läuft weiterhin im Hauptthread. Ein Betriebstag einer Bahnlinie mit 34
+  Zugläufen rechnet in wenigen Millisekunden; der Web Worker bleibt aufgeschoben.
+
+> Die teuerste Lektion der Phase steckt in `resolveDelays`: Wer die Züge in
+> Abfahrtsreihenfolge abarbeitet statt die Belegungen in zeitlicher Reihenfolge, lässt den
+> bereits eingefahrenen Zug auf den noch nicht abgefahrenen warten. Die Überholstelle hatte
+> dadurch messbar *keine* Wirkung — und genau das war die Abnahmebedingung. Siehe
+> [04-BETRIEBSSIMULATION §5](04-BETRIEBSSIMULATION.md#5-laufzeitsimulation-ereignisgesteuert-über-belegungen).
 
 Das ist der Punkt, an dem aus einem Wirtschaftsspiel *dieses* Spiel wird.
 
@@ -151,9 +196,12 @@ Das ist der Punkt, an dem aus einem Wirtschaftsspiel *dieses* Spiel wird.
 - Segmente vollständig mit Tages-, Wochen- und Saisonganglinie
 - Einrichtungen aus Wikidata mit ihren Boost-Faktoren
 - Zufriedenheit je Relation, Folgen von Überfüllung und Unpünktlichkeit
-- Störungen, Fahrzeugalterung, Instandhaltung
-- Signaltechnik-Ausbau (ETCS)
-- Bus-Bahn-Konkurrenz im eigenen Netz (Zubringer statt Wettbewerb)
+- Störungen und ihre Ausbreitung; Instandhaltung als Gegenmittel
+- **Umsteigen zwischen eigenen Linien** — Reisekettenrouting mit Umsteigestrafe.
+  Der größte offene Punkt aus Phase 1 und 3; erst damit wird aus Einzellinien ein Netz.
+- Streckenauslastung als Heatmap über die Karte
+- Bus-Bahn-Konkurrenz im eigenen Netz (Zubringer statt Wettbewerb) — die Angebotsindizes
+  dafür stehen, es fehlt die Zubringerlogik
 
 **Abnahme**: Das Spiel hat einen Schwierigkeitsgrad. Man kann sich verzocken.
 

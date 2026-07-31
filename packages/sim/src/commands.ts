@@ -1,4 +1,4 @@
-import { busClass, nodeId as brandNode, stationCatchment } from '@game/domain'
+import { busClass, nodeId as brandNode, stationCatchment, trainClass } from '@game/domain'
 import type {
   Command,
   CommandResult,
@@ -10,7 +10,7 @@ import type {
   Station,
   Vehicle,
 } from '@game/domain'
-import { busStopCost, BUS_STOP_UPKEEP_PER_DAY, creditLimit, interestRateFor, resaleValue } from '@game/economy'
+import { busStopCost, BUS_STOP_UPKEEP_PER_DAY, creditLimit, interestRateFor, resaleValue, vehicleSpec } from '@game/economy'
 import { applyRailCommand, type CommandContext } from './railCommands.js'
 import { newLineId, newPatternId, newStationId, newVehicleId, withMap } from './state.js'
 
@@ -32,6 +32,7 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
     case 'build_track':
     case 'upgrade_track':
     case 'demolish_track':
+    case 'place_passing_loop':
       return applyRailCommand(state, command, ctx)
 
     case 'place_bus_stop': {
@@ -86,8 +87,11 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
     }
 
     case 'buy_vehicle': {
-      const cls = busClass(command.classId)
+      const bus = busClass(command.classId)
+      const train = trainClass(command.classId)
+      const cls = bus ?? train
       if (!cls) return fail('Unbekannter Fahrzeugtyp.')
+      const mode = bus ? 'bus' : 'rail'
       const count = Math.max(1, Math.round(command.units))
       const cost = cls.purchasePrice * count
       if (state.cash < cost) return fail('Nicht genug Kapital.')
@@ -100,7 +104,7 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
         const vehicle: Vehicle = {
           id,
           classId: cls.id,
-          mode: 'bus',
+          mode,
           units: 1,
           boughtAt: state.day * 86_400,
           condition: 1,
@@ -122,7 +126,7 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
       const assigned = [...state.patterns.values()].some((p) => p.vehicleIds.includes(vehicle.id))
       if (assigned) return fail('Das Fahrzeug ist noch einer Linie zugeteilt.')
 
-      const cls = busClass(vehicle.classId)
+      const cls = vehicleSpec(vehicle)
       const value = cls ? resaleValue(vehicle, cls.purchasePrice) : 0
       const next = { ...state, fleet: withMap(state.fleet, vehicle.id, undefined) }
       return {
@@ -240,7 +244,7 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
 export function fleetValue(state: GameState): Money {
   let sum = 0
   for (const vehicle of state.fleet.values()) {
-    const cls = busClass(vehicle.classId)
+    const cls = vehicleSpec(vehicle)
     if (cls) sum += resaleValue(vehicle, cls.purchasePrice)
   }
   return sum

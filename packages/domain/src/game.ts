@@ -90,6 +90,16 @@ export interface LineDayResult {
   /** Takt, der mit den zugeteilten Fahrzeugen tatsaechlich erreicht wird. */
   readonly effectiveHeadwayMin: number
   readonly warnings: readonly string[]
+
+  // Nur bei Bahnlinien. Die vollstaendigen Zuglaeufe stehen bewusst nicht im
+  // Spielzustand - sie sind gross und lassen sich jederzeit neu rechnen.
+  readonly mode?: 'rail' | 'bus'
+  readonly punctuality?: number
+  readonly averageDelaySec?: number
+  readonly conflictCount?: number
+  readonly trainsNeeded?: number
+  /** Spitzenauslastung je Abschnitt zwischen zwei Halten. */
+  readonly linkLoadFactors?: readonly number[]
 }
 
 export interface DayResult {
@@ -150,6 +160,7 @@ export type Command =
   | { readonly kind: 'remove_bus_stop'; readonly stationId: StationId }
   | { readonly kind: 'delete_line'; readonly lineId: LineId }
   | { readonly kind: 'assign_vehicles'; readonly patternId: PatternId; readonly vehicleIds: readonly VehicleId[] }
+  | { readonly kind: 'place_passing_loop'; readonly trackId: TrackId; readonly position: LngLat; readonly capacity: number }
 
 export type CommandResult =
   | { readonly ok: true; readonly state: GameState; readonly cost: Money }

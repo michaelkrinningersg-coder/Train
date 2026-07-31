@@ -78,7 +78,7 @@ export function NetworkTab(): React.JSX.Element | null {
     <div className="detail">
       <div className="detail__head">
         <h2>Liniennetz</h2>
-        <button type="button" className="primary" onClick={beginLine}>
+        <button type="button" className="primary" onClick={() => beginLine('bus')}>
           Neue Linie
         </button>
       </div>

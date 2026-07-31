@@ -85,3 +85,13 @@ export const DEFAULT_RUNTIME_RESERVE = 1.07
 
 /** Betriebszeit einer neuen Linie: 5 bis 21 Uhr. */
 export const DEFAULT_SERVICE_WINDOW = { firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 } as const
+
+/**
+ * Standardtarif einer neuen Bahnlinie. Deutlich ueber dem Busniveau: die Bahn
+ * ist schneller und bequemer, und die Fahrgaeste zahlen dafuer.
+ */
+export const DEFAULT_RAIL_FARE: FarePolicy = {
+  perKm: { first: 32, second: 19 },
+  baseFare: 300,
+  priceIndex: 1,
+}

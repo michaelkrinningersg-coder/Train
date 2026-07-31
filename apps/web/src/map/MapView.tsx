@@ -98,6 +98,11 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
         return
       }
 
+      if (store.mapMode === 'place-loop') {
+        store.placeLoop(point)
+        return
+      }
+
       if (store.mapMode === 'draw-track') {
         // Ein Klick auf einen Bahnhof setzt Start oder Ziel, alles andere ist
         // ein Stuetzpunkt der Trasse.
@@ -118,7 +123,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
     // jede Mausbewegung die Layer neu aufbauen.
     map.on('mousemove', (e) => {
       const store = useGame.getState()
-      if (store.mapMode === 'draw-track' || store.mapMode === 'place-station') {
+      if (store.mapMode !== 'idle' && store.mapMode !== 'draw-line') {
         store.setHoverPoint([e.lngLat.lng, e.lngLat.lat])
       }
     })
@@ -193,9 +198,12 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
         // Im Zeichenmodus ist ein Klick auf eine erschlossene Stadt das
         // Hinzufuegen zur Linie, nicht das Oeffnen der Stadtdetails.
         if (actions.current.mapMode === 'draw-line') {
-          const stop = [...store.state!.network.stations.values()].find((s) => s.cityId === city.id)
+          const rail = store.draftMode === 'rail'
+          const stop = [...store.state!.network.stations.values()].find(
+            (s) => s.cityId === city.id && (rail ? s.mode !== 'bus' : s.mode !== 'rail'),
+          )
           if (stop) store.toggleDraftStop(stop.id)
-          else store.notify(`${city.name} hat noch keine Haltestelle.`)
+          else store.notify(`${city.name} hat ${rail ? 'noch keinen Bahnhof' : 'noch keine Haltestelle'}.`)
           return
         }
         store.selectCity(city.id)

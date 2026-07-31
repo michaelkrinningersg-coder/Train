@@ -10,6 +10,7 @@ import {
   vehicleUpkeepPerDay,
 } from '@game/economy'
 import { simulateBusDay } from './busDay.js'
+import { buildRailServiceIndex, railOverhead, simulateRailDay } from './railDay.js'
 import { networkUpkeepPerDay } from './railCommands.js'
 
 /** Zinssatz auf einen negativen Kontostand. Teurer als jeder Kredit - mit Absicht. */
@@ -32,8 +33,15 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
   let costs = 0
   let passengers = 0
 
+  // Das eigene Bahnangebot steht einmal fest, bevor Bus und Bahn zugeordnet
+  // werden - sonst konkurrierten die Linien je nach Reihenfolge unterschiedlich.
+  const services = buildRailServiceIndex(state)
+
   for (const line of state.lines.values()) {
-    const result = simulateBusDay(state, demand, line.id)
+    const result =
+      line.mode === 'rail'
+        ? simulateRailDay(state, demand, line.id, services)
+        : simulateBusDay(state, demand, line.id, services)
     if (!result) continue
     lineResults.push(result)
 
@@ -48,7 +56,7 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     }
     // Verwaltung und Vertrieb fallen nur an, wenn die Linie auch faehrt.
     if (result.departuresPerDirection > 0) {
-      const overhead = adminCost(result.revenue) + LINE_OVERHEAD_PER_DAY
+      const overhead = line.mode === 'rail' ? railOverhead(result.revenue) : adminCost(result.revenue) + LINE_OVERHEAD_PER_DAY
       entries.push({ category: 'crew', amount: -overhead, lineId: line.id, note: 'Verwaltung und Vertrieb' })
       costs += overhead
     }

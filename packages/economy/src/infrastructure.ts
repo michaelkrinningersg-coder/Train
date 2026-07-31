@@ -180,3 +180,20 @@ export function blockCount(lengthKm: number, signalling: Signalling): number {
 }
 
 
+
+/**
+ * Überholstelle: ein Ausweichgleis samt Weichen und Signalen. Auf eingleisigen
+ * Strecken ist sie das billigste Mittel gegen Kreuzungskonflikte — ein zweites
+ * durchgehendes Gleis kostet ein Vielfaches.
+ */
+export const PASSING_LOOP_BASE_COST: Money = 2_400_000_00
+export const PASSING_LOOP_PER_TRACK_COST: Money = 900_000_00
+export const PASSING_LOOP_UPKEEP_PER_DAY: Money = 9_000
+
+export function passingLoopCost(capacity: number): Money {
+  return PASSING_LOOP_BASE_COST + PASSING_LOOP_PER_TRACK_COST * Math.max(0, capacity - 1)
+}
+
+export function passingLoopDays(capacity: number): number {
+  return 30 + 15 * Math.max(0, capacity - 1)
+}

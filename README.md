@@ -71,7 +71,7 @@ packages/domain/   Reine Typen und Konstanten des Spiels
 packages/geo/      Distanzen, Polylinienlängen, Bounding-Boxen
 packages/demand/   Verkehrserzeugung, Gravitationsmodell, Verkehrsmittelwahl
 packages/economy/  Kosten, Journal, Kredite, Fahrzeugalterung
-packages/sim/      Befehle, Betriebstag, Tagesabrechnung
+packages/sim/      Befehle, Wegsuche, Fahrzeit, Blockmodell, Betriebstag, Tagesabrechnung
 data/pipeline/     Offline-Aufbereitung (GeoNames, Kacheln)
 data/seed/         Erzeugte Artefakte, zur Laufzeit unter /seed/… geladen
 tools/             Kalibrierungswerkzeug
@@ -102,6 +102,32 @@ verlaufen, lohnt sich eine Buslinie.
    Escape bricht ab.
 3. Fertige Strecken lassen sich elektrifizieren, auf höhere Geschwindigkeit, mehr Gleise
    oder bessere Signaltechnik ausbauen — jeweils mit Bauzeit.
+4. Reiter **Fuhrpark** → **Züge** → einen Zugtyp kaufen. Elektrische Züge brauchen
+   Fahrdraht auf der *ganzen* Route, sonst findet die Wegsuche keinen Weg.
+5. Reiter **Schiene** → **Neue Bahnlinie** → Bahnhöfe der Reihe nach anklicken.
+6. In der Linie Züge zuteilen, Takt und Tarif setzen. Reicht die Zahl der Züge für den
+   gewünschten Takt nicht, sagt die Linie, wie viele fehlen, und fährt weiter auseinander.
+7. **Bildfahrplan einblenden** — das eigentliche Werkzeug.
+
+### Bildfahrplan lesen
+
+Y-Achse Streckenkilometer, X-Achse der Betriebstag. Jede Linie ist ein Zuglauf, ihre
+Steigung die Geschwindigkeit; blau die Hin-, orange die Gegenrichtung. **Rote Punkte sind
+Konflikte** — dort brauchen zwei Züge dieselbe Stelle zur selben Zeit. Der Tooltip nennt
+Uhrzeit, Art und Dauer der Überschneidung.
+
+Auf einer eingleisigen Strecke können sich Gegenzüge nur an einer Betriebsstelle begegnen.
+Gegen das Sägezahnmuster aus wartenden Zügen helfen drei Dinge:
+
+| Mittel | Wirkung | Kosten |
+|---|---|---|
+| **Takt strecken** (60′ statt 30′) | sofort, kostenlos | weniger Fahrgäste |
+| **Überholstelle** setzen (Streckendetail → *Überholstelle bauen*) | teilt den Abschnitt, Kreuzung wird möglich | mittel |
+| **Zweigleisiger Ausbau** | Gegenrichtung stört gar nicht mehr | hoch, mit Bauzeit |
+
+Die Überholstelle ist fast immer die richtige Antwort: München–Augsburg eingleisig im
+60-Minuten-Takt kommt auf 18 % Pünktlichkeit und 26,5 min Ø-Verspätung — mit **einer**
+Überholstelle in Streckenmitte auf 100 % und 0,2 min.
 
 Bahnbau kostet ein Vielfaches des Busbetriebs; die erste Strecke ist das Ziel mehrerer
 Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm dev`.
@@ -120,6 +146,9 @@ Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm 
 
 ## Status
 
-**Phase 2 abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
-Strecken über echtes Gelände trassieren und ausbauen. Als Nächstes Phase 3: Züge,
-Fahrpläne und die Betriebssimulation mit Blockabschnitten.
+**Phase 3 abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
+Strecken über echtes Gelände trassieren und ausbauen, Züge kaufen, Bahnlinien takten und im
+Bildfahrplan Konflikte finden und durch Überholstellen oder Ausbau auflösen.
+
+Als Nächstes Phase 4: Umsteigen zwischen eigenen Linien, Störungen, Zufriedenheit und
+Einrichtungen aus Wikidata. Der Phasenplan steht in [docs/06-ROADMAP.md](docs/06-ROADMAP.md).

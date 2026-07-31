@@ -9,9 +9,11 @@ import {
   type TrackCount,
   type TrackId,
 } from '@game/domain'
-import { formatMoney, trackDemolitionValue, trackUpgradeCost, trackUpgradeDays } from '@game/economy'
+import { formatMoney, passingLoopCost, trackDemolitionValue, trackUpgradeCost, trackUpgradeDays } from '@game/economy'
 import { previewTrack } from '@game/sim'
+import { useState } from 'react'
 import { useGame } from '../game/store.js'
+import { RailLineDetail } from './RailLineDetail.js'
 
 const SIGNALLING_LABEL: Record<Signalling, string> = {
   classic: 'klassisch',
@@ -22,12 +24,127 @@ const SIGNALLING_LABEL: Record<Signalling, string> = {
 export function RailTab(): React.JSX.Element | null {
   const state = useGame((s) => s.state)
   const selectedTrackId = useGame((s) => s.selectedTrackId)
+  const selectedLineId = useGame((s) => s.selectedLineId)
   const trackDraft = useGame((s) => s.trackDraft)
+  const mapMode = useGame((s) => s.mapMode)
+  const draftMode = useGame((s) => s.draftMode)
   if (!state) return null
 
+  if (mapMode === 'draw-line' && draftMode === 'rail') return <RailLineDraft />
   if (trackDraft) return <TrackDraftPanel />
-  if (selectedTrackId) return <TrackDetail trackId={selectedTrackId} />
-  return <TrackList />
+  if (selectedLineId && state.lines.get(selectedLineId)?.mode === 'rail') {
+    return <RailLineDetail lineId={selectedLineId} />
+  }
+  if (selectedTrackId && mapMode !== 'place-loop') return <TrackDetail trackId={selectedTrackId} />
+  if (mapMode === 'place-loop') return <LoopPlacement />
+  return <RailOverview />
+}
+
+function LoopPlacement(): React.JSX.Element {
+  const cancel = useGame((s) => s.cancelBuild)
+  return (
+    <div className="detail">
+      <h2>Überholstelle setzen</h2>
+      <p className="muted small">
+        Stelle auf der Strecke anklicken. Dort können sich Gegenzüge kreuzen — auf einer eingleisigen Strecke ist das
+        der Unterschied zwischen einem fahrbaren und einem unfahrbaren Fahrplan. Zu nah am Streckenende bringt sie
+        nichts.
+      </p>
+      <button type="button" onClick={cancel}>
+        Abbrechen
+      </button>
+    </div>
+  )
+}
+
+function RailLineDraft(): React.JSX.Element | null {
+  const state = useGame((s) => s.state)
+  const draft = useGame((s) => s.draft)
+  const cancel = useGame((s) => s.cancelLine)
+  const commit = useGame((s) => s.commitLine)
+  const [name, setName] = useState('')
+  if (!state) return null
+
+  const names = draft.map((id) => state.network.stations.get(id)?.name).filter((n): n is string => Boolean(n))
+
+  return (
+    <div className="detail">
+      <h2>Neue Bahnlinie</h2>
+      <p className="muted small">
+        Bahnhöfe auf der Karte in Fahrtreihenfolge anklicken. Die Strecke dazwischen sucht das Spiel selbst — sie muss
+        durchgehend befahrbar sein, ein Elektrozug kommt ohne Fahrdraht nicht durch.
+      </p>
+      <ol className="draftlist">
+        {names.length === 0 && <li className="muted">Noch nichts gewählt</li>}
+        {names.map((n, i) => (
+          <li key={`${n}-${i}`}>{n}</li>
+        ))}
+      </ol>
+      <div className="field">
+        <span className="field__label">Name</span>
+        <input type="text" value={name} placeholder={names.join(' – ') || 'Linienname'} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="row">
+        <button type="button" className="primary" disabled={draft.length < 2} onClick={() => { commit(name.trim() || names.join(' – ')); setName('') }}>
+          Linie anlegen
+        </button>
+        <button type="button" onClick={cancel}>
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function RailOverview(): React.JSX.Element | null {
+  const state = useGame((s) => s.state)
+  const beginLine = useGame((s) => s.beginLine)
+  const selectLine = useGame((s) => s.selectLine)
+  if (!state) return null
+
+  const lines = [...state.lines.values()].filter((l) => l.mode === 'rail')
+  const stations = [...state.network.stations.values()].filter((s) => s.mode !== 'bus')
+
+  return (
+    <>
+      <TrackList />
+      <div className="detail detail--split">
+        <div className="detail__head">
+          <h2>Bahnlinien</h2>
+          <button type="button" className="primary" disabled={stations.length < 2} onClick={() => beginLine('rail')}>
+            Neue Bahnlinie
+          </button>
+        </div>
+        {lines.length === 0 ? (
+          <p className="muted small">Noch keine Bahnlinie. Erst Strecke bauen, dann Linie darüberlegen.</p>
+        ) : (
+          <ul className="linelist">
+            {lines.map((l) => {
+              const r = state.lastDay?.lines.find((x) => x.lineId === l.id)
+              return (
+                <li key={l.id}>
+                  <button type="button" onClick={() => selectLine(l.id)}>
+                    <span className="linelist__name">{l.name}</span>
+                    {r ? (
+                      <>
+                        <span className="muted num">{Math.round(r.totalPassengers).toLocaleString('de-DE')} Fg.</span>
+                        <span className={`margin ${(r.punctuality ?? 1) >= 0.8 ? 'pos' : 'neg'}`}>
+                          {Math.round((r.punctuality ?? 1) * 100)} %
+                        </span>
+                        {(r.conflictCount ?? 0) > 0 && <span className="badge" title="Fahrplankonflikte">⚠</span>}
+                      </>
+                    ) : (
+                      <span className="muted">noch kein Betriebstag</span>
+                    )}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+    </>
+  )
 }
 
 function TrackList(): React.JSX.Element | null {
@@ -241,6 +358,7 @@ function TrackDetail({ trackId }: { readonly trackId: TrackId }): React.JSX.Elem
   const state = useGame((s) => s.state)
   const dispatch = useGame((s) => s.dispatch)
   const selectTrack = useGame((s) => s.selectTrack)
+  const beginLoop = useGame((s) => s.beginLoop)
   if (!state) return null
 
   const track = state.network.tracks.get(trackId)
@@ -344,6 +462,18 @@ function TrackDetail({ trackId }: { readonly trackId: TrackId }): React.JSX.Elem
             )
           })}
         </ul>
+      )}
+
+      {track.tracks === 1 && (
+        <>
+          <h3>Überholstelle</h3>
+          <p className="muted small">
+            Teilt den eingleisigen Abschnitt. Gegenzüge können hier kreuzen, statt aufeinander zu warten.
+          </p>
+          <button type="button" className="primary wide" disabled={building} onClick={() => beginLoop(trackId)}>
+            Überholstelle setzen · {formatMoney(passingLoopCost(2), { compact: true })}
+          </button>
+        </>
       )}
 
       <button

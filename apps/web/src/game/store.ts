@@ -1,7 +1,9 @@
 import {
   DAYS_ALL,
   DEFAULT_BUS_FARE,
+  DEFAULT_RAIL_FARE,
   DEFAULT_RUNTIME_RESERVE,
+  DEFAULT_RUNTIME_RESERVE_RAIL,
   DEFAULT_SERVICE_WINDOW,
   type City,
   type CityId,
@@ -23,7 +25,7 @@ import { create } from 'zustand'
 
 export type Tab = 'rail' | 'network' | 'fleet' | 'finance'
 export type Speed = 0 | 1 | 2
-export type MapMode = 'idle' | 'draw-line' | 'place-station' | 'draw-track'
+export type MapMode = 'idle' | 'draw-line' | 'place-station' | 'draw-track' | 'place-loop'
 
 
 /** Standardvorgabe einer neuen Strecke: einfach, unelektrifiziert, 120 km/h. */
@@ -62,6 +64,10 @@ interface GameStore {
     readonly spec: TrackSpec
   } | null
   readonly selectedTrackId: TrackId | null
+  /** Wird gerade eine Bus- oder eine Bahnlinie entworfen? */
+  readonly draftMode: 'bus' | 'rail'
+  /** Bildfahrplan der gewaehlten Bahnlinie einblenden. */
+  readonly showTimetable: boolean
 
   start: (cities: readonly City[]) => void
   dispatch: (command: Command) => boolean
@@ -90,7 +96,10 @@ interface GameStore {
   cancelBuild: () => void
   selectTrack: (id: TrackId | null) => void
 
-  beginLine: () => void
+  beginLine: (mode: 'bus' | 'rail') => void
+  beginLoop: (trackId: TrackId) => void
+  placeLoop: (position: LngLat) => void
+  toggleTimetable: () => void
   toggleDraftStop: (id: StationId) => void
   cancelLine: () => void
   commitLine: (name: string) => void
@@ -115,6 +124,8 @@ export const useGame = create<GameStore>((set, get) => ({
   stationDraft: null,
   trackDraft: null,
   selectedTrackId: null,
+  draftMode: 'bus',
+  showTimetable: false,
 
   start: (cities) => {
     // Entwicklungshilfe: mit VITE_STARTING_CASH laesst sich der Bahnbau testen,
@@ -182,6 +193,8 @@ export const useGame = create<GameStore>((set, get) => ({
       trackDraft: { from: null, waypoints: [], spec: DEFAULT_TRACK_SPEC },
       stationDraft: null,
       selectedTrackId: null,
+  draftMode: 'bus',
+  showTimetable: false,
       tab: 'rail',
     }),
 
@@ -232,12 +245,39 @@ export const useGame = create<GameStore>((set, get) => ({
   setSpeed: (speed) => set({ speed }),
   setTab: (tab) => set({ tab }),
   selectCity: (selectedCityId) => set({ selectedCityId }),
-  selectLine: (selectedLineId) => set({ selectedLineId, tab: 'network' }),
+  selectLine: (selectedLineId) =>
+    set((s) => {
+      // Der Reiter richtet sich nach der Linienart. Beim Abwaehlen bleibt er
+      // stehen - sonst spraenge man beim Zurueckgehen aus der Schiene heraus.
+      if (!selectedLineId) return { selectedLineId }
+      const mode = s.state?.lines.get(selectedLineId)?.mode
+      return { selectedLineId, tab: mode === 'rail' ? 'rail' : 'network', showTimetable: false }
+    }),
   toggleDemand: () => set((s) => ({ showDemand: !s.showDemand })),
   setBasemap: (basemap) => set({ basemap }),
   notify: (message) => set({ message }),
 
-  beginLine: () => set({ mapMode: 'draw-line', draft: [], selectedLineId: null, tab: 'network' }),
+  beginLine: (draftMode) =>
+    set({
+      mapMode: 'draw-line',
+      draft: [],
+      draftMode,
+      selectedLineId: null,
+      trackDraft: null,
+      stationDraft: null,
+      tab: draftMode === 'rail' ? 'rail' : 'network',
+    }),
+
+  beginLoop: (trackId) => set({ mapMode: 'place-loop', selectedTrackId: trackId, tab: 'rail' }),
+
+  placeLoop: (position) => {
+    const { selectedTrackId, dispatch } = get()
+    if (!selectedTrackId) return
+    const ok = dispatch({ kind: 'place_passing_loop', trackId: selectedTrackId, position, capacity: 2 })
+    if (ok) set({ mapMode: 'idle', hoverPoint: null, selectedTrackId: null })
+  },
+
+  toggleTimetable: () => set((s) => ({ showTimetable: !s.showTimetable })),
 
   toggleDraftStop: (id) =>
     set((s) => ({
@@ -253,15 +293,16 @@ export const useGame = create<GameStore>((set, get) => ({
       return
     }
 
+    const rail = get().draftMode === 'rail'
     const created = dispatch({
       kind: 'create_line',
       line: {
         name,
-        mode: 'bus',
-        stops: draft.map((stationId) => ({ stationId, dwellSeconds: 120, serves: true })),
-        path: { kind: 'road' },
-        fare: DEFAULT_BUS_FARE,
-        runtimeReserve: DEFAULT_RUNTIME_RESERVE,
+        mode: rail ? 'rail' : 'bus',
+        stops: draft.map((stationId) => ({ stationId, dwellSeconds: rail ? 60 : 120, serves: true })),
+        path: rail ? { kind: 'rail', tracks: [] } : { kind: 'road' },
+        fare: rail ? DEFAULT_RAIL_FARE : DEFAULT_BUS_FARE,
+        runtimeReserve: rail ? DEFAULT_RUNTIME_RESERVE_RAIL : DEFAULT_RUNTIME_RESERVE,
       },
     })
     if (!created) return
@@ -282,7 +323,7 @@ export const useGame = create<GameStore>((set, get) => ({
       },
     })
 
-    set({ mapMode: 'idle', draft: [], selectedLineId: line.id })
+    set({ mapMode: 'idle', draft: [], selectedLineId: line.id, tab: rail ? 'rail' : 'network' })
   },
 }))
 

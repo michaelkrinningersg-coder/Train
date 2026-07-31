@@ -61,3 +61,61 @@ export function approximateRoadTimeSec(a: LngLat, b: LngLat): number {
   return (distanceKm(a, b) * detourFactor) / averageSpeedKmh * 3600
 }
 export * from './elevation.js'
+
+export interface PointOnPath {
+  /** Index des Segments, auf dem der Punkt liegt. */
+  readonly segment: number
+  /** Lage innerhalb des Segments, 0 bis 1. */
+  readonly t: number
+  readonly point: LngLat
+  /** Weg vom Anfang der Polylinie in km. */
+  readonly alongKm: number
+  /** Abstand des Ausgangspunkts zur Polylinie in km. */
+  readonly distanceKm: number
+}
+
+/**
+ * Nächster Punkt auf einer Polylinie.
+ *
+ * Rechnet in einer lokalen ebenen Näherung: bei den hier auftretenden Längen
+ * (einzelne Kilometer) ist der Fehler gegenüber einer Kugelrechnung kleiner als
+ * die Auflösung, mit der ein Spieler klickt.
+ */
+export function nearestPointOnPath(path: readonly LngLat[], target: LngLat): PointOnPath | null {
+  if (path.length < 2) return null
+
+  const cosLat = Math.cos((target[1] * Math.PI) / 180)
+  const toXY = (p: LngLat): [number, number] => [p[0] * cosLat, p[1]]
+  const [tx, ty] = toXY(target)
+
+  let best: PointOnPath | null = null
+  let along = 0
+
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]!
+    const b = path[i]!
+    const [ax, ay] = toXY(a)
+    const [bx, by] = toXY(b)
+    const dx = bx - ax
+    const dy = by - ay
+    const lengthSq = dx * dx + dy * dy
+
+    const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((tx - ax) * dx + (ty - ay) * dy) / lengthSq))
+    const point: LngLat = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+    const distance = distanceKm(target, point)
+
+    if (!best || distance < best.distanceKm) {
+      best = { segment: i - 1, t, point, alongKm: along + distanceKm(a, point), distanceKm: distance }
+    }
+    along += distanceKm(a, b)
+  }
+
+  return best
+}
+
+/** Teilt eine Polylinie an einem Punkt in zwei Teile. */
+export function splitPath(path: readonly LngLat[], at: PointOnPath): [LngLat[], LngLat[]] {
+  const head = [...path.slice(0, at.segment + 1), at.point]
+  const tail = [at.point, ...path.slice(at.segment + 1)]
+  return [head, tail]
+}
