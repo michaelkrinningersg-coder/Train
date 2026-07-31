@@ -18,6 +18,7 @@ const number = (value: number): string => Math.round(value).toLocaleString('de-D
 export function MissionTab(): React.JSX.Element | null {
   const state = useGame((s) => s.state)
   const restart = useGame((s) => s.restart)
+  const focusCity = useGame((s) => s.focusCity)
 
   const scenario = state ? scenarioById(state.scenarioId) : undefined
   const status = useMemo(() => (state && scenario ? scenarioStatus(state, scenario) : null), [state, scenario])
@@ -33,7 +34,18 @@ export function MissionTab(): React.JSX.Element | null {
         {status.goals.map((goal, i) => (
           <li key={i} className={goal.done ? 'goals__item goals__item--done' : 'goals__item'}>
             <span className="goals__mark">{goal.done ? '✓' : '○'}</span>
-            <span className="goals__label">{goal.label}</span>
+            <span className="goals__label">
+              {goal.label}
+              {goal.cities && (
+                <span className="goals__jump">
+                  {goal.cities.map((id) => (
+                    <button key={id} type="button" className="linkish" onClick={() => focusCity(id)}>
+                      {state.cities.get(id)?.name ?? '?'} zeigen
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
             <span className="goals__value num">
               {goal.goal.kind === 'connect'
                 ? goal.done

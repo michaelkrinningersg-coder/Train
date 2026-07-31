@@ -100,6 +100,15 @@ interface GameStore {
   selectLine: (id: LineId | null) => void
   toggleDemand: () => void
   toggleLoad: () => void
+  /**
+   * Kartenausschnitt auf eine Stadt schwenken.
+   *
+   * Der Store haelt nur den Wunsch, nicht die Karte: `MapView` sieht ihn und
+   * fuehrt ihn aus. Anders herum muesste jede Stelle, die springen will, eine
+   * Kartenreferenz kennen - und das waeren am Ende alle.
+   */
+  focusCity: (id: CityId) => void
+  readonly focus: { readonly centre: LngLat; readonly zoom: number; readonly nonce: number } | null
   setBasemap: (id: string) => void
   notify: (message: string | null) => void
 
@@ -141,6 +150,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectedLineId: null,
   showDemand: false,
   showLoad: false,
+  focus: null,
   basemap: DEFAULT_BASEMAP,
   message: null,
 
@@ -335,6 +345,17 @@ export const useGame = create<GameStore>((set, get) => ({
     }),
   toggleDemand: () => set((s) => ({ showDemand: !s.showDemand })),
   toggleLoad: () => set((s) => ({ showLoad: !s.showLoad })),
+
+  focusCity: (id) => {
+    const city = get().state?.cities.get(id)
+    if (!city) return
+    // Der Zaehler macht aus zwei gleichen Zielen zwei Ereignisse - sonst
+    // passierte beim zweiten Klick auf dieselbe Stadt nichts.
+    set((s) => ({
+      focus: { centre: city.centre, zoom: 9.5, nonce: (s.focus?.nonce ?? 0) + 1 },
+      selectedCityId: id,
+    }))
+  },
   setBasemap: (basemap) => set({ basemap }),
   notify: (message) => set({ message }),
 

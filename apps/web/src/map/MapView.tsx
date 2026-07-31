@@ -32,6 +32,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
   const draft = useGame((s) => s.draft)
   const showDemand = useGame((s) => s.showDemand)
   const showLoad = useGame((s) => s.showLoad)
+  const focus = useGame((s) => s.focus)
   const mapMode = useGame((s) => s.mapMode)
   const selectedTrackId = useGame((s) => s.selectedTrackId)
   const trackDraft = useGame((s) => s.trackDraft)
@@ -220,6 +221,13 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
   useEffect(() => {
     overlayRef.current?.setProps({ layers })
   }, [layers])
+
+  // Schwenk auf eine Stadt. Der Store haelt nur den Wunsch samt Zaehler; das
+  // Ausfuehren gehoert hierher, weil nur hier die Karte bekannt ist.
+  useEffect(() => {
+    if (!focus) return
+    mapRef.current?.flyTo({ center: focus.centre as [number, number], zoom: focus.zoom, duration: 900 })
+  }, [focus])
 
   const picking = mapMode !== 'idle'
   return <div ref={containerRef} className={`map${picking ? ' map--picking' : ''}`} />

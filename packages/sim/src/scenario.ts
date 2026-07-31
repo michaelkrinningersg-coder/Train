@@ -1,4 +1,4 @@
-import { formatDate, type CityId, type GameState, type Goal, type Scenario } from '@game/domain'
+import { formatDate, type CityId, type GameState, type Goal, type LineDayResult, type Scenario } from '@game/domain'
 
 /**
  * Auswertung eines Auftrags.
@@ -22,6 +22,8 @@ export interface GoalProgress {
   readonly goal: Goal
   /** Was zu tun ist, in einem Satzteil. */
   readonly label: string
+  /** Städte, um die es geht — damit die Anzeige dorthin springen kann. */
+  readonly cities?: readonly CityId[]
   readonly value: number
   readonly target: number
   readonly done: boolean
@@ -103,37 +105,37 @@ const cityByName = (state: GameState, name: string): CityId | undefined => {
   return undefined
 }
 
-/** Mittlere Pünktlichkeit des letzten Betriebstags, nach Fahrgästen gewichtet. */
-function meanPunctuality(state: GameState): number {
+/**
+ * Mittelwert einer Güte des letzten Betriebstags, nach Fahrgästen gewichtet.
+ *
+ * **Null, solange nichts fährt** — und das ist der eigentliche Inhalt dieser
+ * Funktion. Der naheliegende Rückgabewert wäre 1: ohne Fahrgäste ist niemand
+ * unzufrieden und kein Zug verspätet. Im Auftrag las sich das als „85 %
+ * Zufriedenheit ✓ 100 %", bevor der Spieler die erste Haltestelle gebaut hatte
+ * — ein Ziel, das zu Beginn erfüllt ist und später wieder aufgeht, ist
+ * schlimmer als gar keins.
+ *
+ * Ein Betrieb ohne Fahrgäste erfüllt kein Qualitätsziel. Er hat schlicht keine
+ * Qualität.
+ */
+function meanQuality(state: GameState, pick: (line: LineDayResult) => number | undefined): number {
   const lines = state.lastDay?.lines ?? []
   let weighted = 0
   let riders = 0
   for (const line of lines) {
     if (line.totalPassengers <= 0) continue
-    weighted += (line.punctuality ?? 1) * line.totalPassengers
+    weighted += (pick(line) ?? 1) * line.totalPassengers
     riders += line.totalPassengers
   }
-  return riders > 0 ? weighted / riders : 1
-}
-
-/** Mittlere Zufriedenheit der bedienten Relationen, nach Fahrgästen gewichtet. */
-function meanSatisfaction(state: GameState): number {
-  const lines = state.lastDay?.lines ?? []
-  let weighted = 0
-  let riders = 0
-  for (const line of lines) {
-    if (line.totalPassengers <= 0) continue
-    weighted += (line.satisfaction ?? 1) * line.totalPassengers
-    riders += line.totalPassengers
-  }
-  return riders > 0 ? weighted / riders : 1
+  return riders > 0 ? weighted / riders : 0
 }
 
 function progressOf(state: GameState, goal: Goal): GoalProgress {
   const day = state.lastDay
-  const make = (label: string, value: number, target: number): GoalProgress => ({
+  const make = (label: string, value: number, target: number, cities?: readonly CityId[]): GoalProgress => ({
     goal,
     label,
+    ...(cities && cities.length > 0 ? { cities } : {}),
     value,
     target,
     done: value >= target,
@@ -167,14 +169,22 @@ function progressOf(state: GameState, goal: Goal): GoalProgress {
         `${goal.from} – ${goal.to} verbinden` +
         (transfers === 0 ? ' (ohne Umstieg)' : ` (höchstens ${transfers}× umsteigen)`)
       if (!from || !to) return make(label, 0, 1)
-      return make(label, reachableCities(state, from, transfers).has(to) ? 1 : 0, 1)
+      return make(label, reachableCities(state, from, transfers).has(to) ? 1 : 0, 1, [from, to])
     }
 
     case 'satisfaction':
-      return make(`${Math.round(goal.value * 100)} % Zufriedenheit`, meanSatisfaction(state), goal.value)
+      return make(
+        `${Math.round(goal.value * 100)} % Zufriedenheit`,
+        meanQuality(state, (l) => l.satisfaction),
+        goal.value,
+      )
 
     case 'punctuality':
-      return make(`${Math.round(goal.value * 100)} % Pünktlichkeit`, meanPunctuality(state), goal.value)
+      return make(
+        `${Math.round(goal.value * 100)} % Pünktlichkeit`,
+        meanQuality(state, (l) => l.punctuality),
+        goal.value,
+      )
   }
 }
 
