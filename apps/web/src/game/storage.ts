@@ -71,7 +71,7 @@ export async function writeSlot(id: string, save: SaveGame): Promise<void> {
 }
 
 export async function readSlot(id: string): Promise<SaveGame | null> {
-  const entry = await withStore<StoredEntry | undefined>('readonly', (store) => store.get(id))
+  const entry = await withStore<StoredEntry | undefined>('readonly', (store) => store.get(id) as IDBRequest<StoredEntry | undefined>)
   return entry?.save ?? null
 }
 
@@ -80,7 +80,7 @@ export async function deleteSlot(id: string): Promise<void> {
 }
 
 export async function listSlots(): Promise<SaveSlot[]> {
-  const entries = await withStore<StoredEntry[]>('readonly', (store) => store.getAll())
+  const entries = await withStore<StoredEntry[]>('readonly', (store) => store.getAll() as IDBRequest<StoredEntry[]>)
   return entries
     .map((e) => e.meta)
     .sort((a, b) => (a.id === AUTOSAVE_SLOT ? -1 : b.id === AUTOSAVE_SLOT ? 1 : b.savedAt.localeCompare(a.savedAt)))

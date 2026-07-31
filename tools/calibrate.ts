@@ -524,11 +524,14 @@ for (const minute of [0, 10, 20, 30, 40, 50]) {
   const link = lineConnections(state, offers, feeder.id).find((c) => c.stationName === 'Augsburg')!
   const day = simulateDay(state, demand)
 
+  const there = link.toOther?.waitSec ?? 0
+  const back = link.fromOther?.waitSec ?? 0
+
   console.log(
     `  Abfahrt :${String(minute).padStart(2, '0')}` +
-      `   Umstieg auf die Fernlinie ${((link.toOtherSec ?? 0) / 60).toFixed(0).padStart(3)} min` +
-      `  zurück ${((link.fromOtherSec ?? 0) / 60).toFixed(0).padStart(3)} min` +
-      `  Summe ${(((link.toOtherSec ?? 0) + (link.fromOtherSec ?? 0)) / 60).toFixed(0).padStart(3)} min` +
+      `   Umstieg auf die Fernlinie ${(there / 60).toFixed(0).padStart(3)} min` +
+      `  zurück ${(back / 60).toFixed(0).padStart(3)} min` +
+      `  Summe ${((there + back) / 60).toFixed(0).padStart(3)} min` +
       `  ·  Umsteiger ${Math.round(day.lines.reduce((s, l) => s + (l.transferPassengers ?? 0), 0)).toString().padStart(4)}` +
       `  Fahrgäste ${Math.round(day.lines.reduce((s, l) => s + l.totalPassengers, 0)).toString().padStart(5)}`,
   )

@@ -37,7 +37,7 @@ import {
   rollDisruptions,
 } from './disruptions.js'
 import { simulateRailLine } from './day.js'
-import { legRunTime, timeAtKm } from './runTime.js'
+import { timeAtKm } from './runTime.js'
 import { createGame } from './state.js'
 
 const city = (name: string, population: number, lng: number, lat: number): City => ({

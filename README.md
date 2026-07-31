@@ -296,6 +296,20 @@ nicht *wie voll ist meine Linie*, sondern *welcher Korridor ist voll und was lie
 | [docs/05-DATENPIPELINE.md](docs/05-DATENPIPELINE.md) | OSM/GeoNames/Routing-Aufbereitung |
 | [docs/06-ROADMAP.md](docs/06-ROADMAP.md) | Phasenplan bis zum spielbaren Prototyp |
 
+## Prüfen
+
+```bash
+pnpm check     # Typen, Werkzeugtypen, Lint, Tests, Build — dasselbe wie in der CI
+```
+
+Einzeln: `pnpm typecheck`, `pnpm typecheck:tools`, `pnpm lint`, `pnpm test`, `pnpm build`.
+Der Lauf steht als GitHub-Action in `.github/workflows/ci.yml` und läuft bei jedem Push.
+
+Gelintet wird nur, was der Typprüfer **nicht** sieht — vergessenes `await`, toter Code, `any`,
+Abhängigkeiten von React-Hooks. Ein Formatierer ist bewusst nicht eingerichtet: die
+Formatierung ist im Bestand einheitlich, und ein Werkzeug, das jede Datei anfasst, macht jede
+spätere Änderung schwerer zu lesen.
+
 ## Status
 
 **Phase 4c abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,

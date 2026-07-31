@@ -11,6 +11,10 @@
     "dev": "pnpm --filter @game/web dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
+    "typecheck:tools": "tsc --noEmit -p tools",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "pnpm typecheck && pnpm typecheck:tools && pnpm lint && pnpm test && pnpm build",
     "test": "pnpm -r test",
     "data:cities": "pnpm --filter @game/pipeline cities",
     "data:basemap": "pnpm --filter @game/pipeline basemap",
@@ -20,14 +24,19 @@
     "data:osm": "pnpm --filter @game/pipeline osm"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "@game/domain": "workspace:*",
+    "@eslint/js": "^9.39.5",
     "@game/demand": "workspace:*",
+    "@game/domain": "workspace:*",
     "@game/economy": "workspace:*",
-    "@game/sim": "workspace:*",
     "@game/geo": "workspace:*",
-    "tsx": "^4.20.6"
+    "@game/sim": "workspace:*",
+    "@types/node": "^22.20.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

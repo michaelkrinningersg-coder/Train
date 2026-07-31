@@ -3,20 +3,16 @@ import {
   FACILITY_SIZE_LABELS,
   MAX_PLATFORMS,
   SEGMENTS,
-  cityRadiusKm,
   platformsInService,
-  stationCatchment,
   type CityId,
 } from '@game/domain'
 import {
   busStopCost,
   formatMoney,
-  railStationCost,
   railStationUpkeep,
   stationExpansionCost,
   stationExpansionDays,
 } from '@game/economy'
-import { distanceKm } from '@game/geo'
 import { useGame } from '../game/store.js'
 
 const de = (n: number): string => n.toLocaleString('de-DE')

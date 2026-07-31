@@ -1,5 +1,5 @@
 import { isAvailable } from '@game/domain'
-import type { DayResult, GameState, LedgerEntry, LineDayResult, Money } from '@game/domain'
+import type { DayResult, GameState, LedgerEntry, Money } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import {
   adminCost,

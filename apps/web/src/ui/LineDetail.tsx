@@ -209,7 +209,7 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
                   <span className="muted num">{cls?.seats ?? 0} Sitze</span>
                   <span className={`num ${away ? 'neg' : 'muted'}`}>
                     {away
-                      ? `${v.workshopReason === 'repair' ? 'Schaden' : 'HU'} bis ${formatDate(v.inWorkshopUntil!)}`
+                      ? `${v.workshopReason === 'repair' ? 'Schaden' : 'HU'} bis ${formatDate(v.inWorkshopUntil)}`
                       : `${Math.round(v.condition * 100)} %`}
                   </span>
                 </label>

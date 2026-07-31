@@ -164,7 +164,8 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
         const map = mapRef.current
         if (cancelled || !map) return
         map.setStyle(style)
-        map.once('styledata', () => hidePlaceLabels(map))
+        // `once` liefert je nach Ueberladung ein Promise; hier zaehlt der Rueckruf.
+        void map.once('styledata', () => hidePlaceLabels(map))
       })
       .catch((err: unknown) => {
         useGame.getState().notify(`Kartenstil "${basemap.label}" nicht ladbar: ${String(err)}`)

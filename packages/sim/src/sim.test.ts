@@ -7,7 +7,6 @@ import {
   type City,
   type GameState,
   type Line,
-  type StationId,
 } from '@game/domain'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -51,7 +50,7 @@ function setup(buses = 4): GameState {
 
 function addLine(state: GameState, stopNames: string[], headwayMin = 60): GameState {
   const stops = [...state.network.stations.values()]
-  const ids = stopNames.map((n) => stops.find((s) => s.name === n)!.id as StationId)
+  const ids = stopNames.map((n) => stops.find((s) => s.name === n)!.id)
 
   const created = applyCommand(state, {
     kind: 'create_line',

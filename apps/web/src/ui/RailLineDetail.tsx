@@ -151,7 +151,7 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
                   <span className="muted num">{(cls?.seats.first ?? 0) + (cls?.seats.second ?? 0)} Sitze</span>
                   <span className={`num ${away ? 'neg' : 'muted'}`}>
                     {away
-                      ? `${v.workshopReason === 'repair' ? 'Schaden' : 'HU'} bis ${formatDate(v.inWorkshopUntil!)}`
+                      ? `${v.workshopReason === 'repair' ? 'Schaden' : 'HU'} bis ${formatDate(v.inWorkshopUntil)}`
                       : `${cls?.topSpeedKmh ?? 0} km/h`}
                   </span>
                 </label>

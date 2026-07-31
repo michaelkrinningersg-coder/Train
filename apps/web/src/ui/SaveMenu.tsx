@@ -46,6 +46,9 @@ export function SaveMenu({ onClose }: { readonly onClose: () => void }): React.J
       .catch(() => notify('Spielstände lassen sich nicht lesen — läuft der Browser im privaten Modus?'))
   }
 
+  // Einmal beim Oeffnen. `refresh` haengt an `notify` und wuerde bei jeder
+  // Meldung neu laufen - die Liste soll aber nicht auf Meldungen reagieren.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(refresh, [])
 
   const save = async (): Promise<void> => {

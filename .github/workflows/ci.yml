@@ -1,0 +1,45 @@
+# Was bei jedem Push laufen muss, damit „bei mir geht es" keine Aussage bleibt.
+#
+# Die Reihenfolge ist nach Laufzeit sortiert: der Typprüfer meldet einen
+# Umbenennungsfehler in Sekunden, die Tests brauchen Minuten. Wer zuerst baut,
+# wartet am längsten auf die billigste Erkenntnis.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Die Pakete zuerst, dann die Werkzeuge daneben. `tools/` hing lange in
+      # keinem tsconfig und ist genau deshalb still veraltet.
+      - name: Typen
+        run: pnpm typecheck
+
+      - name: Typen der Werkzeuge
+        run: pnpm typecheck:tools
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

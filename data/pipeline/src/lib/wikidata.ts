@@ -56,9 +56,9 @@ export async function runQuery(query: string, attempts = 4): Promise<WikidataRow
       const json = (await response.json()) as { results: { bindings: SparqlBinding[] } }
       const rows: WikidataRow[] = []
       for (const binding of json.results.bindings) {
-        const point = binding['coord']?.value ? parsePoint(binding['coord']!.value) : null
+        const point = binding['coord']?.value ? parsePoint(binding['coord'].value) : null
         if (!point) continue
-        const magnitude = binding['magnitude']?.value ? Number(binding['magnitude']!.value) : undefined
+        const magnitude = binding['magnitude']?.value ? Number(binding['magnitude'].value) : undefined
         rows.push({
           id: binding['item']?.value.split('/').pop() ?? '?',
           name: binding['itemLabel']?.value ?? '?',

@@ -28,7 +28,8 @@ je Segment.
 
 **Was aus Phase 0 offen blieb** (bewusst, kein Blocker):
 
-- Kein Lint-Setup und keine CI — kommt mit dem ersten echten Team-Workflow.
+- ~~Kein Lint-Setup und keine CI.~~ Nachgeholt in Phase 4c: ESLint mit typbewussten
+  Regeln und ein GitHub-Actions-Lauf über Typen, Lint, Tests und Build.
 - Basiskarte hängt noch an den MapLibre-Demokacheln (Zoom ≤ 6, nur Ländergrenzen).
   Der Austausch gegen eigene PMTiles ist ein Einzeiler und steht in Phase 5.
 
@@ -336,6 +337,10 @@ pünktlich weiterfahren —, kam im Spiel nicht vor.
 - **Spielstandformat 2** mit dem ersten echten Migrationsschritt.
 - **Auslastungs-Heatmap über der Karte** (Schalter „Auslastung"): Farbe und Strichstärke je
   Abschnitt aus dem letzten Betriebstag, mit Zeigerhinweis und Klick auf die Linie.
+- **Lint und CI**, seit Phase 0 offen. ESLint mit typbewussten Regeln — gemeldet wird nur, was
+  ein Typsystem *nicht* sieht: vergessenes `await`, toter Code, `any`, Hook-Abhängigkeiten.
+  `tools/` bekam dabei sein erstes tsconfig und war prompt kaputt: `calibrate.ts` benutzte
+  noch die Anschluss-API von vor drei Stunden. Genau dafür ist ein CI-Lauf da.
 - **Unplanmäßiger Werkstattaufenthalt**: eine schwere Störung am Fahrzeug nimmt es für 2 bis
   24 Tage aus dem Verkehr. Störungen werden dafür je Zuglauf mit *seinem* Fahrzeug gewürfelt,
   nicht mehr pauschal mit dem ersten der Linie. Im Fuhrpark steht, ob ein Fahrzeug wegen HU
