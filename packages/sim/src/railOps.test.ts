@@ -3,6 +3,7 @@ import {
   DEFAULT_RAIL_FARE,
   DEFAULT_RUNTIME_RESERVE_RAIL,
   cityId,
+  capacityFactor,
   cityRadiusKm,
   platformsInService,
   trainClass,
@@ -12,13 +13,23 @@ import {
   type TrackSpec,
 } from '@game/domain'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
+import { SERVICE_RESTORES_TO, serviceCost } from '@game/economy'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { advanceDays } from './advance.js'
 import { assignPassengers, type AssignmentFlow } from './assignment.js'
 import { findConflicts, headwaySeconds, isMinor, type Claim } from './blocks.js'
 import { applyCommand } from './commands.js'
 import { findPath } from './railGraph.js'
-import { buildRuns, planLine, trainsNeeded } from './railRuns.js'
+import { buildRuns, planLine, resolveDelays, trainsNeeded } from './railRuns.js'
+import {
+  BASE_FAILURE_RATE,
+  DISRUPTION_MAX_SEC,
+  DISRUPTION_MIN_SEC,
+  disruptionSeconds,
+  failureRate,
+  roll,
+  rollDisruptions,
+} from './disruptions.js'
 import { simulateRailLine } from './day.js'
 import { legRunTime, timeAtKm } from './runTime.js'
 import { createGame } from './state.js'
@@ -252,8 +263,11 @@ describe('Blockmodell', () => {
 describe('Betrieb und Verspätung', () => {
   it('faehrt auf zweigleisiger Strecke puenktlich', () => {
     const r = run(railSetup({ spec: DOUBLE }))
-    expect(r.punctuality).toBe(1)
-    expect(r.averageDelaySec).toBeLessThan(30)
+    // Nicht exakt 100 %: auch ein neuer Zug auf neuer Strecke faellt gelegentlich
+    // aus. Was hier zaehlt, ist die Abwesenheit von *Fahrplan*konflikten.
+    expect(r.conflicts.filter((c) => !isMinor(c))).toHaveLength(0)
+    expect(r.punctuality).toBeGreaterThan(0.95)
+    expect(r.averageDelaySec).toBeLessThan(120)
     expect(r.totalPassengers).toBeGreaterThan(0)
   })
 
@@ -480,5 +494,137 @@ describe('Bahnhofsausbau', () => {
     const days = stationOf(started.state).construction!.finishesOnDay - started.state.day
     const finished = advanceDays(started.state, demand, days)
     expect(platformCapacity(finished)).toBe(8)
+  })
+})
+
+describe('Störungen und Instandhaltung', () => {
+  it('würfelt reproduzierbar — derselbe Spielstand ergibt denselben Tag', () => {
+    // Ohne das waere ein Spielstand keine Sicherung, sondern eine Wette.
+    expect(roll(1, 100, 'p1-3')).toBe(roll(1, 100, 'p1-3'))
+    expect(roll(1, 100, 'p1-3')).not.toBe(roll(1, 101, 'p1-3'))
+    expect(roll(1, 100, 'p1-3')).not.toBe(roll(2, 100, 'p1-3'))
+  })
+
+  it('verteilt die Würfe gleichmäßig über [0,1)', () => {
+    const values = Array.from({ length: 4000 }, (_, i) => roll(7, i, 'lauf'))
+    expect(Math.min(...values)).toBeLessThan(0.02)
+    expect(Math.max(...values)).toBeGreaterThan(0.98)
+    const mean = values.reduce((s, v) => s + v, 0) / values.length
+    expect(mean).toBeGreaterThan(0.46)
+    expect(mean).toBeLessThan(0.54)
+  })
+
+  it('macht ein abgenutztes Fahrzeug deutlich störanfälliger', () => {
+    const neu = failureRate({ condition: 1, trackAgeYears: 0, loadFactor: 0.5 })
+    const alt = failureRate({ condition: 0.2, trackAgeYears: 0, loadFactor: 0.5 })
+    expect(neu).toBeCloseTo(BASE_FAILURE_RATE, 10)
+    expect(alt / neu).toBeGreaterThan(5)
+  })
+
+  it('lässt Streckenalter und Auslastung mitwirken', () => {
+    const base = failureRate({ condition: 1, trackAgeYears: 0, loadFactor: 0 })
+    expect(failureRate({ condition: 1, trackAgeYears: 40, loadFactor: 0 })).toBeGreaterThan(base)
+    expect(failureRate({ condition: 1, trackAgeYears: 0, loadFactor: 1.5 })).toBeGreaterThan(base)
+  })
+
+  it('macht kurze Störungen häufig und lange selten', () => {
+    expect(disruptionSeconds(0)).toBe(DISRUPTION_MIN_SEC)
+    expect(disruptionSeconds(1)).toBe(DISRUPTION_MAX_SEC)
+    // Bei der Haelfte des Wurfs erst ein Viertel der Spanne.
+    expect(disruptionSeconds(0.5)).toBeLessThan((DISRUPTION_MIN_SEC + DISRUPTION_MAX_SEC) / 2)
+  })
+
+  it('trifft eine heruntergewirtschaftete Linie über ein Jahr deutlich öfter', () => {
+    const runIds = Array.from({ length: 34 }, (_, i) => `p1-${i}`)
+    const count = (condition: number): number => {
+      let total = 0
+      for (let day = 0; day < 365; day++) {
+        total += rollDisruptions({
+          seed: 1,
+          day,
+          runIds,
+          vehicle: { condition } as never,
+          trackAgeYears: 5,
+          loadFactor: 0.7,
+        }).length
+      }
+      return total
+    }
+    const gepflegt = count(0.95)
+    const verwahrlost = count(0.15)
+    expect(verwahrlost).toBeGreaterThan(gepflegt * 4)
+  })
+
+  it('setzt eine Störung als Standzeit in die Belegung, nicht als Zufallszahl aufs Ergebnis', () => {
+    // Nachweis, dass die Stoerung durch dieselbe Ereignisschleife laeuft wie ein
+    // zu dichter Takt: der betroffene Zug haelt an, und die Folgenden warten.
+    const state = railSetup({ spec: DOUBLE })
+    const pattern = [...state.patterns.values()][0]!
+    const runs = buildRuns(state, lineOf(state), pattern, 60)
+    const legs = planLine(state, lineOf(state)).legs.map((l) => l.runSeconds)
+
+    const ohne = resolveDelays(runs, legs, 1.07)
+    const mit = resolveDelays(runs, legs, 1.07, new Map([[runs[0]!.id, { atClaim: 2, seconds: 20 * 60 }]]))
+
+    expect(mit.averageDelaySec).toBeGreaterThan(ohne.averageDelaySec)
+    expect(mit.punctuality).toBeLessThan(ohne.punctuality)
+  })
+
+  it('stellt ein Fahrzeug durch eine Hauptuntersuchung wieder her', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const id = [...state.fleet.keys()][0]!
+    const worn: GameState = {
+      ...state,
+      fleet: new Map([...state.fleet].map(([k, v]) => [k, k === id ? { ...v, condition: 0.3 } : v])),
+    }
+
+    const result = applyCommand(worn, { kind: 'service_vehicle', vehicleId: id })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.state.fleet.get(id)!.condition).toBe(SERVICE_RESTORES_TO)
+    expect(result.cost).toBeGreaterThan(0)
+    expect(result.state.cash).toBe(worn.cash - result.cost)
+  })
+
+  it('macht die Hauptuntersuchung teurer, je mehr aufzuholen ist', () => {
+    const cls = trainClass('emu_regional')!
+    const leicht = serviceCost({ condition: 0.85, units: 1 } as never, cls.purchasePrice)
+    const schwer = serviceCost({ condition: 0.15, units: 1 } as never, cls.purchasePrice)
+    expect(schwer).toBeGreaterThan(leicht * 3)
+  })
+
+  it('verweigert die Hauptuntersuchung an einem guten Fahrzeug', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const id = [...state.fleet.keys()][0]!
+    expect(applyCommand(state, { kind: 'service_vehicle', vehicleId: id }).ok).toBe(false)
+  })
+
+  it('setzt das Streckenalter durch eine Erneuerung zurück', () => {
+    let state = railSetup({ spec: DOUBLE })
+    state = advanceDays(state, demand, 400)
+    const track = [...state.network.tracks.values()][0]!
+    const ageBefore = state.day - track.builtOnDay
+    expect(ageBefore).toBeGreaterThan(365)
+
+    const result = applyCommand(state, { kind: 'renew_track', trackId: track.id })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const renewed = result.state.network.tracks.get(track.id)!
+    expect(renewed.construction).toBeDefined()
+
+    const after = advanceDays(result.state, demand, renewed.construction!.finishesOnDay - result.state.day)
+    const fresh = after.network.tracks.get(track.id)!
+    expect(after.day - fresh.builtOnDay).toBeLessThanOrEqual(1)
+    expect(fresh.construction).toBeUndefined()
+  })
+
+  it('drosselt die Strecke während der Erneuerung', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const track = [...state.network.tracks.values()][0]!
+    const result = applyCommand(state, { kind: 'renew_track', trackId: track.id })
+    if (!result.ok) throw new Error(result.reason)
+    expect(capacityFactor(result.state.network.tracks.get(track.id)!, result.state.day)).toBeLessThan(1)
   })
 })

@@ -19,7 +19,8 @@ import {
 } from '@game/domain'
 import type { ElevationGrid } from '@game/geo'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
-import { advanceDay, applyCommand, createGame } from '@game/sim'
+import { advanceDay, applyCommand, createGame, makeSave, readSave } from '@game/sim'
+import { AUTOSAVE_SLOT, writeSlot } from './storage.js'
 import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
 import { create } from 'zustand'
 
@@ -35,6 +36,9 @@ export const DEFAULT_TRACK_SPEC: TrackSpec = {
   tracks: 1,
   signalling: 'classic',
 }
+
+/** Spieltage zwischen zwei automatischen Speicherungen. */
+export const AUTOSAVE_EVERY_DAYS = 30
 
 /** Millisekunden je Spieltag je Geschwindigkeitsstufe. */
 export const SPEED_INTERVAL_MS: Record<Speed, number> = { 0: 0, 1: 900, 2: 180 }
@@ -68,10 +72,17 @@ interface GameStore {
   readonly draftMode: 'bus' | 'rail'
   /** Bildfahrplan der gewaehlten Bahnlinie einblenden. */
   readonly showTimetable: boolean
+  /** Spielstandsverwaltung offen. */
+  readonly showSaves: boolean
 
   start: (cities: readonly City[]) => void
   dispatch: (command: Command) => boolean
   step: (days?: number) => void
+
+  /** Spielstand aus einer Datei oder aus IndexedDB uebernehmen. */
+  load: (raw: unknown) => boolean
+  /** Tag, an dem zuletzt selbst gespeichert wurde - Grundlage des Autosaves. */
+  readonly lastAutosaveDay: number
 
   setSpeed: (speed: Speed) => void
   setTab: (tab: Tab) => void
@@ -100,6 +111,7 @@ interface GameStore {
   beginLoop: (trackId: TrackId) => void
   placeLoop: (position: LngLat) => void
   toggleTimetable: () => void
+  setShowSaves: (open: boolean) => void
   toggleDraftStop: (id: StationId) => void
   cancelLine: () => void
   commitLine: (name: string) => void
@@ -126,6 +138,8 @@ export const useGame = create<GameStore>((set, get) => ({
   selectedTrackId: null,
   draftMode: 'bus',
   showTimetable: false,
+  showSaves: false,
+  lastAutosaveDay: 0,
 
   start: (cities) => {
     // Entwicklungshilfe: mit VITE_STARTING_CASH laesst sich der Bahnbau testen,
@@ -142,7 +156,36 @@ export const useGame = create<GameStore>((set, get) => ({
       }),
       demand: buildDemandMatrix(enriched, { minTripsPerDay: 1 }),
       ready: true,
+      lastAutosaveDay: 0,
     })
+  },
+
+  load: (raw) => {
+    try {
+      const state = readSave(raw)
+      // Die Nachfragematrix haengt nur an den Staedten und wird deshalb aus dem
+      // geladenen Zustand neu gebaut, nicht mitgespeichert.
+      set({
+        state,
+        demand: buildDemandMatrix([...state.cities.values()], { minTripsPerDay: 1 }),
+        ready: true,
+        speed: 0,
+        selectedCityId: null,
+        selectedLineId: null,
+        selectedTrackId: null,
+        mapMode: 'idle',
+        draft: [],
+        stationDraft: null,
+        trackDraft: null,
+        showTimetable: false,
+        lastAutosaveDay: state.day,
+        message: null,
+      })
+      return true
+    } catch (error) {
+      set({ message: (error as Error).message })
+      return false
+    }
   },
 
   dispatch: (command) => {
@@ -164,6 +207,16 @@ export const useGame = create<GameStore>((set, get) => ({
     let next = state
     for (let i = 0; i < days; i++) next = advanceDay(next, demand)
     set({ state: next })
+
+    // Autosave alle AUTOSAVE_EVERY_DAYS Spieltage. Bewusst nach dem Setzen des
+    // Zustands und ohne `await`: ein langsamer Schreibvorgang darf die Spieluhr
+    // nicht anhalten, und schlaegt er fehl, ist der naechste in dreissig Tagen.
+    if (next.day - get().lastAutosaveDay >= AUTOSAVE_EVERY_DAYS) {
+      set({ lastAutosaveDay: next.day })
+      void writeSlot(AUTOSAVE_SLOT, makeSave(next, 'Automatisch', new Date().toISOString())).catch(() => {
+        set({ message: 'Automatisches Speichern fehlgeschlagen — Spielstand notfalls exportieren.' })
+      })
+    }
   },
 
   setElevation: (elevation) => set({ elevation }),
@@ -278,6 +331,8 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   toggleTimetable: () => set((s) => ({ showTimetable: !s.showTimetable })),
+
+  setShowSaves: (showSaves) => set({ showSaves }),
 
   toggleDraftStop: (id) =>
     set((s) => ({

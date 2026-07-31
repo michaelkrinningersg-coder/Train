@@ -1,4 +1,13 @@
-import { MAX_PLATFORMS, SEGMENTS, cityRadiusKm, platformsInService, stationCatchment, type CityId } from '@game/domain'
+import {
+  FACILITY_LABELS,
+  FACILITY_SIZE_LABELS,
+  MAX_PLATFORMS,
+  SEGMENTS,
+  cityRadiusKm,
+  platformsInService,
+  stationCatchment,
+  type CityId,
+} from '@game/domain'
 import {
   busStopCost,
   formatMoney,
@@ -134,6 +143,24 @@ export function CityPanel({ cityId }: { readonly cityId: CityId }): React.JSX.El
         <button type="button" className="primary wide" onClick={() => beginStation(cityId)}>
           Bahnhof bauen …
         </button>
+      )}
+
+      {city.facilities.length > 0 && (
+        <section>
+          <h3>Einrichtungen</h3>
+          <ul className="facilities">
+            {city.facilities.map((f) => (
+              <li key={f.type}>
+                <span>{FACILITY_LABELS[f.type]}</span>
+                <span className="muted small">{FACILITY_SIZE_LABELS[f.size - 1]}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">
+            Einrichtungen machen eine Stadt als <em>Ziel</em> attraktiver, nicht als Quelle: eine Hochschule zieht
+            Studenten an, sie bringt keine hervor.
+          </p>
+        </section>
       )}
 
       {destinations.length > 0 && (

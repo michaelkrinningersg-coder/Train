@@ -10,7 +10,16 @@ import type {
   Station,
   Vehicle,
 } from '@game/domain'
-import { busStopCost, BUS_STOP_UPKEEP_PER_DAY, creditLimit, interestRateFor, resaleValue, vehicleSpec } from '@game/economy'
+import {
+  BUS_STOP_UPKEEP_PER_DAY,
+  SERVICE_RESTORES_TO,
+  busStopCost,
+  creditLimit,
+  interestRateFor,
+  resaleValue,
+  serviceCost,
+  vehicleSpec,
+} from '@game/economy'
 import { applyRailCommand, type CommandContext } from './railCommands.js'
 import { newLineId, newPatternId, newStationId, newVehicleId, withMap } from './state.js'
 
@@ -30,6 +39,7 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
   switch (command.kind) {
     case 'place_station':
     case 'upgrade_station':
+    case 'renew_track':
     case 'build_track':
     case 'upgrade_track':
     case 'demolish_track':
@@ -118,6 +128,32 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
         ok: true,
         cost,
         state: book(next, { category: 'vehicle_purchase', amount: -cost, note: `${count} × ${cls.displayName}` }),
+      }
+    }
+
+    case 'service_vehicle': {
+      const vehicle = state.fleet.get(command.vehicleId)
+      if (!vehicle) return fail('Unbekanntes Fahrzeug.')
+      if (vehicle.condition >= SERVICE_RESTORES_TO - 0.01) {
+        return fail('Das Fahrzeug ist in gutem Zustand.')
+      }
+
+      const cls = vehicleSpec(vehicle)
+      if (!cls) return fail('Unbekannter Fahrzeugtyp.')
+      const cost = serviceCost(vehicle, cls.purchasePrice)
+      if (state.cash < cost) return fail('Nicht genug Kapital.')
+
+      // Das Fahrzeug bleibt im Umlauf: eine Hauptuntersuchung dauert im Spiel
+      // keinen Betriebstag. Das ist grosszuegig - real steht der Zug wochenlang
+      // in der Werkstatt -, aber ein Fahrzeug mitten im Fahrplan herauszunehmen
+      // wuerde die Linie stillegen, und das waere keine Entscheidung mehr,
+      // sondern eine Falle.
+      const serviced = { ...vehicle, condition: SERVICE_RESTORES_TO }
+      const next = { ...state, fleet: withMap(state.fleet, vehicle.id, serviced) }
+      return {
+        ok: true,
+        cost,
+        state: book(next, { category: 'vehicle_upkeep', amount: -cost, note: 'Hauptuntersuchung' }),
       }
     }
 

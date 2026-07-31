@@ -19,6 +19,8 @@ import {
   railStationUpkeep,
   stationExpansionCost,
   stationExpansionDays,
+  trackRenewalCost,
+  trackRenewalDays,
   trackBuildCost,
   trackBuildDays,
   trackDemolitionValue,
@@ -197,6 +199,39 @@ export function applyRailCommand(state: GameState, command: Command, ctx: Comman
           amount: -cost,
           note: `Strecke ${lengthKm.toFixed(0)} km`,
         }),
+      }
+    }
+
+    case 'renew_track': {
+      const track = state.network.tracks.get(command.trackId)
+      if (!track) return fail('Unbekannte Strecke.')
+      if (state.day < track.readyOnDay) return fail('Die Strecke ist noch im Bau.')
+      if (track.construction) return fail('Auf dieser Strecke laufen bereits Arbeiten.')
+
+      const cost = trackRenewalCost(track)
+      if (state.cash < cost) return fail('Nicht genug Kapital.')
+
+      const days = trackRenewalDays(track)
+      const renewed: TrackSegment = {
+        ...track,
+        // Der Oberbau ist neu, also faengt das Alter von vorn an. Trasse und
+        // Bauwerke bleiben - deshalb kostet es nur einen Bruchteil des Neubaus.
+        builtOnDay: state.day + days,
+        construction: {
+          upgrade: { kind: 'speed', to: track.maxSpeed },
+          finishesOnDay: state.day + days,
+          capacityFactorDuringWorks: 0.5,
+        },
+      }
+
+      const next: GameState = {
+        ...state,
+        network: { ...state.network, tracks: withMap(state.network.tracks, track.id, renewed) },
+      }
+      return {
+        ok: true,
+        cost,
+        state: book(next, { category: 'construction', amount: -cost, note: 'Streckenerneuerung' }),
       }
     }
 

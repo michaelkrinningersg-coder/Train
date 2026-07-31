@@ -9,7 +9,15 @@ import {
   type TrackCount,
   type TrackId,
 } from '@game/domain'
-import { formatMoney, passingLoopCost, trackDemolitionValue, trackUpgradeCost, trackUpgradeDays } from '@game/economy'
+import {
+  formatMoney,
+  passingLoopCost,
+  trackDemolitionValue,
+  trackRenewalCost,
+  trackRenewalDays,
+  trackUpgradeCost,
+  trackUpgradeDays,
+} from '@game/economy'
 import { previewTrack } from '@game/sim'
 import { useState } from 'react'
 import { useGame } from '../game/store.js'
@@ -371,6 +379,7 @@ function TrackDetail({ trackId }: { readonly trackId: TrackId }): React.JSX.Elem
   const readyIn = track.readyOnDay - state.day
   const worksLeft = track.construction ? track.construction.finishesOnDay - state.day : 0
 
+  const ageYears = Math.max(0, (state.day - track.builtOnDay) / 365)
   const upgrades = [
     ...MAX_SPEEDS.filter((v) => v > track.maxSpeed).map((v) => ({
       label: `Ausbau auf ${v} km/h`,
@@ -463,6 +472,21 @@ function TrackDetail({ trackId }: { readonly trackId: TrackId }): React.JSX.Elem
           })}
         </ul>
       )}
+
+      <h3>Zustand</h3>
+      <p className="muted small">
+        Die Strecke ist <b className="num">{ageYears.toFixed(1)}</b> Jahre alt. Mit dem Alter steigt die
+        Störanfälligkeit — eine Erneuerung des Oberbaus setzt sie zurück.
+      </p>
+      <button
+        type="button"
+        className="wide"
+        disabled={building || trackRenewalCost(track) > state.cash}
+        title={`${trackRenewalDays(track)} Tage Bauzeit, in denen nur die halbe Kapazität zur Verfügung steht`}
+        onClick={() => dispatch({ kind: 'renew_track', trackId })}
+      >
+        Oberbau erneuern · {formatMoney(trackRenewalCost(track), { compact: true })}
+      </button>
 
       {track.tracks === 1 && (
         <>

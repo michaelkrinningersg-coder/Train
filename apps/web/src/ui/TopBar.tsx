@@ -16,6 +16,7 @@ export function TopBar(): React.JSX.Element | null {
   const step = useGame((s) => s.step)
   const showDemand = useGame((s) => s.showDemand)
   const toggleDemand = useGame((s) => s.toggleDemand)
+  const setShowSaves = useGame((s) => s.setShowSaves)
   if (!state) return null
 
   const profit = state.lastDay?.profit ?? 0
@@ -47,6 +48,10 @@ export function TopBar(): React.JSX.Element | null {
       <div className="topbar__spacer" />
 
       <BasemapPicker />
+
+      <button type="button" className="chip" onClick={() => setShowSaves(true)} title="Speichern, laden, exportieren">
+        Spielstand
+      </button>
 
       <button
         type="button"

@@ -214,10 +214,10 @@ Das ist der Punkt, an dem aus einem Wirtschaftsspiel *dieses* Spiel wird.
 
 | Angebot München–Augsburg | Fahrgäste/Tag | Spitze | Zufriedenheit | Ergebnis |
 |---|---|---|---|---|
-| 120′ mit 2 Bussen | 372 | 129 % | 87 % | +2 144 €/Tag |
-| 60′ mit 4 Bussen | 851 | 153 % | 83 % | +5 710 €/Tag |
-| 30′ mit 8 Bussen | 1 381 | 124 % | 94 % | **+8 232 €/Tag** |
-| 15′ mit 16 Bussen | 1 704 | 80 % | 100 % | +5 365 €/Tag |
+| 120′ mit 2 Bussen | 414 | 133 % | 83 % | +2 602 €/Tag |
+| 60′ mit 4 Bussen | 941 | 160 % | 80 % | +6 675 €/Tag |
+| 30′ mit 8 Bussen | 1 572 | 131 % | 91 % | **+10 284 €/Tag** |
+| 15′ mit 16 Bussen | 2 084 | 89 % | 100 % | +9 440 €/Tag |
 
 **Es gibt jetzt ein Optimum, und es liegt nicht am Rand.** Wer zu knapp fährt, verliert über
 Monate Fahrgäste ans Auto; wer zu üppig fährt, verbrennt Geld. Damit kann man sich verzocken —
@@ -235,7 +235,7 @@ verschieben kostet keinen Cent. Dieselben zwei Linien, nur die Phasenlage verän
 
 | Abfahrtsminute des Zubringers | Umstieg hin | zurück | Summe | Umsteiger/Tag |
 |---|---|---|---|---|
-| :00 | 23 min | 3 min | 26 min | **54** |
+| :00 | 23 min | 3 min | 26 min | **51** |
 | :20 | 3 min | 23 min | 26 min | 52 |
 | :40 | 43 min | 43 min | 86 min | **31** |
 
@@ -262,17 +262,55 @@ Rechnung hinter einem Integralen Taktfahrplan.
 
 ---
 
-## Phase 4b — Tiefe (2–3 Wochen)
+## Phase 4b — Spielstände, Einrichtungen, Störungen ✅ abgeschlossen
 
-- Segmente vollständig mit Tages-, Wochen- und Saisonganglinie
-- Einrichtungen aus Wikidata mit ihren Boost-Faktoren
-- Störungen und ihre Ausbreitung; Instandhaltung als Gegenmittel
-- Streckenauslastung als Heatmap über die Karte
-- Bus-Bahn-Konkurrenz im eigenen Netz bewusst gestalten (Zubringertarife, abgestimmte
-  Anschlüsse statt zufälliger Wartezeit)
+**Ziel**: Das Spiel lässt sich zu Ende spielen, die Städte unterscheiden sich, und der
+Fuhrpark will gepflegt werden.
 
-**Abnahme**: Ein überalterter Fuhrpark auf einer überlasteten Strecke wird spürbar
-unzuverlässig, und man sieht auf der Karte, wo es klemmt.
+- [x] **Spielstände** in IndexedDB, mit Autosave alle 30 Spieltage sowie Export und Import
+      als Datei. Ausgeschriebene Serialisierung mit Versionsfeld und Migrationsstelle.
+- [x] **Einrichtungen aus Wikidata**: Hochschulen, Sehenswürdigkeiten, Naturziele,
+      Freizeitparks, Flughäfen und große Arbeitgeber, je Stadt zugeordnet und nach ihrer
+      Bedeutung eingestuft
+- [x] **Störungen** aus Fahrzeugzustand, Streckenalter und Auslastung — deterministisch
+      gewürfelt, damit ein Spielstand ein Spielstand bleibt
+- [x] **Instandhaltung**: Hauptuntersuchung für Fahrzeuge, Oberbauerneuerung für Strecken
+
+**Abnahme erreicht**: Eine Sitzung lässt sich speichern und am nächsten Tag fortsetzen.
+Erlangen zieht mit 102 000 Einwohnern mehr Studenten an als Ingolstadt mit 123 000, weil es
+eine Universität hat. Und ein heruntergefahrener Fuhrpark wird über ein Jahr **viermal so oft**
+gestört wie ein gepflegter.
+
+### Was die Einrichtungen mit der Nachfrage machen
+
+Die Gesamtzahl der Reisen bleibt bei 338 000/Tag — Einrichtungen **verteilen** um, sie
+erfinden nichts. Verschoben wird dafür deutlich:
+
+| Stärkste Studentenziele | ohne | mit Einrichtungen |
+|---|---|---|
+| Erlangen (102 Tsd. Ew) | 218 | **491** |
+| Regensburg (151 Tsd. Ew) | 200 | 302 |
+| Ingolstadt (123 Tsd. Ew) | 232 | 219 |
+| Dachau (36 Tsd. Ew) | 183 | *aus den Top 8* |
+
+Und das schlägt bis in die Wirtschaftlichkeit durch: **München–Ingolstadt kippt von Verlust
+auf Gewinn** (−474 → +1 249 €/Tag), weil Ingolstadt einen realen Großarbeitgeber hat und
+damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
+
+**Was aus Phase 4b offen blieb:**
+
+- **Keine Migration im Ernstfall erprobt.** Die Stelle ist da und leer — das erste Format
+  hat nichts zu heben. Ob sie trägt, zeigt sich erst beim zweiten.
+- **Ein Fahrzeug bleibt während der Hauptuntersuchung im Umlauf.** Real steht es wochenlang
+  in der Werkstatt. Es herauszunehmen würde die Linie stilllegen, und das wäre keine
+  Entscheidung mehr, sondern eine Falle — dafür bräuchte es erst Reservefahrzeuge.
+- **Einrichtungen sind statisch.** Eine Universität wird nicht gegründet, ein Werk nicht
+  geschlossen. Für eine Kampagne über Jahrzehnte wäre das der nächste Schritt.
+- **Die Größeneinstufung hängt an lückenhaften Daten.** Besucherzahlen stehen bei den
+  wenigsten Museen; ersatzweise zählt die Anzahl der Ziele einer Stadt. Beim Wechsel der
+  Region gehört die Verteilung, die der Pipelinelauf ausgibt, noch einmal gelesen.
+- Segmente mit vollständiger Saisonganglinie, die Auslastungs-Heatmap und abgestimmte
+  Zubringertarife stehen weiterhin aus.
 
 ---
 

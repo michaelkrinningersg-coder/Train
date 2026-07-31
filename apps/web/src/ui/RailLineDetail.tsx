@@ -178,6 +178,10 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
               <dt>Ø Verspätung</dt>
               <dd className="num">{((result.averageDelaySec ?? 0) / 60).toFixed(1)} min</dd>
             </div>
+            <div title="Ausfälle und Zwischenfälle: Fahrzeugzustand, Streckenalter und Auslastung bestimmen, wie oft es trifft.">
+              <dt>Störungen</dt>
+              <dd className={`num ${(result.disruptionCount ?? 0) > 2 ? 'neg' : ''}`}>{result.disruptionCount ?? 0}</dd>
+            </div>
             <div>
               <dt>Erlös</dt>
               <dd className="num">{formatMoney(result.revenue)}</dd>

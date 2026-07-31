@@ -171,3 +171,49 @@ die in der Anforderung gefordert war.
 
 Die Pipeline ist identisch, nur der Ausschnitt wächst. Das kostet nichts extra, spart aber
 in der Entwicklung sehr viel Wartezeit.
+
+
+---
+
+## Einrichtungen aus Wikidata
+
+`pnpm data:facilities` ergänzt den Städtedatensatz um Hochschulen, Sehenswürdigkeiten,
+Naturziele, Freizeitparks, Flughäfen und große Arbeitgeber. Der Mechanismus im
+Nachfragemodell war seit Phase 0 fertig und bekam bis dahin keine Daten — in jeder Stadt
+stand `facilities: []`.
+
+Zwei Eigenheiten des Wikidata Query Service haben die Form bestimmt:
+
+1. **Der Geo-Box-Dienst ist langsamer als eine Länderabfrage.** Die naheliegende Lösung —
+   `SERVICE wikibase:box` mit der Bounding-Box der Region — läuft zuverlässig in den Timeout.
+   Abgefragt wird deshalb je Land (`wdt:P17`), und der Ausschnitt wird lokal gefiltert.
+   Nebeneffekt: derselbe Abruf trägt später auch größere Regionen.
+2. **Der Dienst antwortet unregelmäßig.** Zeitüberschreitungen und 502er sind Normalbetrieb.
+   Deshalb Wiederholungen mit wachsendem Abstand — und ein Abbruch, der die Pipeline nicht
+   scheitern lässt: ohne Einrichtungen ist der Datensatz ärmer, aber brauchbar.
+
+Ebenso vermieden: `wdt:P31/wdt:P279*` über tiefe Klassenbäume. Einige wenige konkrete Klassen
+(`VALUES ?class { … }`) liefern fast dieselbe Ausbeute und antworten.
+
+### Größeneinstufung
+
+Jede Einrichtung bekommt eine Stufe von 1 bis 3. Sie ist das Größere aus zwei Quellen:
+
+- **Kennzahl der Sache selbst** — Studierende (P2196), Beschäftigte (P1128), Besucher (P1174).
+- **Anzahl gleichartiger Einrichtungen der Stadt.**
+
+Die zweite Quelle ist nicht Notbehelf, sondern bei dieser Datenlage oft das bessere Maß:
+Besucherzahlen stehen bei den wenigsten Museen, wie viele Ziele eine Stadt hat, weiß der
+Datensatz dagegen zuverlässig. München ist nicht wegen eines Hauses ein Reiseziel, sondern
+wegen dreihundert.
+
+Die Schwellen sind aus der tatsächlichen Verteilung gesetzt, die der Lauf selbst ausgibt — bei
+den Sehenswürdigkeiten liegt der Median bayerischer Städte bei 10 und München bei 292; eine
+Schwelle bei 30 wäre fast überall erreicht gewesen. **Beim Wechsel der Region gehört diese
+Zeile noch einmal gelesen.**
+
+### Zuordnung
+
+Jede Einrichtung geht an die nächste Stadt, in deren 1,6-fachem Stadtradius sie liegt.
+Der Zuschlag gegenüber dem Radius selbst ist Absicht: Flughäfen und Universitätscampus liegen
+regelmäßig am Rand oder knapp davor. Je Stadt und Typ bleibt eine Einrichtung übrig.

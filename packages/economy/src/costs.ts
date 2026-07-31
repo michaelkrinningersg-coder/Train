@@ -31,6 +31,24 @@ export function vehicleUpkeepPerDay(vehicle: Vehicle): Money {
   return Math.round(cls.upkeepPerDay * vehicle.units * wearFactor)
 }
 
+/**
+ * Zustand nach einer Hauptuntersuchung. Nie ganz neu — ein aufgearbeitetes
+ * Fahrzeug ist ein aufgearbeitetes Fahrzeug, und irgendwann lohnt der Ersatz
+ * mehr als die naechste Werkstatt.
+ */
+export const SERVICE_RESTORES_TO = 0.92
+
+/**
+ * Kosten einer Hauptuntersuchung: anteilig am Neupreis, und zwar nach dem, was
+ * aufzuholen ist. Ein fast neues Fahrzeug durchzusehen ist billig, ein
+ * heruntergefahrenes kostet ein Drittel des Neupreises — dort faengt der
+ * Vergleich mit dem Neukauf an, und genau der soll die Entscheidung sein.
+ */
+export function serviceCost(vehicle: Vehicle, purchasePrice: Money): Money {
+  const gap = Math.max(0, SERVICE_RESTORES_TO - vehicle.condition)
+  return Math.round(purchasePrice * vehicle.units * (0.04 + 0.36 * gap))
+}
+
 /** Alterung pro Betriebstag. Ein Bus ist nach rund 15 Jahren durch. */
 export const CONDITION_LOSS_PER_DAY = 1 / (15 * 365)
 

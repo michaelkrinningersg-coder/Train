@@ -200,6 +200,21 @@ export function stationExpansionCost(
   )
 }
 
+/**
+ * Erneuerung einer Strecke: Oberbau, Schotter, Schwellen. Ein Bruchteil des
+ * Neubaus, weil Trasse, Bruecken und Grunderwerb bleiben — teuer genug, um eine
+ * Entscheidung zu sein, billig genug, um die Alternative zum Verfall zu bleiben.
+ */
+export const TRACK_RENEWAL_SHARE = 0.28
+
+export function trackRenewalCost(track: TrackSegment): Money {
+  return Math.round(trackBuildCost(track.lengthKm, track, track.terrainFactor) * TRACK_RENEWAL_SHARE)
+}
+
+export function trackRenewalDays(track: TrackSegment): number {
+  return Math.max(20, Math.round(track.lengthKm * 1.2))
+}
+
 /** Bauzeit einer Bahnhofserweiterung. */
 export function stationExpansionDays(fromPlatforms: number, toPlatforms: number): number {
   const added = Math.max(0, toPlatforms - fromPlatforms)

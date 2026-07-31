@@ -309,10 +309,10 @@ Zubringers verschoben:
 
 | Abfahrt | Umstieg hin | zurück | **Summe** | Umsteiger/Tag |
 |---|---|---|---|---|
-| :00 | 23 min | 3 min | **26 min** | 54 |
-| :10 | 13 min | 13 min | **26 min** | 52 |
+| :00 | 23 min | 3 min | **26 min** | 51 |
+| :10 | 13 min | 13 min | **26 min** | 51 |
 | :20 | 3 min | 23 min | **26 min** | 52 |
-| :30 | 53 min | 33 min | **86 min** | 32 |
+| :30 | 53 min | 33 min | **86 min** | 31 |
 | :40 | 43 min | 43 min | **86 min** | 31 |
 | :50 | 33 min | 53 min | **86 min** | 31 |
 
@@ -495,10 +495,10 @@ Kapazität. Die Zufriedenheit braucht Wochen, um sich einzupendeln, deshalb der 
 
 | Angebot München–Augsburg | Fahrgäste/Tag | Spitzenauslastung | Zufriedenheit | Ergebnis |
 |---|---|---|---|---|
-| 120′ mit 2 Bussen | 372 | 129 % | 87 % | +2 144 €/Tag |
-| 60′ mit 4 Bussen | 851 | 153 % | 83 % | +5 710 €/Tag |
-| 30′ mit 8 Bussen | 1 381 | 124 % | 94 % | **+8 232 €/Tag** |
-| 15′ mit 16 Bussen | 1 704 | 80 % | 100 % | +5 365 €/Tag |
+| 120′ mit 2 Bussen | 414 | 133 % | 83 % | +2 602 €/Tag |
+| 60′ mit 4 Bussen | 941 | 160 % | 80 % | +6 675 €/Tag |
+| 30′ mit 8 Bussen | 1 572 | 131 % | 91 % | **+10 284 €/Tag** |
+| 15′ mit 16 Bussen | 2 084 | 89 % | 100 % | +9 440 €/Tag |
 
 Das ist die gewünschte Form: **es gibt ein Optimum, und es liegt nicht am Rand.** Wer zu
 knapp fährt, verliert über Monate Fahrgäste an das Auto; wer zu üppig fährt, verbrennt Geld
@@ -508,9 +508,9 @@ Der Umsteigeblock zeigt den zweiten Effekt:
 
 | | Fahrgäste/Tag | davon Umsteiger |
 |---|---|---|
-| nur München–Augsburg (30′) | 1 381 | 0 |
-| + Zubringer Landsberg–Augsburg | 1 484 | 63 |
-| + Anschluss München–Rosenheim | 1 865 | 76 |
+| nur München–Augsburg (30′) | 1 572 | 0 |
+| + Zubringer Landsberg–Augsburg | 1 661 | 65 |
+| + Anschluss München–Rosenheim | 2 065 | 75 |
 
 Landsberg hat keine eigene Verbindung nach München und bekommt sie über den Umstieg in
 Augsburg. Die dritte Linie bringt mehr als ihre eigene Relation: Landsberg erreicht über

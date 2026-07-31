@@ -224,9 +224,37 @@ Haltezeit hängt vom Andrang ab, der Andrang über die Reisezeit von der Halteze
 Fixpunkt zu iterieren, plant das Spiel mit den Zahlen von gestern — genau wie ein echter
 Betrieb seinen Fahrplan schreibt. Der Zustand hält sie in `GameState.crowding`.
 
-**Noch nicht umgesetzt**: Störungen als seedbasierter Zufall (Fahrzeugzustand, Streckenalter).
-Die Ereignisschleife nimmt sie ohne Umbau auf, weil eine Störung nur zusätzliche
-Belegungszeit ist.
+**Störungen** (Phase 4b, `packages/sim/src/disruptions.ts`). Eine Störung ist hier kein eigenes
+Ereignis, sondern **zusätzliche Belegungszeit**: der Zug steht länger auf seinem Abschnitt,
+alles Folgende verschiebt sich. Damit fällt sie in dieselbe Ereignisschleife wie ein zu dichter
+Takt, und sie trifft eine ausgelastete Strecke härter als eine leere.
+
+Die Wahrscheinlichkeit je Zuglauf:
+
+```
+rate = 0,004 · (1 + 12 · (1 − zustand)²) · (1 + 3 · min(1, streckenalter/40)) · (1 + max(0, auslastung − 0,8))
+```
+
+Der Fahrzeugzustand geht **quadratisch** ein: die ersten Jahre kosten wenig, die letzten viel.
+Über ein Jahr gerechnet wird eine heruntergefahrene Linie rund viermal so oft gestört wie eine
+gepflegte. Die Dauer liegt zwischen 3 und 45 Minuten, quadratisch verteilt — kurze Störungen
+sind häufig, lange selten.
+
+**Deterministisch trotz Zufall.** Der Würfel ist eine Hashfunktion aus Spielseed, Tag und
+Zuglaufkennung, nicht `Math.random()`. Derselbe Spielstand ergibt denselben Tag — sonst wäre
+ein Spielstand keine Sicherung, sondern eine Wette, und zweimal dasselbe zu laden brächte zwei
+verschiedene Ergebnisse.
+
+**Gegenmittel** sind die Hauptuntersuchung (`service_vehicle`, setzt den Zustand auf 92 %) und
+die Oberbauerneuerung (`renew_track`, setzt das Streckenalter zurück und drosselt die Strecke
+währenddessen auf die halbe Kapazität). Beides wird teurer, je länger man wartet — bei einem
+heruntergefahrenen Fahrzeug erreicht die Untersuchung ein Drittel des Neupreises, und dort
+fängt der Vergleich mit dem Neukauf an.
+
+**Nicht modelliert**: dass eine Störung zwei Fahrzeuge zugleich trifft, dass sie sich über Tage
+zieht, oder dass ein Fahrzeug während der Hauptuntersuchung ausfällt. Das letzte ist eine
+bewusste Großzügigkeit: ein Fahrzeug mitten im Fahrplan herauszunehmen würde die Linie
+stilllegen, und das wäre keine Entscheidung mehr, sondern eine Falle.
 
 ---
 

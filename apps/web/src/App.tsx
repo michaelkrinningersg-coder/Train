@@ -3,6 +3,7 @@ import { loadElevation, useCityDataset } from './data/dataset.js'
 import { SPEED_INTERVAL_MS, useGame, type Tab } from './game/store.js'
 import { MapView } from './map/MapView.js'
 import { CityPanel } from './ui/CityPanel.js'
+import { SaveMenu } from './ui/SaveMenu.js'
 import { FinanceTab } from './ui/FinanceTab.js'
 import { FleetTab } from './ui/FleetTab.js'
 import { Legend } from './ui/Legend.js'
@@ -36,6 +37,8 @@ export function App(): React.JSX.Element {
   const setElevation = useGame((s) => s.setElevation)
   const selectedLineId = useGame((s) => s.selectedLineId)
   const showTimetable = useGame((s) => s.showTimetable)
+  const showSaves = useGame((s) => s.showSaves)
+  const setShowSaves = useGame((s) => s.setShowSaves)
   const state = useGame((s) => s.state)
 
   useEffect(() => {
@@ -82,7 +85,13 @@ export function App(): React.JSX.Element {
       <main className="stage">
         {ready && <MapView view={dataset.data.view} />}
         <Legend />
-        {mapMode === 'place-station' ? <StationPlacement /> : selectedCityId && <CityPanel cityId={selectedCityId} />}
+        {showSaves ? (
+          <SaveMenu onClose={() => setShowSaves(false)} />
+        ) : mapMode === 'place-station' ? (
+          <StationPlacement />
+        ) : (
+          selectedCityId && <CityPanel cityId={selectedCityId} />
+        )}
 
         <aside className="sidebar">
           <nav className="tabs" role="tablist">

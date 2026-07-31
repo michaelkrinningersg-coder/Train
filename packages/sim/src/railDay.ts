@@ -70,6 +70,14 @@ export function finishRailDay(
   if (assignment.peakLoadFactor > 1) {
     warnings.push(`Überfüllt: in der Spitze ${Math.round(assignment.peakLoadFactor * 100)} % der Kapazität.`)
   }
+  if (detail.disruptions.length > 0) {
+    const minutes = Math.round(detail.disruptions.reduce((s, d) => s + d.seconds, 0) / 60)
+    const vehicle = detail.disruptions.filter((d) => d.cause === 'vehicle').length
+    warnings.push(
+      `${detail.disruptions.length} Störung${detail.disruptions.length === 1 ? '' : 'en'} (${minutes} min)` +
+        (vehicle > 0 ? ' — überwiegend am Fahrzeug. Eine Hauptuntersuchung hilft.' : ' — überwiegend an der Strecke.'),
+    )
+  }
 
   const vehicleKm = detail.runs.reduce((s, r) => s + r.lengthKm, 0)
   const drivingHours = detail.runs.reduce((s, r) => s + (r.arrival - r.departure), 0) / 3600
@@ -93,6 +101,7 @@ export function finishRailDay(
       mode: 'rail',
       linkLoadFactors: assignment.linkLoadFactors,
       conflictCount: serious.length,
+      disruptionCount: detail.disruptions.length,
       conflicts: detail.conflicts,
       runs: detail.runs,
       punctuality: offer.punctuality,

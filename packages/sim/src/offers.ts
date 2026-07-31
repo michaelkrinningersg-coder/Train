@@ -12,6 +12,7 @@ import {
   type TrainClass,
 } from '@game/domain'
 import { findConflicts, type Conflict } from './blocks.js'
+import { lineTrackAgeYears, rollDisruptions, type Disruption } from './disruptions.js'
 import {
   departureTimes,
   effectiveHeadwayMin,
@@ -116,6 +117,7 @@ export interface BusDetail {
 }
 
 export interface RailDetail {
+  readonly disruptions: readonly Disruption[]
   readonly plan: LinePlan
   readonly train: TrainClass
   /** Zugläufe mit bereits eingerechneter Verspätung — so sieht sie der Bildfahrplan. */
@@ -316,10 +318,34 @@ function prepareRail(state: GameState, line: Line, crowding: readonly number[]):
   }
 
   const conflicts = findConflicts(runs.flatMap((r) => r.claims))
+
+  // Stoerungen: Zustand des Zuges, Alter der Strecke, Auslastung von gestern.
+  // Die Auslastung stammt aus dem Vortag - dieselbe Ueberlegung wie bei den
+  // Haltezeiten, und aus demselben Grund kein Fixpunkt.
+  const yesterday = crowding.reduce((s, v) => s + v, 0)
+  const capacity = plan.train.seats.first + plan.train.seats.second
+  const disruptions = rollDisruptions({
+    seed: state.seed,
+    day: state.day,
+    runIds: runs.map((r) => r.id),
+    vehicle: pattern.vehicleIds[0] ? state.fleet.get(pattern.vehicleIds[0]) : undefined,
+    trackAgeYears: lineTrackAgeYears(state, line),
+    loadFactor: capacity > 0 ? Math.min(3, yesterday / Math.max(1, capacity)) : 0,
+  })
+
+  const stalls = new Map(
+    disruptions.map((d) => {
+      const claims = runs.find((r) => r.id === d.runId)?.claims.length ?? 0
+      // Etwa auf halber Strecke - dort schadet ein Halt am meisten.
+      return [d.runId, { atClaim: Math.floor(claims * 0.4), seconds: d.seconds }]
+    }),
+  )
+
   const { delays, punctuality, averageDelaySec } = resolveDelays(
     runs,
     plan.legs.map((l) => l.runSeconds),
     line.runtimeReserve,
+    stalls,
   )
   const delayed = applyDelays(runs, delays)
 
@@ -365,7 +391,7 @@ function prepareRail(state: GameState, line: Line, crowding: readonly number[]):
       firstDepartureSec: zero,
       oneWaySec: stops[stops.length - 1]?.arrivalSec ?? 0,
     },
-    detail: { plan, train: plan.train, runs: delayed, conflicts, trainsNeeded: needed, seats },
+    detail: { plan, train: plan.train, runs: delayed, conflicts, disruptions, trainsNeeded: needed, seats },
   }
 }
 

@@ -436,6 +436,12 @@ export function resolveDelays(
   runs: readonly RailRun[],
   legRunSeconds: readonly number[],
   reserve: number,
+  /**
+   * Störungen: je Zuglauf, ab welcher Belegung er wie lange stehen bleibt.
+   * Der Halt wirkt wie jede andere Belegung — er hält die Strecke besetzt, und
+   * was daraus an Folgeverspätung entsteht, ergibt sich von selbst.
+   */
+  stalls: ReadonlyMap<string, { readonly atClaim: number; readonly seconds: number }> = new Map(),
 ): DelayResult {
   const occupied = new Map<string, Claim[]>()
   const delays = new Map<string, number>()
@@ -467,6 +473,11 @@ export function resolveDelays(
     if (guard++ > limit) break
     const i = pending()
     if (i < 0) break
+
+    // Steht hier eine Stoerung an, faengt der Zug sie sich, bevor er die
+    // Belegung anfordert - er blockiert die Stelle dann entsprechend laenger.
+    const stall = stalls.get(runs[i]!.id)
+    if (stall && cursor[i] === stall.atClaim) delay[i] = delay[i]! + stall.seconds
 
     const claim = sortedClaims[i]![cursor[i]!]!
     const existing = occupied.get(claim.resource) ?? []

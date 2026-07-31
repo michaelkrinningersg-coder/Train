@@ -28,7 +28,38 @@
       ],
       "population": 1530955,
       "radiusKm": 27.11,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "capital",
+          "size": 1,
+          "name": "Landeshauptstadt"
+        },
+        {
+          "type": "landmark",
+          "size": 3,
+          "name": "Palais Crailsheim"
+        },
+        {
+          "type": "major_employer",
+          "size": 3,
+          "name": "Allianz SE"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Isar-Inn-Schotterplatten"
+        },
+        {
+          "type": "theme_park",
+          "size": 1,
+          "name": "Hot Gun Town"
+        },
+        {
+          "type": "university",
+          "size": 3,
+          "name": "Ludwig-Maximilians-Universität München"
+        }
+      ],
       "absorbed": [
         {
           "name": "Germering",
@@ -67,7 +98,33 @@
       ],
       "population": 587509,
       "radiusKm": 16.79,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "airport_hub",
+          "size": 1,
+          "name": "Flughafen Nürnberg-Marienberg"
+        },
+        {
+          "type": "landmark",
+          "size": 3,
+          "name": "Burgbasteien"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "GfK"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Fränkisches Keuper-Lias-Land"
+        },
+        {
+          "type": "university",
+          "size": 2,
+          "name": "Akademie der Bildenden Künste Nürnberg"
+        }
+      ],
       "absorbed": [
         {
           "name": "Fürth",
@@ -98,7 +155,23 @@
       ],
       "population": 338395,
       "radiusKm": 12.74,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 3,
+          "name": "Burgstall Kissing"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "Premium Aerotec"
+        },
+        {
+          "type": "university",
+          "size": 2,
+          "name": "Universität Augsburg"
+        }
+      ],
       "absorbed": [
         {
           "name": "Friedberg",
@@ -133,7 +206,23 @@
       ],
       "population": 151389,
       "radiusKm": 8.52,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 3,
+          "name": "Burg Loch (Eichhofen)"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "Barmherzige Brüder gemeinnützige Träger GmbH"
+        },
+        {
+          "type": "university",
+          "size": 2,
+          "name": "Universität Regensburg"
+        }
+      ]
     },
     {
       "id": "gn:2805615",
@@ -146,7 +235,23 @@
       ],
       "population": 136716,
       "radiusKm": 8.1,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Würzburger Residenz"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Hochflächen im südlichen Maindreieck"
+        },
+        {
+          "type": "university",
+          "size": 2,
+          "name": "Julius-Maximilians-Universität Würzburg"
+        }
+      ],
       "absorbed": [
         {
           "name": "Kitzingen",
@@ -165,7 +270,23 @@
       ],
       "population": 123327,
       "radiusKm": 7.69,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Neues Schloss"
+        },
+        {
+          "type": "major_employer",
+          "size": 3,
+          "name": "Audi"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Technische Hochschule Ingolstadt"
+        }
+      ],
       "absorbed": [
         {
           "name": "Neuburg an der Donau",
@@ -184,7 +305,18 @@
       ],
       "population": 101679,
       "radiusKm": 6.99,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Baudenkmal D-5-62-000-102 in Erlangen im Ortsteil Erlangen"
+        },
+        {
+          "type": "university",
+          "size": 3,
+          "name": "Friedrich-Alexander-Universität Erlangen-Nürnberg"
+        }
+      ],
       "absorbed": [
         {
           "name": "Forchheim",
@@ -207,7 +339,23 @@
       ],
       "population": 94581,
       "radiusKm": 6.74,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "airport_hub",
+          "size": 1,
+          "name": "Flughafen Flugplatzstraße 100 in Fürth (D-5-63-000-1624#8)"
+        },
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Ensemble Burg und Markt Cadolzburg"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "Norma"
+        }
+      ],
       "absorbed": [
         {
           "name": "Zirndorf",
@@ -226,7 +374,23 @@
       ],
       "population": 74730,
       "radiusKm": 5.99,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Burg Bühl"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "NKD"
+        },
+        {
+          "type": "university",
+          "size": 2,
+          "name": "Universität Bayreuth"
+        }
+      ],
       "absorbed": [
         {
           "name": "Kulmbach",
@@ -245,7 +409,18 @@
       ],
       "population": 71863,
       "radiusKm": 5.87,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Palais Pettenkofer"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Hochschule für angewandte Wissenschaften Landshut"
+        }
+      ]
     },
     {
       "id": "gn:2952984",
@@ -258,7 +433,18 @@
       ],
       "population": 70047,
       "radiusKm": 5.8,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Altenburg"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Otto-Friedrich-Universität Bamberg"
+        }
+      ]
     },
     {
       "id": "gn:2955272",
@@ -271,7 +457,23 @@
       ],
       "population": 68551,
       "radiusKm": 5.74,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Stadtmauer Aschaffenburg"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "Linde Material Handling"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Technische Hochschule Aschaffenburg"
+        }
+      ]
     },
     {
       "id": "gn:2891621",
@@ -284,7 +486,18 @@
       ],
       "population": 61399,
       "radiusKm": 5.43,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Ponikauhaus"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Hochschule für angewandte Wissenschaften Kempten"
+        }
+      ]
     },
     {
       "id": "gn:2844988",
@@ -297,7 +510,23 @@
       ],
       "population": 60167,
       "radiusKm": 5.37,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Hofberg"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "Kathrein-Werke"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Technische Hochschule Rosenheim"
+        }
+      ]
     },
     {
       "id": "gn:2863941",
@@ -310,7 +539,23 @@
       ],
       "population": 58889,
       "radiusKm": 5.32,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Burg Klingenstein"
+        },
+        {
+          "type": "major_employer",
+          "size": 2,
+          "name": "Müller"
+        },
+        {
+          "type": "university",
+          "size": 3,
+          "name": "Universität Ulm"
+        }
+      ],
       "absorbed": [
         {
           "name": "Senden",
@@ -329,7 +574,13 @@
       ],
       "population": 55206,
       "radiusKm": 5.15,
-      "facilities": [],
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Hennebergische Reichsburg Schweinfurt"
+        }
+      ],
       "absorbed": [
         {
           "name": "Bad Kissingen",
@@ -348,7 +599,18 @@
       ],
       "population": 50560,
       "radiusKm": 4.93,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Lamberg-Palais"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Universität Passau"
+        }
+      ]
     },
     {
       "id": "gn:2902768",
@@ -361,7 +623,23 @@
       ],
       "population": 49239,
       "radiusKm": 4.86,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Burgstall Schartenmauer"
+        },
+        {
+          "type": "major_employer",
+          "size": 3,
+          "name": "Fresenius Medical Care"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Hochschule für Angewandte Wissenschaften Hof"
+        }
+      ]
     },
     {
       "id": "gn:2956656",
@@ -374,7 +652,18 @@
       ],
       "population": 44737,
       "radiusKm": 4.63,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Burg Amberg"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Ostbayerische Technische Hochschule Amberg-Weiden"
+        }
+      ]
     },
     {
       "id": "gn:2826099",
@@ -387,7 +676,13 @@
       ],
       "population": 44580,
       "radiusKm": 4.63,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Herzogsschloss"
+        }
+      ]
     },
     {
       "id": "gn:2871992",
@@ -400,7 +695,23 @@
       ],
       "population": 44192,
       "radiusKm": 4.61,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "airport_hub",
+          "size": 1,
+          "name": "Memmingen AB Airport"
+        },
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Fliehburg (Woringen)"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Unteres Illertal"
+        }
+      ]
     },
     {
       "id": "gn:2925034",
@@ -413,7 +724,18 @@
       ],
       "population": 42570,
       "radiusKm": 4.52,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Fürstbischöfliche Residenz"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Hochschule für angewandte Wissenschaften Weihenstephan-Triesdorf"
+        }
+      ]
     },
     {
       "id": "gn:2813040",
@@ -426,7 +748,13 @@
       ],
       "population": 42550,
       "radiusKm": 4.52,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Burgstall Mallersricht"
+        }
+      ]
     },
     {
       "id": "gn:2892080",
@@ -439,7 +767,13 @@
       ],
       "population": 42505,
       "radiusKm": 4.52,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Irsee"
+        }
+      ]
     },
     {
       "id": "gn:2939951",
@@ -452,7 +786,23 @@
       ],
       "population": 41901,
       "radiusKm": 4.48,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 2,
+          "name": "Baudenkmal D-4-63-000-385 in Coburg im Ortsteil Coburg"
+        },
+        {
+          "type": "major_employer",
+          "size": 2,
+          "name": "Brose Fahrzeugteile"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Hochschule für angewandte Wissenschaften Coburg"
+        }
+      ]
     },
     {
       "id": "gn:2864549",
@@ -465,7 +815,13 @@
       ],
       "population": 39557,
       "radiusKm": 4.36,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Neumarkter Brauereimuseum"
+        }
+      ]
     },
     {
       "id": "gn:2939623",
@@ -478,7 +834,13 @@
       ],
       "population": 35581,
       "radiusKm": 4.13,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Schloss Dachau"
+        }
+      ]
     },
     {
       "id": "gn:2921039",
@@ -491,7 +853,18 @@
       ],
       "population": 34492,
       "radiusKm": 4.07,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Parsberg"
+        },
+        {
+          "type": "major_employer",
+          "size": 1,
+          "name": "Webasto SE"
+        }
+      ]
     },
     {
       "id": "gn:2923625",
@@ -504,7 +877,13 @@
       ],
       "population": 33533,
       "radiusKm": 4.01,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Abschnittsbefestigung Puch"
+        }
+      ]
     },
     {
       "id": "gn:2929715",
@@ -517,7 +896,13 @@
       ],
       "population": 33519,
       "radiusKm": 4.01,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Erding"
+        }
+      ]
     },
     {
       "id": "gn:2835537",
@@ -530,7 +915,13 @@
       ],
       "population": 32081,
       "radiusKm": 3.92,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Heimatmuseum Kornburg"
+        }
+      ]
     },
     {
       "id": "gn:2955936",
@@ -543,7 +934,18 @@
       ],
       "population": 31839,
       "radiusKm": 3.91,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Jägerndorfer Heimatstuben"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Hochschule für angewandte Wissenschaften Ansbach"
+        }
+      ]
     },
     {
       "id": "gn:2938540",
@@ -556,7 +958,18 @@
       ],
       "population": 31081,
       "radiusKm": 3.86,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Natternberg"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Technische Hochschule Deggendorf"
+        }
+      ]
     },
     {
       "id": "gn:2835297",
@@ -569,7 +982,13 @@
       ],
       "population": 28235,
       "radiusKm": 3.68,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Bodendenkmal in Schwandorf, #D-3-6638-0138"
+        }
+      ]
     },
     {
       "id": "gn:2881509",
@@ -582,7 +1001,13 @@
       ],
       "population": 27017,
       "radiusKm": 3.6,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Sandau"
+        }
+      ]
     },
     {
       "id": "gn:2922530",
@@ -595,7 +1020,13 @@
       ],
       "population": 26022,
       "radiusKm": 3.53,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Werdenfels"
+        }
+      ]
     },
     {
       "id": "gn:2882588",
@@ -608,7 +1039,18 @@
       ],
       "population": 25775,
       "radiusKm": 3.52,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Plassenburg"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Obermainisches Hügelland"
+        }
+      ]
     },
     {
       "id": "gn:2866070",
@@ -621,7 +1063,13 @@
       ],
       "population": 25701,
       "radiusKm": 3.51,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Schloss Neuburg (Bayern)"
+        }
+      ]
     },
     {
       "id": "gn:2925910",
@@ -634,7 +1082,18 @@
       ],
       "population": 25500,
       "radiusKm": 3.5,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Forchheim"
+        },
+        {
+          "type": "theme_park",
+          "size": 1,
+          "name": "Erlebnispark Schloss Thurn"
+        }
+      ]
     },
     {
       "id": "gn:2844265",
@@ -647,7 +1106,13 @@
       ],
       "population": 25083,
       "radiusKm": 3.47,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgruine Wartstein"
+        }
+      ]
     },
     {
       "id": "gn:2818766",
@@ -660,7 +1125,13 @@
       ],
       "population": 24726,
       "radiusKm": 3.45,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Schloss Ottenburg"
+        }
+      ]
     },
     {
       "id": "gn:2814874",
@@ -673,7 +1144,13 @@
       ],
       "population": 24676,
       "radiusKm": 3.44,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Kraiburg"
+        }
+      ]
     },
     {
       "id": "gn:2877550",
@@ -686,7 +1163,13 @@
       ],
       "population": 24518,
       "radiusKm": 3.43,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Degelstein"
+        }
+      ]
     },
     {
       "id": "gn:2829457",
@@ -699,7 +1182,13 @@
       ],
       "population": 23940,
       "radiusKm": 3.39,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Karlsburg"
+        }
+      ]
     },
     {
       "id": "gn:2812515",
@@ -712,7 +1201,13 @@
       ],
       "population": 23378,
       "radiusKm": 3.35,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Turmhügel Wilzhofen"
+        }
+      ]
     },
     {
       "id": "gn:2921139",
@@ -725,7 +1220,13 @@
       ],
       "population": 23364,
       "radiusKm": 3.35,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Bodendenkmal in Dietramszell, #D-1-8134-0051"
+        }
+      ]
     },
     {
       "id": "gn:2854386",
@@ -738,7 +1239,13 @@
       ],
       "population": 23192,
       "radiusKm": 3.34,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Bodendenkmal in Scheyern, #D-1-7434-0171"
+        }
+      ]
     },
     {
       "id": "gn:2880144",
@@ -751,7 +1258,13 @@
       ],
       "population": 23108,
       "radiusKm": 3.33,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Wenzelburg"
+        }
+      ]
     },
     {
       "id": "gn:2857472",
@@ -764,7 +1277,13 @@
       ],
       "population": 22395,
       "radiusKm": 3.28,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Roggenstein"
+        }
+      ]
     },
     {
       "id": "gn:2878074",
@@ -777,7 +1296,13 @@
       ],
       "population": 21336,
       "radiusKm": 3.2,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Bodendenkmal in Lichtenfels (Oberfranken), #D-4-5832-0052"
+        }
+      ]
     },
     {
       "id": "gn:2831088",
@@ -790,7 +1315,13 @@
       ],
       "population": 21285,
       "radiusKm": 3.2,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Burgberg"
+        }
+      ]
     },
     {
       "id": "gn:2821517",
@@ -803,7 +1334,13 @@
       ],
       "population": 21244,
       "radiusKm": 3.19,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Schloss Stein an der Traun"
+        }
+      ]
     },
     {
       "id": "gn:2885908",
@@ -816,7 +1353,18 @@
       ],
       "population": 20673,
       "radiusKm": 3.15,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Mercateum"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Lechtalheiden"
+        }
+      ]
     },
     {
       "id": "gn:2861914",
@@ -829,7 +1377,13 @@
       ],
       "population": 20352,
       "radiusKm": 3.13,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Wallerstein"
+        }
+      ]
     },
     {
       "id": "gn:2953424",
@@ -842,7 +1396,13 @@
       ],
       "population": 20134,
       "radiusKm": 3.11,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgruine Botenlauben"
+        }
+      ]
     },
     {
       "id": "gn:2958975",
@@ -855,7 +1415,13 @@
       ],
       "population": 19860,
       "radiusKm": 3.09,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burg Wittelsbach"
+        }
+      ]
     },
     {
       "id": "gn:2924803",
@@ -868,7 +1434,13 @@
       ],
       "population": 18573,
       "radiusKm": 2.99,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Abschnittsbefestigung Rederzhausen"
+        }
+      ]
     },
     {
       "id": "gn:2890158",
@@ -881,7 +1453,18 @@
       ],
       "population": 18402,
       "radiusKm": 2.97,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Ehemaliges Stadtpalais, heute Musikschule"
+        },
+        {
+          "type": "nature",
+          "size": 2,
+          "name": "Kitzinger Maintal"
+        }
+      ]
     },
     {
       "id": "gn:2817818",
@@ -894,7 +1477,13 @@
       ],
       "population": 17696,
       "radiusKm": 2.91,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Haus der Donauschwaben"
+        }
+      ]
     },
     {
       "id": "gn:2905457",
@@ -907,7 +1496,18 @@
       ],
       "population": 16912,
       "radiusKm": 2.85,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Bodendenkmal in Herzogenaurach, #D-5-6431-0156"
+        },
+        {
+          "type": "major_employer",
+          "size": 2,
+          "name": "Adidas"
+        }
+      ]
     },
     {
       "id": "gn:2833080",
@@ -920,7 +1520,13 @@
       ],
       "population": 14775,
       "radiusKm": 2.66,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Bodendenkmal in Neu-Ulm, #D-7-7626-0305"
+        }
+      ]
     },
     {
       "id": "gn:2804034",
@@ -933,7 +1539,13 @@
       ],
       "population": 14254,
       "radiusKm": 2.62,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Alte Veste"
+        }
+      ]
     },
     {
       "id": "gn:2819465",
@@ -946,7 +1558,23 @@
       ],
       "population": 14135,
       "radiusKm": 2.6,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Schloss Perlachsoed"
+        },
+        {
+          "type": "theme_park",
+          "size": 1,
+          "name": "Jochen Schweizer Arena"
+        },
+        {
+          "type": "university",
+          "size": 1,
+          "name": "Universität der Bundeswehr München"
+        }
+      ]
     },
     {
       "id": "gn:2864252",
@@ -959,7 +1587,13 @@
       ],
       "population": 13326,
       "radiusKm": 2.53,
-      "facilities": []
+      "facilities": [
+        {
+          "type": "landmark",
+          "size": 1,
+          "name": "Burgstall Hammel"
+        }
+      ]
     },
     {
       "id": "gn:2920891",

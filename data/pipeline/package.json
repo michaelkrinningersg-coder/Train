@@ -10,7 +10,8 @@
     "test": "vitest run --passWithNoTests",
     "basemap": "tsx src/03-basemap.ts",
     "terrain": "tsx src/06-terrain.ts",
-    "osm": "tsx src/07-osm-cache.ts"
+    "osm": "tsx src/07-osm-cache.ts",
+    "facilities": "NODE_USE_ENV_PROXY=1 tsx src/08-facilities.ts"
   },
   "dependencies": {
     "@game/domain": "workspace:*",

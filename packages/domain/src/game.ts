@@ -97,6 +97,8 @@ export interface LineDayResult {
   readonly punctuality?: number
   readonly averageDelaySec?: number
   readonly conflictCount?: number
+  /** Stoerungen des Tages auf dieser Linie. */
+  readonly disruptionCount?: number
   readonly trainsNeeded?: number
   /** Spitzenauslastung je Abschnitt zwischen zwei Halten. */
   readonly linkLoadFactors?: readonly number[]
@@ -182,6 +184,8 @@ export type Command =
   | { readonly kind: 'demolish_track'; readonly trackId: TrackId }
   | { readonly kind: 'place_station'; readonly cityId: CityId; readonly position: LngLat; readonly platforms: number }
   | { readonly kind: 'upgrade_station'; readonly stationId: StationId; readonly platforms: number }
+  | { readonly kind: 'service_vehicle'; readonly vehicleId: VehicleId }
+  | { readonly kind: 'renew_track'; readonly trackId: TrackId }
   | { readonly kind: 'buy_vehicle'; readonly classId: string; readonly units: number }
   | { readonly kind: 'sell_vehicle'; readonly vehicleId: VehicleId }
   | { readonly kind: 'create_line'; readonly line: Omit<Line, 'id'> }

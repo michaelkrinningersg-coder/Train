@@ -17,6 +17,24 @@ export const FACILITY_TYPES = [
 
 export type FacilityType = (typeof FACILITY_TYPES)[number]
 
+/** Klartext fuer die Anzeige. */
+export const FACILITY_LABELS: Readonly<Record<FacilityType, string>> = {
+  university: 'Hochschule',
+  school_centre: 'Schulzentrum',
+  landmark: 'Sehenswürdigkeiten',
+  nature: 'Naturziel',
+  theme_park: 'Freizeitpark',
+  major_employer: 'Großer Arbeitgeber',
+  industrial_cluster: 'Industriestandort',
+  finance_hub: 'Finanzplatz',
+  trade_fair: 'Messestandort',
+  capital: 'Landeshauptstadt',
+  airport_hub: 'Flughafen',
+}
+
+/** Groessenstufe als Wort - „Stufe 2" sagt niemandem etwas. */
+export const FACILITY_SIZE_LABELS: readonly [string, string, string] = ['klein', 'bedeutend', 'herausragend']
+
 export interface Facility {
   readonly type: FacilityType
   readonly size: 1 | 2 | 3

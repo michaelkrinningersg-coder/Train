@@ -60,6 +60,7 @@ Hinter einem Proxy braucht Node's `fetch` ein Flag: `NODE_USE_ENV_PROXY=1 pnpm d
 | `pnpm data:cities [-- --region=dach]` | Städtedatensatz erzeugen |
 | `pnpm data:basemap [-- --region=dach]` | Schlichte Basiskacheln cachen |
 | `pnpm data:terrain [-- --region=dach]` | Höhenraster für Baukosten erzeugen |
+| `pnpm data:facilities [-- --region=dach]` | Einrichtungen der Städte aus Wikidata ergänzen |
 | `pnpm data:osm [-- --style=liberty]` | OSM-Basiskarte lokal cachen (offline-fähig) |
 | `pnpm calibrate` | Kalibrierungsbericht für Nachfrage und Wirtschaftlichkeit |
 
@@ -141,10 +142,10 @@ Optimum, das nicht am Rand liegt — dieselbe Relation über ein halbes Jahr:
 
 | Angebot München–Augsburg | Fahrgäste/Tag | Spitze | Zufriedenheit | Ergebnis |
 |---|---|---|---|---|
-| 120′ mit 2 Bussen | 372 | 129 % | 87 % | +2 144 €/Tag |
-| 60′ mit 4 Bussen | 851 | 153 % | 83 % | +5 710 €/Tag |
-| **30′ mit 8 Bussen** | 1 381 | 124 % | 94 % | **+8 232 €/Tag** |
-| 15′ mit 16 Bussen | 1 704 | 80 % | 100 % | +5 365 €/Tag |
+| 120′ mit 2 Bussen | 414 | 133 % | 83 % | +2 602 €/Tag |
+| 60′ mit 4 Bussen | 941 | 160 % | 80 % | +6 675 €/Tag |
+| **30′ mit 8 Bussen** | 1 572 | 131 % | 91 % | **+10 284 €/Tag** |
+| 15′ mit 16 Bussen | 2 084 | 89 % | 100 % | +9 440 €/Tag |
 
 Zu knapp verliert Fahrgäste, zu üppig verbrennt Geld.
 
@@ -173,7 +174,7 @@ Dieselben zwei Linien, nur die Abfahrtsminute des Zubringers verändert:
 
 | Abfahrt | → auf die Fernlinie | ← zurück | Summe | Umsteiger/Tag |
 |---|---|---|---|---|
-| **:00** | 23 min | 3 min | 26 min | **54** |
+| **:00** | 23 min | 3 min | 26 min | **51** |
 | :20 | 3 min | 23 min | 26 min | 52 |
 | :40 | 43 min | 43 min | 86 min | **31** |
 
@@ -195,6 +196,41 @@ ist, macht es für ein halbes Jahr enger.
 Bahnbau kostet ein Vielfaches des Busbetriebs; die erste Strecke ist das Ziel mehrerer
 Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm dev`.
 
+### Spielstände
+
+Oben rechts **Spielstand**. Gespeichert wird in der Datenbank des Browsers, automatisch alle
+30 Spieltage und von Hand beliebig oft. Wichtig: was im Browser liegt, überlebt kein Aufräumen
+der Websitedaten — wer einen Stand behalten will, **exportiert ihn als Datei**.
+
+Ein Spielstand mit einem Jahr Spielzeit und acht Linien ist rund 750 kB groß.
+
+### Einrichtungen
+
+Städte unterscheiden sich nicht nur durch ihre Einwohnerzahl. Hochschulen, Sehenswürdigkeiten,
+Naturziele, Freizeitparks, Flughäfen und große Arbeitgeber kommen aus Wikidata und stehen im
+Stadtpanel. Sie machen eine Stadt als **Ziel** attraktiver, nicht als Quelle: eine Hochschule
+zieht Studenten an, sie bringt keine hervor.
+
+Der Effekt ist deutlich — Erlangen zieht mit 102 000 Einwohnern mehr Studenten an als
+Ingolstadt mit 123 000, und Ingolstadts Großarbeitgeber macht aus einem Verlustkorridor einen
+tragfähigen.
+
+### Störungen und Instandhaltung
+
+Züge fallen aus. Wie oft, hängt an drei Dingen: **Fahrzeugzustand**, **Streckenalter** und
+**Auslastung**. Eine Störung ist kein Aufschlag auf die Statistik, sondern Standzeit auf der
+Strecke — der Zug hält an, und die folgenden warten.
+
+Zwei Gegenmittel:
+
+| Mittel | Wo | Wirkung |
+|---|---|---|
+| **Hauptuntersuchung** | Fuhrpark → Spalte *HU* | Fahrzeugzustand zurück auf 92 % |
+| **Oberbau erneuern** | Streckendetail → *Zustand* | Streckenalter zurück auf null |
+
+Beides kostet, und beides ist teurer, je länger man wartet. Ein heruntergefahrener Fuhrpark
+wird über ein Jahr rund viermal so oft gestört wie ein gepflegter.
+
 ## Dokumentation
 
 | Dokument | Inhalt |
@@ -209,10 +245,13 @@ Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm 
 
 ## Status
 
-**Phase 4a abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
+**Phase 4b abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
 Strecken über echtes Gelände trassieren und ausbauen, Züge kaufen, Bahnlinien takten und im
 Bildfahrplan Konflikte durch Überholstellen oder Ausbau auflösen. Fahrgäste steigen zwischen
 eigenen Linien um, und Überfüllung kostet Stammkunden und Fahrplanstabilität.
 
-Als Nächstes Phase 4b: Störungen, Einrichtungen aus Wikidata, Auslastungs-Heatmap. Der
-Phasenplan steht in [docs/06-ROADMAP.md](docs/06-ROADMAP.md).
+Spielstände lassen sich speichern und exportieren, Städte haben echte Einrichtungen aus
+Wikidata, und Fahrzeuge wie Strecken wollen instand gehalten werden.
+
+Als Nächstes: Auslastungs-Heatmap, Saisonganglinien — oder Phase 5, Europa. Der Phasenplan
+steht in [docs/06-ROADMAP.md](docs/06-ROADMAP.md).
