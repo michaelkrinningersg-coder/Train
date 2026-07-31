@@ -1,7 +1,8 @@
 import type { GameState, LineId } from '@game/domain'
 import { waitFromHeadway } from '@game/demand'
 import { distanceKm } from '@game/geo'
-import { expectedHoldSec, holdProbability, missProbability } from './holding.js'
+import { expectedHoldSec, holdLateChance, holdProbability, missProbability } from './holding.js'
+import { PUNCTUALITY_THRESHOLD_SEC } from './railRuns.js'
 import { arrivalAt, departureAt, type Direction, type LineOffer } from './offers.js'
 
 /**
@@ -259,6 +260,8 @@ export interface HoldEvent {
   readonly seconds: number
   /** Wie oft überhaupt gewartet wird. */
   readonly chance: number
+  /** Und wie oft das Warten die Fahrt unpünktlich macht. */
+  readonly lateChance: number
 }
 
 export interface LineHold {
@@ -319,6 +322,10 @@ export function applyConnectionHolding(
             fromLineId: feeder.lineId,
             seconds,
             chance: holdProbability(feeder.averageDelaySec, slack),
+            // Unpuenktlich ist die Fahrt erst, wenn der Halt die Schwelle
+            // reisst - sonst gaelten fuer dieselben zwei Minuten Verspaetung
+            // zwei verschiedene Massstaebe, je nachdem, woher sie kommen.
+            lateChance: holdLateChance(feeder.averageDelaySec, slack, own.holdSec, PUNCTUALITY_THRESHOLD_SEC),
           }
         }
       }
@@ -326,7 +333,7 @@ export function applyConnectionHolding(
       if (worst !== null) {
         events.push(worst)
         seconds += worst.seconds
-        onTimeChance *= 1 - worst.chance
+        onTimeChance *= 1 - worst.lateChance
       }
     })
 

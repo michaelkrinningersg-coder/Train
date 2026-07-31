@@ -306,6 +306,9 @@ damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
   Phase 4c ihre erste echte Aufgabe gegeben; ein Test lädt einen Stand aus Format 1.
 - ~~Kein unplanmäßiger Werkstattaufenthalt.~~ Erledigt in Phase 4c: eine schwere Störung am
   Fahrzeug schickt es für 2 bis 24 Tage ins Werk. Erst damit hat die Reserve einen Zweck.
+  Gemessen an einem Umlauf von sechs Zügen im Halbstundentakt über ein Jahr
+  (`pnpm calibrate`, Abschnitt 7): 1 Schaden bei 95 % Zustand, 7 bei 60 %, 23 bei 30 %, 32 bei
+  15 % — und 357 Ausfalltage bei 30 % Zustand, also dauerhaft ein Zug weniger im Umlauf.
 - **Einrichtungen sind statisch.** Eine Universität wird nicht gegründet, ein Werk nicht
   geschlossen. Für eine Kampagne über Jahrzehnte wäre das der nächste Schritt.
 - **Die Größeneinstufung hängt an lückenhaften Daten.** Besucherzahlen stehen bei den
@@ -337,6 +340,11 @@ pünktlich weiterfahren —, kam im Spiel nicht vor.
 - **Spielstandformat 2** mit dem ersten echten Migrationsschritt.
 - **Auslastungs-Heatmap über der Karte** (Schalter „Auslastung"): Farbe und Strichstärke je
   Abschnitt aus dem letzten Betriebstag, mit Zeigerhinweis und Klick auf die Linie.
+- **Zwei Kanten im Nachfragemodell beseitigt**, beide von der Anschlusssicherung aufgedeckt:
+  die Grundneigung einer Reisekette kam bis dahin vom längsten Teilstück, und der
+  Bestandsverkehr fiel nur weg, wenn das längste Teilstück auf der Schiene lag. Zwei Minuten
+  mehr auf dem Zubringerbus konnten damit die Fahrgastzahl einer Kette um den Faktor sieben
+  ändern. Beides rechnet jetzt mit dem nach Fahrzeit gewichteten Verkehrsmittelgemisch.
 - **Lint und CI**, seit Phase 0 offen. ESLint mit typbewussten Regeln — gemeldet wird nur, was
   ein Typsystem *nicht* sieht: vergessenes `await`, toter Code, `any`, Hook-Abhängigkeiten.
   `tools/` bekam dabei sein erstes tsconfig und war prompt kaputt: `calibrate.ts` benutzte
@@ -350,6 +358,22 @@ pünktlich weiterfahren —, kam im Spiel nicht vor.
 Anschlüsse baut, muss entweder Puffer legen (kostet alle Umsteiger Zeit) oder warten lassen
 (kostet alle an Bord Pünktlichkeit). Es gibt keine Einstellung, die beides gewinnt.
 
+Gemessen an einem knappen Anschluss hinter einem Zubringer mit 13 min mittlerer Verspätung
+(`pnpm calibrate`, Abschnitt 7):
+
+| warten bis | Pünktlichkeit der Anschlusslinie | Anschlusswarten | verpasste Anschlüsse |
+|---|---|---|---|
+| nie | 100 % | 0,0 min | 8 von 44 |
+| 3′ | 100 % | 2,4 min | 8 von 46 |
+| 5′ | 100 % | 3,7 min | 7 von 48 |
+| 10′ | 44 % | 6,2 min | 5 von 45 |
+
+Bis fünf Minuten trägt sich der Tausch: weniger verpasste Anschlüsse, mehr Umsteiger, und die
+Pünktlichkeit bleibt, weil ein Halt unter der Pünktlichkeitsschwelle keiner ist. Bei zehn
+Minuten kippt es. Wo genau der Umschlagpunkt liegt, hängt am Verhältnis von Puffer zur
+Verspätung des Zubringers — eine überall richtige Voreinstellung gibt die Mechanik nicht her,
+und genau deshalb ist es eine Entscheidung.
+
 **Was offen bleibt:**
 
 - **Die Anschlusssicherung wirkt in einer Runde.** Wer wartet, gibt seine Verspätung nicht an
@@ -361,6 +385,9 @@ Anschlüsse baut, muss entweder Puffer legen (kostet alle Umsteiger Zeit) oder w
   Kennzahlen, ist aber im Zeit-Weg-Diagramm nicht als solcher zu erkennen.
 - **Ein Schaden streicht keine Fahrt.** Er wirkt ab dem nächsten Betriebstag; die restlichen
   Läufe des Tages fahren noch.
+- **Die Werkstattschwelle ist gesetzt, nicht gemessen.** Eine halbe Stunde Störung als Grenze
+  zwischen „sitzt es aus" und „bleibt liegen", und ein Anteil von 12 %, kalibriert auf
+  Betriebsjahre statt auf eine Quelle.
 
 ---
 

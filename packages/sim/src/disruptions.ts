@@ -71,6 +71,23 @@ export function failureRate(options: {
   return BASE_FAILURE_RATE * wear * age * load
 }
 
+/**
+ * Anteil der Störungen, der am Fahrzeug liegt und nicht an der Strecke.
+ *
+ * Vorher entschied eine harte Schwelle: unter 60 % Zustand lag es am Fahrzeug,
+ * darüber an der Strecke. Als reine Beschriftung einer Warnung ging das durch;
+ * seit daran ein Werkstattaufenthalt hängt, nicht mehr — ein Fuhrpark bei 61 %
+ * wäre unverwüstlich und einer bei 59 % ständig kaputt. Diese Kante ist keine
+ * Entscheidung, die ein Spieler treffen können soll, sondern eine, die er nur
+ * verlieren kann.
+ *
+ * Fünf Prozent bleiben auch bei einem neuen Fahrzeug: es gibt keinen Zustand,
+ * in dem nichts kaputtgehen kann.
+ */
+export function vehicleShare(condition: number): number {
+  return Math.max(0.05, 1 - Math.max(0, Math.min(1, condition)))
+}
+
 export function disruptionSeconds(dice: number): number {
   // Kurze Störungen sind häufig, lange selten - deshalb quadratisch verteilt.
   return DISRUPTION_MIN_SEC + (DISRUPTION_MAX_SEC - DISRUPTION_MIN_SEC) * dice ** 2
@@ -85,6 +102,19 @@ export function disruptionSeconds(dice: number): number {
  * sie wäre entweder jede Kleinigkeit ein Werkstattfall oder keiner.
  */
 export const BREAKDOWN_THRESHOLD_SEC = 30 * 60
+
+/**
+ * Anteil der schweren Fahrzeugstörungen, nach denen der Zug wirklich stehen
+ * bleibt.
+ *
+ * Ohne diesen dritten Wurf wäre jede fünfte Störung eines gealterten Fahrzeugs
+ * ein Werkstattfall — bei zwei Störungen am Tag also alle zweieinhalb Tage
+ * einer. Ein zehn Jahre alter Triebwagen fällt nicht alle zweieinhalb Tage aus.
+ * Der Anteil ist auf Betriebsjahre kalibriert: rund 3 Schäden im Jahr bei 60 %
+ * Zustand, rund 14 bei 30 %, bezogen auf einen Umlauf von sechs Fahrzeugen im
+ * Halbstundentakt (siehe `pnpm calibrate`, Abschnitt 7).
+ */
+export const BREAKDOWN_SHARE = 0.12
 
 /** Kürzeste Reparaturdauer — ein Tag Diagnose, ein Tag Arbeit. */
 export const BREAKDOWN_MIN_DAYS = 2
@@ -169,13 +199,16 @@ export function rollDisruptions(options: {
     // ausgeloeste Stoerungen immer die langen.
     const severity = roll(options.seed, options.day, run.id, 'dauer')
     const seconds = disruptionSeconds(severity)
-    const cause = condition < 0.6 ? 'vehicle' : 'track'
+    const cause = roll(options.seed, options.day, run.id, 'ursache') < vehicleShare(condition) ? 'vehicle' : 'track'
 
+    // Der dritte Wurf: liegt der Zug wirklich, oder faehrt er weiter? Ohne ihn
+    // waere jede fuenfte Stoerung eines gealterten Fahrzeugs ein Werkstattfall.
     const breaks =
       cause === 'vehicle' &&
       seconds >= BREAKDOWN_THRESHOLD_SEC &&
       vehicle !== undefined &&
-      !broken.has(vehicle.id)
+      !broken.has(vehicle.id) &&
+      roll(options.seed, options.day, run.id, 'schaden') < BREAKDOWN_SHARE
     if (breaks) broken.add(vehicle.id)
 
     out.push({

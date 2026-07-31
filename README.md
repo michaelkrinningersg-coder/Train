@@ -249,6 +249,19 @@ es **liegenbleiben**. Zwei bis vierundzwanzig Tage, je schlechter der Zustand, d
 Im Fuhrpark steht dann „Schaden" statt „HU" — das eine hat man bestellt, das andere ist einem
 passiert.
 
+Wie sehr sich Pflege lohnt, misst man in Ausfalltagen und nicht in Reparaturrechnungen. Sechs
+Züge im Halbstundentakt, ein Jahr:
+
+| Zustand | Schäden | Ausfalltage |
+|---|---|---|
+| 95 % | 1 | 9 |
+| 60 % | 7 | 81 |
+| 30 % | 23 | 357 |
+| 15 % | 32 | 548 |
+
+Bei 30 % fehlt dauerhaft ein Zug von sechs. Ohne Reserve heißt das: das ganze Jahr über
+dünnerer Takt.
+
 Im Linienpanel steht neben jedem zugeteilten Fahrzeug **ersetzen**. Damit tauscht man es gegen
 ein freies — für die Werkstattzeit, oder um einen alten Bus gegen einen neuen zu wechseln, ohne
 die Linie erst leerzuräumen.

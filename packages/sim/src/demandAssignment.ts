@@ -75,7 +75,13 @@ export function assignDemand(
 
     // Wo der Spieler selbst mit der Bahn faehrt, faellt der Bestandsverkehr weg -
     // er hat die Relation uebernommen. Sonst konkurrierte er gegen ein Phantom.
-    if (!connections.some((c) => c.mode === 'rail')) {
+    //
+    // Gefragt wird, ob *irgendeine* Teilstrecke auf der Schiene liegt, nicht ob
+    // die laengste es tut. Das war vorher anders und ergab dieselbe Kante wie
+    // beim Etikett einer Kette: zwei Minuten mehr auf dem Zubringerbus liessen
+    // den Bestandsverkehr zurueckkehren, obwohl der Spieler dieselbe Bahnfahrt
+    // anbietet wie zuvor.
+    if (!connections.some((c) => (c.modeMix.rail ?? 0) > 0)) {
       const smaller = Math.min(
         state.cities.get(fromCity)?.population ?? 0,
         state.cities.get(toCity)?.population ?? 0,

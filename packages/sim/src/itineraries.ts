@@ -87,8 +87,10 @@ export interface Itinerary {
    * Vor der ersten Teilstrecke immer 0 — dort gibt es nichts zu verpassen.
    */
   readonly legMisses: readonly number[]
-  /** Prägendes Verkehrsmittel: das der längsten Teilstrecke. */
+  /** Prägendes Verkehrsmittel: das der längsten Teilstrecke. Nur für die Anzeige. */
   readonly mode: 'bus' | 'rail'
+  /** Zusammensetzung nach Fahrzeit — das, was im Logit zählt. */
+  readonly modeMix: Readonly<Partial<Record<'bus' | 'rail', number>>>
   readonly travelTimeSec: number
   readonly waitTimeSec: number
   readonly fareCents: number
@@ -104,6 +106,7 @@ export interface Itinerary {
 export function itineraryAlternative(itinerary: Itinerary, ascOffset: number): Alternative {
   return {
     mode: itinerary.mode,
+    modeMix: itinerary.modeMix,
     priceCents: itinerary.fareCents,
     travelTimeSec: itinerary.travelTimeSec,
     waitTimeSec: itinerary.waitTimeSec,
@@ -149,6 +152,11 @@ function combine(
   const totalRide = Math.max(1, legs.reduce((s, l) => s + l.timeSec, 0))
   const comfort = parts.reduce((s, p) => s + p.offer.comfort * (p.leg.timeSec / totalRide), 0)
 
+  // Nach Fahrzeit gewichtete Zusammensetzung. Sie ersetzt im Logit die harte
+  // Auswahl des laengsten Teilstuecks - siehe `Alternative.modeMix`.
+  const modeMix: Partial<Record<'bus' | 'rail', number>> = {}
+  for (const p of parts) modeMix[p.offer.mode] = (modeMix[p.offer.mode] ?? 0) + p.leg.timeSec / totalRide
+
   const longest = parts.reduce((best, p) => (p.leg.timeSec > best.leg.timeSec ? p : best), parts[0]!)
   const first = parts[0]!
   const last = parts[parts.length - 1]!
@@ -164,6 +172,7 @@ function combine(
     legWaits,
     legMisses,
     mode: longest.offer.mode,
+    modeMix,
     travelTimeSec,
     waitTimeSec,
     fareCents,
@@ -196,6 +205,7 @@ function combine(
 export interface ItineraryOption {
   readonly od: string
   readonly mode: 'bus' | 'rail'
+  readonly modeMix: Readonly<Partial<Record<'bus' | 'rail', number>>>
   readonly travelTimeSec: number
   readonly waitTimeSec: number
   readonly fareCents: number
@@ -211,6 +221,7 @@ export interface ItineraryOption {
 export function optionAlternative(option: ItineraryOption, ascOffset: number): Alternative {
   return {
     mode: option.mode,
+    modeMix: option.modeMix,
     priceCents: option.fareCents,
     travelTimeSec: option.travelTimeSec,
     waitTimeSec: option.waitTimeSec,
@@ -294,9 +305,16 @@ function mergeOptions(offers: readonly LineOffer[], chains: readonly Itinerary[]
       perPosition.slice(1).reduce((sum, _p, i) => sum + weight((c) => c.legWaits[i + 1] ?? 0), 0)
 
     const first = list[0]!
+    const modeMix: Partial<Record<'bus' | 'rail', number>> = {}
+    for (const mode of ['bus', 'rail'] as const) {
+      const share = weight((c) => c.modeMix[mode] ?? 0)
+      if (share > 0) modeMix[mode] = share
+    }
+
     options.push({
       od: first.od,
       mode: first.mode,
+      modeMix,
       travelTimeSec: weight((c) => c.travelTimeSec),
       waitTimeSec,
       fareCents: weight((c) => c.fareCents),

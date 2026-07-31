@@ -127,16 +127,36 @@ P(m)  = exp(U_m) / Σ_n exp(U_n)
 
 | Segment | Bahn | Bus | Auto | nicht reisen |
 |---|---|---|---|---|
-| commuter | +0,30 | −0,60 | 0 | −2,20 |
-| pupil | +0,90 | +0,40 | −2,50 | −1,80 |
-| student | +0,60 | +0,25 | −0,90 | −1,20 |
-| business | +0,70 | −1,80 | 0 | −0,60 |
-| tourist | +0,45 | −0,30 | 0 | −0,40 |
-| vfr | +0,10 | −0,40 | 0 | −0,90 |
+| commuter | +0,30 | −1,80 | 0 | −2,20 |
+| pupil | +0,90 | +0,20 | −2,50 | −1,80 |
+| student | +0,60 | −0,40 | −0,90 | −1,20 |
+| business | +0,70 | −2,60 | 0 | −0,60 |
+| tourist | +0,45 | −1,00 | 0 | −0,40 |
+| vfr | +0,10 | −1,10 | 0 | −0,90 |
 
 Diese Tabelle ist der eigentliche Charaktergeber des Spiels. Sie sagt: Schüler haben kein Auto,
 Geschäftsreisende steigen nicht in den Bus, Touristen sind flexibel. Sie ist bewusst als
 **reine Datentabelle** modelliert, damit man sie beim Balancing anfassen kann, ohne Code zu ändern.
+
+**Und was ist die Konstante einer Reisekette aus Bus und Bahn?** Die naheliegende Antwort —
+die des längsten Teilstücks — ist falsch, und zwar sichtbar falsch. Zwischen `rail` (+0,30) und
+`bus` (−1,80) liegen bei Berufspendlern gut zwei Nutzenpunkte, also Faktor acht in den
+Fahrgastzahlen. Eine Kette, deren Busabschnitt zwei Minuten länger wird als der Bahnabschnitt,
+verlöre in einem Schritt sieben Achtel ihrer Fahrgäste. Das ist keine Modellaussage, sondern
+ein Artefakt der Maximumsbildung — aufgefallen ist es, als die Anschlusssicherung dem
+Zubringerbus ein paar Minuten Wartezeit eintrug und die Umsteigerzahl um den Faktor sieben
+einbrach.
+
+Deshalb trägt jede Alternative optional ein **Verkehrsmittelgemisch** (`modeMix`): den nach
+Fahrzeit gewichteten Anteil jedes Verkehrsmittels. Die Konstante wird daraus anteilig gebildet.
+Eine Kette aus 60 % Bahnfahrt und 40 % Busfahrt liegt zwischen beiden Konstanten und bewegt
+sich stetig, wenn sich die Anteile verschieben. Für eine Direktverbindung ändert sich nichts —
+dort ist das Gemisch die eine Konstante selbst.
+
+Dieselbe Kante gab es beim **Bestandsverkehr**: er fällt weg, wo der Spieler die Relation mit
+der Bahn übernimmt. Maßgeblich ist jetzt, ob *irgendeine* Teilstrecke auf der Schiene liegt,
+nicht ob die längste es tut — sonst kehrte die Konkurrenz zurück, weil der Zubringerbus zwei
+Minuten länger braucht, während der Spieler dieselbe Bahnfahrt anbietet wie zuvor.
 
 **Auto-Referenz**: Fahrzeit aus der OSRM-Matrix, Kosten mit 0,32 €/km angesetzt (Kraftstoff +
 Verschleiß, ohne Fixkosten — so entscheiden Menschen tatsächlich). Damit hat die Bahn auf

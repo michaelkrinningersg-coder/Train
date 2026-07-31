@@ -34,6 +34,7 @@ import {
   disruptionSeconds,
   failureRate,
   roll,
+  vehicleShare,
   rollDisruptions,
 } from './disruptions.js'
 import { simulateRailLine } from './day.js'
@@ -856,27 +857,41 @@ describe('Fahrzeugschäden', () => {
     expect(all.some((d) => d.seconds < BREAKDOWN_THRESHOLD_SEC && d.workshopDays === 0)).toBe(true)
   })
 
-  it('lässt ein gepflegtes Fahrzeug nicht liegenbleiben', () => {
-    // Bei gutem Zustand liegt die Ursache an der Strecke - die haelt auf, aber
-    // sie nimmt kein Fahrzeug aus dem Umlauf.
-    const runs = Array.from({ length: 600 }, (_, i) => ({ id: `p1-${i}`, vehicleId: vehicleId(`v${i}`) }))
-    const all = rollDisruptions({
-      seed: 7,
-      day: 3,
-      runs,
-      vehicleOf: (id) => ({ id, condition: 0.95 }) as never,
-      trackAgeYears: 30,
-      loadFactor: 1,
-    })
-    expect(all.length).toBeGreaterThan(0)
-    expect(all.every((d) => d.workshopDays === 0)).toBe(true)
+  it('verschiebt die Ursache stetig vom Gleis zum Fahrzeug', () => {
+    // Vorher entschied eine harte Schwelle bei 60 % Zustand. Als Beschriftung
+    // einer Warnung ging das durch; seit ein Werkstattaufenthalt daran haengt,
+    // waere ein Fuhrpark bei 61 % unverwuestlich und einer bei 59 % staendig
+    // kaputt. Diese Kante kann ein Spieler nur verlieren.
+    expect(vehicleShare(0.95)).toBeLessThan(vehicleShare(0.6))
+    expect(vehicleShare(0.6)).toBeLessThan(vehicleShare(0.3))
+    // Und es gibt keinen Zustand, in dem nichts kaputtgehen kann.
+    expect(vehicleShare(1)).toBeGreaterThan(0)
+  })
+
+  it('lässt ein gepflegtes Fahrzeug praktisch nie liegenbleiben', () => {
+    const broken = (condition: number): number => {
+      const runs = Array.from({ length: 6000 }, (_, i) => ({ id: `p1-${i}`, vehicleId: vehicleId(`v${i}`) }))
+      return rollDisruptions({
+        seed: 7,
+        day: 3,
+        runs,
+        vehicleOf: (id) => ({ id, condition }) as never,
+        trackAgeYears: 30,
+        loadFactor: 1,
+      }).filter((d) => d.workshopDays > 0).length
+    }
+
+    // Zwei Groessenordnungen Unterschied - das ist der Grund, warum sich eine
+    // Hauptuntersuchung rechnet.
+    expect(broken(0.95)).toBe(0)
+    expect(broken(0.25)).toBeGreaterThan(8)
   })
 
   it('nimmt dasselbe Fahrzeug am selben Tag nur einmal aus dem Verkehr', () => {
     // Ein Fahrzeug faehrt mehrere Laeufe am Tag. Der erste Schaden nimmt es aus
     // dem Verkehr; ein zweiter waere ein Schaden an einem Fahrzeug im Werk.
     const one = vehicleId('v1')
-    const runs = Array.from({ length: 400 }, (_, i) => ({ id: `p1-${i}`, vehicleId: one }))
+    const runs = Array.from({ length: 6000 }, (_, i) => ({ id: `p1-${i}`, vehicleId: one }))
     const broken = rollDisruptions({
       seed: 7,
       day: 3,

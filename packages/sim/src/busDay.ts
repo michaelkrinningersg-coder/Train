@@ -83,6 +83,11 @@ export function finishBusDay(
   if (extraDwell > 60) {
     warnings.push(`Andrang verlängert die Fahrzeit um ${Math.round(extraDwell / 60)} min je Richtung.`)
   }
+  if (offer.heldSec > 60) {
+    warnings.push(
+      `Anschlusswarten kostet im Mittel ${Math.round(offer.heldSec / 60)} min Verspätung — das fahren alle an Bord mit.`,
+    )
+  }
 
   return {
     result: {
@@ -98,6 +103,11 @@ export function finishBusDay(
       effectiveHeadwayMin: offer.headwayMin,
       warnings,
       mode: 'bus',
+      // Ein Bus faehrt im Modell puenktlich - es sei denn, er wartet auf einen
+      // Anschluss. Seit es die Anschlusssicherung gibt, muss auch die Buslinie
+      // ihre Puenktlichkeit melden, sonst bliebe der Preis des Wartens unsichtbar.
+      punctuality: offer.punctuality,
+      averageDelaySec: offer.averageDelaySec,
       linkLoadFactors: assignment.linkLoadFactors,
       transferPassengers,
       satisfaction: meanSatisfaction(state, assignment.byOd.keys()),

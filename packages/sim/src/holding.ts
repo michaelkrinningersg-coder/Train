@@ -76,6 +76,30 @@ export function holdProbability(meanDelaySec: number, slackSec: number): number 
 }
 
 /**
+ * Wie oft ein gehaltener Anschluss die Fahrt **unpünktlich** macht.
+ *
+ * Nicht dasselbe wie `holdProbability`: dort zählt jede Sekunde Warten, hier
+ * nur, was über der Pünktlichkeitsschwelle liegt. Der Unterschied ist nicht
+ * kosmetisch. Hinter einem Zubringer mit zehn Minuten mittlerer Verspätung
+ * wartet ein knapper Anschluss fast immer *ein bisschen* — zählte das als
+ * unpünktlich, stünde jede wartende Linie bei zehn Prozent Pünktlichkeit,
+ * während dieselben zwei Minuten Verspätung aus dem Betrieb heraus als
+ * pünktlich durchgingen. Zwei Maßstäbe für dieselbe Verspätung.
+ *
+ * Wartet die Linie höchstens bis zur Schwelle, kann sie daran gar nicht
+ * scheitern — der Halt ist nach oben begrenzt.
+ */
+export function holdLateChance(
+  meanDelaySec: number,
+  slackSec: number,
+  maxHoldSec: number,
+  thresholdSec: number,
+): number {
+  if (meanDelaySec <= 0 || maxHoldSec <= thresholdSec) return 0
+  return Math.exp(-(Math.max(0, slackSec) + thresholdSec) / meanDelaySec)
+}
+
+/**
  * Anteil der Umsteiger, die den Anschluss trotz allem verpassen.
  *
  * Ohne Anschlusssicherung ist das genau der Anteil, dessen Zubringer den Puffer

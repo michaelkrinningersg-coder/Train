@@ -30,6 +30,7 @@ import {
   type City,
   type CityId,
   type GameState,
+  type LineDayResult,
   type TrackSpec,
 } from '@game/domain'
 import {
@@ -45,6 +46,7 @@ import { distanceKm, terrainStats, type ElevationGrid } from '@game/geo'
 import {
   advanceDays,
   applyCommand,
+  applyConnectionHolding,
   createGame,
   isMinor,
   lineConnections,
@@ -558,4 +560,180 @@ console.log(
     '— aber beide Richtungen zugleich kurz zu bekommen geht nur, wenn Fahrzeit\n' +
     'und Takt zueinander passen. Das ist genau die Rechnung hinter einem\n' +
     'Integralen Taktfahrplan.',
+)
+
+console.log('\n═══ 7. Anschlusssicherung und Fahrzeugschäden ═══\n')
+
+/**
+ * Beide Mechaniken brauchen eine *unpuenktliche* Linie, sonst zeigen sie
+ * nichts. Buslinien sind im Modell immer puenktlich; die Verspaetung kommt aus
+ * dem Bahnbetrieb. Deshalb hier ein eingleisiger Bahnkorridor als Zubringer und
+ * ein Bus, der auf ihn wartet oder nicht.
+ */
+function railLine(
+  state: GameState,
+  name: string,
+  cityNames: readonly string[],
+  trains: number,
+  headway: number,
+  spec: TrackSpec,
+  classId = 'emu_regional',
+): GameState {
+  let next = state
+  const apply = (command: Parameters<typeof applyCommand>[1]): void => {
+    const r = applyCommand(next, command)
+    if (!r.ok) throw new Error(r.reason)
+    next = r.state
+  }
+
+  for (const n of cityNames) {
+    const c = cities.find((x) => x.name === n)!
+    if (![...next.network.stations.values()].some((s) => s.name === n && s.mode === 'rail')) {
+      apply({ kind: 'place_station', cityId: c.id, position: c.centre, platforms: 4 })
+    }
+  }
+  const nodes = cityNames.map((n) => [...next.network.stations.values()].find((s) => s.name === n && s.mode === 'rail')!.nodeId)
+  for (let i = 1; i < nodes.length; i++) {
+    apply({ kind: 'build_track', from: nodes[i - 1]!, to: nodes[i]!, geometry: [], spec })
+  }
+
+  const before = new Set(next.fleet.keys())
+  apply({ kind: 'buy_vehicle', classId, units: trains })
+  const fresh = [...next.fleet.values()].filter((v) => !before.has(v.id)).map((v) => v.id)
+
+  apply({
+    kind: 'create_line',
+    line: {
+      name,
+      mode: 'rail',
+      stops: cityNames.map((n) => ({
+        stationId: [...next.network.stations.values()].find((s) => s.name === n && s.mode === 'rail')!.id,
+        dwellSeconds: 60,
+        serves: true,
+      })),
+      path: { kind: 'rail', tracks: [] },
+      fare: { perKm: { first: 32, second: 19 }, baseFare: 300, priceIndex: 1 },
+      runtimeReserve: 1.07,
+      connectionHoldSec: 0,
+    },
+  })
+  const line = [...next.lines.values()].find((l) => l.name === name)!
+  apply({
+    kind: 'set_pattern',
+    pattern: {
+      lineId: line.id,
+      direction: 'forward',
+      vehicleIds: fresh,
+      days: DAYS_ALL,
+      headway: { everyMinutes: headway, firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 },
+    },
+  })
+
+  const ready = Math.max(0, ...[...next.network.tracks.values()].map((t) => t.readyOnDay))
+  return advanceDays(next, demand, Math.max(0, ready - next.day))
+}
+
+/**
+ * Der Bus faehrt bewusst mit **knappem** Anschluss: gesucht wird die
+ * Abfahrtsminute mit der kuerzesten Umsteigezeit. Bei grosszuegigem Puffer
+ * zeigt die Mechanik nichts - dann kommt der Zubringer auch verspaetet noch
+ * rechtzeitig, und genau das ist ja der Sinn eines Puffers.
+ */
+function connectionCase(minute: number, holdSec: number, days: number): GameState {
+  let state = createGame({ cities, startingCash: 50_000_000_000_00 })
+  state = railLine(state, 'M–A Bahn', ['München', 'Augsburg'], 4, 60, RAIL_SINGLE)
+  state = busLine(state, 'A–L Bus', ['Augsburg', 'Landsberg am Lech'], 3, 60, minute)
+
+  const bus = [...state.lines.values()].find((l) => l.name === 'A–L Bus')!
+  const set = applyCommand(state, { kind: 'set_connection_hold', lineId: bus.id, seconds: holdSec })
+  if (!set.ok) throw new Error(set.reason)
+  return advanceDays(set.state, demand, days)
+}
+
+/** Umsteigezeit von der Bahn in den Bus, fuer eine Abfahrtsminute. */
+function busBuffer(state: GameState): number {
+  const offers = applyConnectionHolding(
+    state,
+    prepareLines(state).flatMap((p) => (p.kind === 'idle' ? [] : [p.offer])),
+  ).offers
+  const train = [...state.lines.values()].find((l) => l.name === 'M–A Bahn')!
+  const link = lineConnections(state, offers, train.id).find((c) => c.stationName === 'Augsburg')
+  return link?.toOther?.waitSec ?? Number.POSITIVE_INFINITY
+}
+
+const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+const tightest = minutes
+  .map((m) => ({ m, buffer: busBuffer(connectionCase(m, 0, 1)) }))
+  .reduce((a, b) => (a.buffer <= b.buffer ? a : b))
+
+console.log(
+  'Anschlusssicherung — Bahn München–Augsburg eingleisig (unpünktlich), Bus Augsburg–Landsberg.\n' +
+    `Abfahrtsminute :${String(tightest.m).padStart(2, '0')}, damit der Anschluss knapp ist ` +
+    `(${(tightest.buffer / 60).toFixed(0)} min Umsteigezeit):`,
+)
+
+for (const holdMin of [0, 3, 5, 10]) {
+  const state = connectionCase(tightest.m, holdMin * 60, 30)
+  const busId = [...state.lines.values()].find((l) => l.name === 'A–L Bus')!.id
+  const week = state.history.slice(-7)
+  const busOf = (pick: (l: LineDayResult) => number | undefined): number =>
+    week.reduce((s, d) => s + (pick(d.lines.find((l) => l.lineId === busId)!) ?? 0), 0) / 7
+  const transfers =
+    week.reduce((s, d) => s + d.lines.reduce((t, l) => t + (l.transferPassengers ?? 0), 0), 0) / 7
+
+  console.log(
+    `  warten bis ${String(holdMin).padStart(2)}′` +
+      `   Bus: Pünktlichkeit ${(busOf((l) => l.punctuality) * 100).toFixed(0).padStart(3)} %` +
+      `  Anschlusswarten ${(busOf((l) => l.holdDelaySec) / 60).toFixed(1).padStart(4)} min` +
+      `  ·  verpasste Anschlüsse ${busOf((l) => l.missedConnections).toFixed(0).padStart(4)}` +
+      `  von ${transfers.toFixed(0).padStart(4)} Umsteigern`,
+  )
+}
+
+console.log(
+  '\nZu lesen von links nach rechts: die Wartebereitschaft kauft verpasste Anschlüsse\n' +
+    'mit eigener Verspätung. Beides ist echter Verlust — die eine Spalte trifft die\n' +
+    'Umsteiger, die andere alle an Bord. Bis fünf Minuten trägt sich der Tausch hier:\n' +
+    'ein Drittel weniger verpasste Anschlüsse für vier Minuten Verspätung, und die\n' +
+    'Umsteigerzahl steigt. Bei zehn Minuten kippt es — dort reißt der Halt die\n' +
+    'Pünktlichkeitsschwelle, und die Linie verliert mehr an Ruf, als sie an Umsteigern\n' +
+    'gewinnt. Wo genau der Umschlagpunkt liegt, hängt am Verhältnis von Puffer zur\n' +
+    'Verspätung des Zubringers; die Mechanik gibt keine Voreinstellung her, die überall\n' +
+    'stimmt. Die einzige Stellschraube, die beide Spalten zugleich senkt, ist mehr\n' +
+    'Puffer — und der kostet planmäßige Reisezeit.',
+)
+
+console.log('\nFahrzeugschäden — dieselbe Linie, ein Jahr, verschiedener Fuhrparkzustand:')
+for (const condition of [0.95, 0.6, 0.3, 0.15]) {
+  const built = railLine(
+    createGame({ cities, startingCash: 50_000_000_000_00 }),
+    'M–A Bahn',
+    ['München', 'Augsburg'],
+    6,
+    30,
+    RAIL_DOUBLE,
+  )
+  const worn: GameState = {
+    ...built,
+    fleet: new Map([...built.fleet].map(([k, v]) => [k, { ...v, condition }])),
+  }
+  const state = advanceDays(worn, demand, 365)
+
+  const repairs = state.ledger.filter((e) => e.note?.startsWith('Schaden'))
+  const days = repairs.reduce((s, e) => s + Number(/(\d+) Tage/.exec(e.note ?? '')?.[1] ?? 0), 0)
+  const cost = -repairs.reduce((s, e) => s + e.amount, 0)
+
+  console.log(
+    `  Zustand ${(condition * 100).toFixed(0).padStart(3)} %` +
+      `   Schäden ${String(repairs.length).padStart(3)}/Jahr` +
+      `   Ausfalltage ${String(days).padStart(4)}` +
+      `   Reparaturen ${formatMoney(cost).padStart(12)}`,
+  )
+}
+
+console.log(
+  '\nDie Ausfalltage sind der eigentliche Posten, nicht die Reparaturrechnung: bei\n' +
+    '30 % Zustand fehlt über das Jahr mehr als ein ganzer Zug, und eine Linie ohne\n' +
+    'Reserve fährt so lange dünneren Takt. Genau daran misst sich, ob eine\n' +
+    'Hauptuntersuchung ihr Geld wert ist — nicht an den Verspätungsminuten.',
 )

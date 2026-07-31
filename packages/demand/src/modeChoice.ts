@@ -60,6 +60,42 @@ export interface Alternative {
    * getarnt werden - das waere dasselbe Ergebnis mit einer Luege im Modell.
    */
   readonly ascOffset?: number
+  /**
+   * Zusammensetzung einer Reisekette aus Verkehrsmitteln, nach Fahrzeit
+   * gewichtet — etwa `{ rail: 0.6, bus: 0.4 }`.
+   *
+   * Ohne diese Angabe zählt `mode`, und für eine Direktverbindung ist das genau
+   * richtig. Für eine Kette aus Bus und Bahn ist es eine **Kante**: die Kette
+   * bekäme die Grundneigung des längsten Teilstücks, und zwei Minuten mehr auf
+   * dem Busabschnitt würden aus einer Bahnverbindung eine Busverbindung machen.
+   * Für Berufspendler liegen zwischen `rail` (+0,3) und `bus` (−1,8) gut zwei
+   * Nutzenpunkte — Faktor acht in den Fahrgastzahlen, ausgelöst von zwei
+   * Minuten. Das ist keine Modellaussage, sondern ein Artefakt der
+   * Maximumsbildung.
+   *
+   * Mit dem Gemisch wird die Konstante anteilig gebildet. Eine Kette, die zu
+   * 60 % aus Bahnfahrt besteht, liegt zwischen beiden Konstanten und bewegt sich
+   * stetig, wenn sich die Anteile verschieben.
+   */
+  readonly modeMix?: Readonly<Partial<Record<Mode, number>>>
+}
+
+/**
+ * Grundneigung einer Alternative: die Konstante ihres Verkehrsmittels, bei einer
+ * Reisekette das nach Fahrzeit gewichtete Mittel über ihre Teilstücke.
+ */
+function ascFor(segment: SegmentId, alt: Alternative): number {
+  const table = ASC[segment]
+  if (!alt.modeMix) return table[alt.mode]
+
+  let weighted = 0
+  let total = 0
+  for (const mode of MODES) {
+    const share = alt.modeMix[mode] ?? 0
+    weighted += table[mode] * share
+    total += share
+  }
+  return total > 0 ? weighted / total : table[alt.mode]
 }
 
 /**
@@ -92,7 +128,7 @@ export function alternativeShares(segment: SegmentId, alternatives: readonly Alt
   const s = SEGMENTS[segment]
 
   const utilities = alternatives.map(
-    (alt) => ASC[segment][alt.mode] + (alt.ascOffset ?? 0) + s.priceBeta * generalisedCost(segment, alt),
+    (alt) => ascFor(segment, alt) + (alt.ascOffset ?? 0) + s.priceBeta * generalisedCost(segment, alt),
   )
 
   // Verschiebung um das Maximum: mathematisch identisch, aber ohne Overflow.
