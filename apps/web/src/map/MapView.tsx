@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { THEME } from '../theme.js'
-import { buildLayers } from './layers.js'
+import { buildLayers, type LoadLink } from './layers.js'
 import { basemapById, hidePlaceLabels, loadStyle, PLAIN_STYLE } from './mapStyle.js'
 
 // Nur unsere eigene Quelle. Die Herkunft der Basiskarte liefert der jeweilige
@@ -31,6 +31,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
   const selectedLineId = useGame((s) => s.selectedLineId)
   const draft = useGame((s) => s.draft)
   const showDemand = useGame((s) => s.showDemand)
+  const showLoad = useGame((s) => s.showLoad)
   const mapMode = useGame((s) => s.mapMode)
   const selectedTrackId = useGame((s) => s.selectedTrackId)
   const trackDraft = useGame((s) => s.trackDraft)
@@ -63,10 +64,13 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
 
     const overlay = new MapboxOverlay({
       interleaved: false,
-      getTooltip: ({ object }: PickingInfo<City>) =>
-        object && 'population' in object
+      getTooltip: ({ object }: PickingInfo<City | LoadLink>) =>
+        object && (('population' in object) || ('load' in object))
           ? {
-              html: `<strong>${object.name}</strong><br/>${object.population.toLocaleString('de-DE')} Einwohner`,
+              html:
+                'load' in object
+                  ? `<strong>${object.lineName}</strong><br/>${object.from} → ${object.to}<br/>${Math.round(object.load * 100)} % ausgelastet`
+                  : `<strong>${object.name}</strong><br/>${object.population.toLocaleString('de-DE')} Einwohner`,
               style: {
                 background: THEME.surface,
                 color: THEME.textPrimary,
@@ -183,6 +187,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       selectedLineId,
       draft,
       showDemand,
+      showLoad,
       tone: basemap.tone,
       selectedTrackId,
       trackDraft: trackDraft ? { from: trackDraft.from, waypoints: trackDraft.waypoints } : null,
@@ -209,7 +214,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
         store.selectCity(city.id)
       },
     })
-  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
+  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand, showLoad, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
 
   useEffect(() => {
     overlayRef.current?.setProps({ layers })

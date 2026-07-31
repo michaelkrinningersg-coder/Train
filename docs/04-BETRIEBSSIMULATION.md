@@ -399,10 +399,22 @@ Auto aus, und er kommt deutlich langsamer zurück, als er gegangen ist.
 | **Deckungsbeitrag je Linie** | Umsatz − Betriebskosten − anteiliger Infrastrukturunterhalt |
 
 Umgesetzt sind Pünktlichkeit, Ø-Verspätung, Konfliktzahl, stehen gebliebene Fahrgäste,
-Sitzplatzauslastung **je Abschnitt** und der Deckungsbeitrag je Linie. Die Streckenauslastung
-in Prozent der theoretischen Kapazität und ihre Heatmap über die Karte fehlen noch — das ist
-vermutlich das nützlichste Analysewerkzeug des ganzen Spiels und steht deshalb weit oben in
-Phase 4.
+Sitzplatzauslastung **je Abschnitt** und der Deckungsbeitrag je Linie.
+
+Die Sitzplatzauslastung je Abschnitt liegt seit Phase 4c auch **über der Karte** (Kopfzeile,
+Schalter „Auslastung"). Das ist kein Zweitverwerten derselben Zahl: im Linienpanel ist der
+Engpass eine Zeile in einer Tabelle, auf der Karte ist er ein Ort — man sieht, welcher
+Korridor voll ist und was daneben liegt. Genau das beantwortet eine Tabelle nicht.
+
+Kodiert ist die Auslastung als **sequenzielle Rampe mit monoton fallender Helligkeit**, nicht
+als Rot/Grün-Achse: hell heißt leer, dunkel heißt voll. Wer keine Farben unterscheidet, sieht
+die Reihenfolge trotzdem, und die Strichstärke sagt dasselbe noch einmal — über 100 Prozent
+wächst sie weiter, während die Farbe am dunklen Ende stehen bleibt. Der Unterschied zwischen
+120 und 180 Prozent ist keiner, den man auf der Karte lesen will.
+
+Was weiterhin fehlt: die **Streckenauslastung** in Prozent der theoretischen Kapazität — also
+wie viele Trassen eine Strecke noch hergibt. Die Heatmap zeigt die Auslastung der *Züge*, nicht
+die der *Gleise*.
 
 ---
 

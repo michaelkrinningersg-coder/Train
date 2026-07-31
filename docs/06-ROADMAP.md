@@ -171,8 +171,8 @@ sich sauber an der Überholstelle kreuzen.
   neuer. Die Ereignisschleife nimmt Störungen ohne Umbau auf.
 - **Die Reihenfolge am Bahnsteig fehlt.** Bei Überfüllung werden alle Gruppen eines
   Abschnitts gleich behandelt; real bekommt der den Platz, der zuerst da war.
-- **Keine Streckenauslastungs-Heatmap.** Die Auslastung je Abschnitt wird berechnet und im
-  Linienpanel gezeigt, aber noch nicht über die Karte gelegt.
+- ~~Keine Streckenauslastungs-Heatmap.~~ Erledigt in Phase 4c. Was bleibt: sie zeigt die
+  Auslastung der *Züge*, nicht die der *Gleise*.
 - **Ein Fahrzeugtyp je Linie.** Gemischte Umläufe rechnen mit dem ersten zugeteilten Zug.
 - Die Simulation läuft weiterhin im Hauptthread. Ein Betriebstag einer Bahnlinie mit 34
   Zugläufen rechnet in wenigen Millisekunden; der Web Worker bleibt aufgeschoben.
@@ -310,8 +310,8 @@ damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
 - **Die Größeneinstufung hängt an lückenhaften Daten.** Besucherzahlen stehen bei den
   wenigsten Museen; ersatzweise zählt die Anzahl der Ziele einer Stadt. Beim Wechsel der
   Region gehört die Verteilung, die der Pipelinelauf ausgibt, noch einmal gelesen.
-- Segmente mit vollständiger Saisonganglinie, die Auslastungs-Heatmap und abgestimmte
-  Zubringertarife stehen weiterhin aus.
+- Segmente mit vollständiger Saisonganglinie und abgestimmte Zubringertarife stehen
+  weiterhin aus.
 
 ---
 
@@ -334,6 +334,8 @@ pünktlich weiterfahren —, kam im Spiel nicht vor.
 - **Risiko im Anschlusspanel**: ab 15 % verpasster Umsteiger ist ein Anschluss als riskant
   markiert, egal wie kurz er auf dem Papier ist.
 - **Spielstandformat 2** mit dem ersten echten Migrationsschritt.
+- **Auslastungs-Heatmap über der Karte** (Schalter „Auslastung"): Farbe und Strichstärke je
+  Abschnitt aus dem letzten Betriebstag, mit Zeigerhinweis und Klick auf die Linie.
 - **Unplanmäßiger Werkstattaufenthalt**: eine schwere Störung am Fahrzeug nimmt es für 2 bis
   24 Tage aus dem Verkehr. Störungen werden dafür je Zuglauf mit *seinem* Fahrzeug gewürfelt,
   nicht mehr pauschal mit dem ersten der Linie. Im Fuhrpark steht, ob ein Fahrzeug wegen HU

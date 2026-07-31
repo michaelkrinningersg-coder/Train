@@ -3,7 +3,7 @@ import type { Layer } from '@deck.gl/core'
 import { capacityFactor, type City, type CityId, type GameState, type LineId, type LngLat, type NodeId, type StationId, type TrackId } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import { distanceKm } from '@game/geo'
-import { MARKS, rgba, type MarkPalette, type Tone } from '../theme.js'
+import { MARKS, loadColor, rgba, type MarkPalette, type Tone } from '../theme.js'
 
 /** Punktradius in Pixeln. Einwohnerzahl per Wurzelskala auf die Flaeche abgebildet. */
 export function dotRadius(population: number): number {
@@ -67,6 +67,57 @@ export function topDemandArcs(state: GameState, demand: DemandMatrix): DemandArc
     })
 }
 
+/** Ein Abschnitt zwischen zwei Halten, mit der Auslastung von gestern. */
+export interface LoadLink {
+  readonly lineId: LineId
+  readonly lineName: string
+  readonly from: string
+  readonly to: string
+  readonly load: number
+  readonly path: [number, number][]
+}
+
+/**
+ * Die Auslastung je Abschnitt, für die Karte.
+ *
+ * Sie steht schon in jedem Linienpanel — nur eben je Linie, und dort ist der
+ * Engpass eine Zeile in einer Tabelle. Ein Engpass ist aber eine **Ortsfrage**:
+ * welcher Korridor ist voll, und was liegt daneben. Genau die beantwortet eine
+ * Tabelle nicht.
+ *
+ * Gezeichnet werden nur Abschnitte, auf denen gestern jemand saß. Ein Netz, in
+ * dem jede Linie einen blassen Streifen bekommt, wäre voller Farbe ohne
+ * Information.
+ */
+export function loadLinks(state: GameState): LoadLink[] {
+  const out: LoadLink[] = []
+  for (const result of state.lastDay?.lines ?? []) {
+    const line = state.lines.get(result.lineId)
+    if (!line || !result.linkLoadFactors) continue
+
+    const stations = line.stops.map((stop) => state.network.stations.get(stop.stationId))
+    for (let i = 0; i < result.linkLoadFactors.length; i++) {
+      const load = result.linkLoadFactors[i] ?? 0
+      const a = stations[i]
+      const b = stations[i + 1]
+      if (load <= 0 || !a || !b) continue
+      out.push({
+        lineId: line.id,
+        lineName: line.name,
+        from: a.name,
+        to: b.name,
+        load,
+        path: [
+          [a.position[0], a.position[1]],
+          [b.position[0], b.position[1]],
+        ],
+      })
+    }
+  }
+  // Die vollsten zuletzt, damit sie bei Ueberlagerung obenauf liegen.
+  return out.sort((x, y) => x.load - y.load)
+}
+
 export interface LayerContext {
   readonly state: GameState
   readonly demand: DemandMatrix
@@ -76,6 +127,8 @@ export interface LayerContext {
   readonly selectedLineId: LineId | null
   readonly draft: readonly StationId[]
   readonly showDemand: boolean
+  /** Auslastungs-Heatmap ueber den eigenen Linien. */
+  readonly showLoad: boolean
   readonly tone: Tone
   readonly selectedTrackId: TrackId | null
   /** Entwurf einer Strecke: Startknoten, Stuetzpunkte und Zeigerposition. */
@@ -84,6 +137,11 @@ export interface LayerContext {
   readonly onPickTrack: (id: TrackId) => void
   readonly onPickCity: (city: City | null) => void
   readonly onPickLine: (id: LineId) => void
+}
+
+/** Strichstärke eines Abschnitts. Über 100 Prozent wächst sie weiter. */
+function loadWidth(load: number): number {
+  return 3 + 7 * Math.min(1, load) + (load > 1 ? 4 * Math.min(1, load - 1) : 0)
 }
 
 export function buildLayers(ctx: LayerContext): Layer[] {
@@ -274,6 +332,44 @@ export function buildLayers(ctx: LayerContext): Layer[] {
         updateTriggers: { getColor: selectedLineId, getWidth: selectedLineId },
       }),
     )
+  }
+
+  // Ueber den Linien, damit der Engpass nicht unter seiner eigenen Linie
+  // verschwindet, aber unter Staedten und Beschriftung.
+  if (ctx.showLoad) {
+    const links = loadLinks(state)
+    if (links.length > 0) {
+      layers.push(
+        new PathLayer<LoadLink>({
+          id: 'load-casing',
+          data: links,
+          getPath: (d) => d.path,
+          getColor: rgba(c.casing, 190),
+          getWidth: (d) => loadWidth(d.load) + 3,
+          widthUnits: 'pixels',
+          capRounded: true,
+          jointRounded: true,
+          pickable: false,
+        }),
+        new PathLayer<LoadLink>({
+          id: 'load-links',
+          data: links,
+          getPath: (d) => d.path,
+          getColor: (d) => loadColor(c.load, d.load),
+          // Die Strichstaerke sagt dasselbe wie die Farbe noch einmal - wer
+          // Farben nicht unterscheidet, sieht den Engpass trotzdem.
+          getWidth: (d) => loadWidth(d.load),
+          widthUnits: 'pixels',
+          capRounded: true,
+          jointRounded: true,
+          pickable: true,
+          onClick: ({ object }) => {
+            if (object) ctx.onPickLine(object.lineId)
+            return true
+          },
+        }),
+      )
+    }
   }
 
   if (draftPath.length >= 2) {

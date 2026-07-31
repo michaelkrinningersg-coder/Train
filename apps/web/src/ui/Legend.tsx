@@ -1,4 +1,6 @@
 import { useGame } from '../game/store.js'
+import { basemapById } from '../map/mapStyle.js'
+import { MARKS } from '../theme.js'
 
 /** Größenlegende: die Einwohnerzahl ist über den Radius kodiert, nicht über die Farbe. */
 const SAMPLES = [
@@ -13,6 +15,8 @@ function dotRadius(population: number): number {
 
 export function Legend(): React.JSX.Element {
   const showDemand = useGame((s) => s.showDemand)
+  const showLoad = useGame((s) => s.showLoad)
+  const tone = basemapById(useGame((s) => s.basemap)).tone
   const maxDiameter = dotRadius(Math.max(...SAMPLES.map((s) => s.population))) * 2
 
   return (
@@ -37,6 +41,19 @@ export function Legend(): React.JSX.Element {
         <span className="legend__item">
           <span className="legend__stroke legend__stroke--demand" /> Nachfrage
         </span>
+      )}
+      {showLoad && (
+        <>
+          <span className="legend__sep" />
+          <span className="legend__item">
+            leer
+            <span
+              className="legend__ramp"
+              style={{ background: `linear-gradient(to right, ${MARKS[tone].load.join(', ')})` }}
+            />
+            voll
+          </span>
+        </>
       )}
     </div>
   )

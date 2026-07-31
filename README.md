@@ -274,6 +274,16 @@ In der Anschlussliste steht neben jeder Umsteigezeit, wie viel Prozent der Umste
 verpassen. Ab 15 % ist der Anschluss rot — auch wenn er auf dem Papier nur drei Minuten
 dauert. Ein Anschluss, den ein Teil der Fahrgäste nicht erreicht, ist keiner.
 
+## Wo ist der Engpass?
+
+Der Schalter **Auslastung** in der Kopfzeile legt die Sitzplatzauslastung des letzten
+Betriebstags über die Karte — je Abschnitt zwischen zwei Halten, nicht je Linie. Hell heißt
+leer, dunkel heißt voll, und über 100 Prozent wird der Strich zusätzlich dicker. Ein Klick
+öffnet die Linie, der Zeiger nennt die Zahl.
+
+Dieselbe Zahl steht auch im Linienpanel. Auf der Karte beantwortet sie eine andere Frage:
+nicht *wie voll ist meine Linie*, sondern *welcher Korridor ist voll und was liegt daneben*.
+
 ## Dokumentation
 
 | Dokument | Inhalt |

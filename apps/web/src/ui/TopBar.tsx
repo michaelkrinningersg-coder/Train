@@ -15,6 +15,8 @@ export function TopBar(): React.JSX.Element | null {
   const setSpeed = useGame((s) => s.setSpeed)
   const step = useGame((s) => s.step)
   const showDemand = useGame((s) => s.showDemand)
+  const showLoad = useGame((s) => s.showLoad)
+  const toggleLoad = useGame((s) => s.toggleLoad)
   const toggleDemand = useGame((s) => s.toggleDemand)
   const setShowSaves = useGame((s) => s.setShowSaves)
   if (!state) return null
@@ -60,6 +62,15 @@ export function TopBar(): React.JSX.Element | null {
         title="Die stärksten Reiserelationen einblenden"
       >
         Nachfrage
+      </button>
+
+      <button
+        type="button"
+        className={`chip${showLoad ? ' chip--on' : ''}`}
+        onClick={toggleLoad}
+        title="Auslastung je Abschnitt aus dem letzten Betriebstag"
+      >
+        Auslastung
       </button>
 
       <div className="speed" role="group" aria-label="Geschwindigkeit">

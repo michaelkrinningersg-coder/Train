@@ -56,6 +56,8 @@ interface GameStore {
   readonly selectedCityId: CityId | null
   readonly selectedLineId: LineId | null
   readonly showDemand: boolean
+  /** Auslastungs-Heatmap ueber den eigenen Linien. */
+  readonly showLoad: boolean
   readonly basemap: string
   readonly message: string | null
 
@@ -90,6 +92,7 @@ interface GameStore {
   selectCity: (id: CityId | null) => void
   selectLine: (id: LineId | null) => void
   toggleDemand: () => void
+  toggleLoad: () => void
   setBasemap: (id: string) => void
   notify: (message: string | null) => void
 
@@ -129,6 +132,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectedCityId: null,
   selectedLineId: null,
   showDemand: false,
+  showLoad: false,
   basemap: DEFAULT_BASEMAP,
   message: null,
 
@@ -308,6 +312,7 @@ export const useGame = create<GameStore>((set, get) => ({
       return { selectedLineId, tab: mode === 'rail' ? 'rail' : 'network', showTimetable: false }
     }),
   toggleDemand: () => set((s) => ({ showDemand: !s.showDemand })),
+  toggleLoad: () => set((s) => ({ showLoad: !s.showLoad })),
   setBasemap: (basemap) => set({ basemap }),
   notify: (message) => set({ message }),
 

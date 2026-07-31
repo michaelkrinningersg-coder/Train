@@ -1014,3 +1014,13 @@ button.primary.on {
   padding: 0.2rem 0;
   border-bottom: 1px solid var(--border);
 }
+
+/* Farbrampe der Auslastung. Helligkeit traegt die Reihenfolge, nicht der Farbton. */
+.legend__ramp {
+  display: inline-block;
+  width: 56px;
+  height: 6px;
+  margin: 0 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
