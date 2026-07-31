@@ -32,13 +32,16 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
   const draft = useGame((s) => s.draft)
   const showDemand = useGame((s) => s.showDemand)
   const mapMode = useGame((s) => s.mapMode)
+  const selectedTrackId = useGame((s) => s.selectedTrackId)
+  const trackDraft = useGame((s) => s.trackDraft)
+  const hoverPoint = useGame((s) => s.hoverPoint)
   const basemapId = useGame((s) => s.basemap)
   const basemap = basemapById(basemapId)
   const mapRef = useRef<maplibregl.Map | null>(null)
 
-  // Aktionen ueber ein Ref, damit der Karten-Effekt nur einmal laeuft.
-  const actions = useRef({ mapMode, draft })
-  actions.current = { mapMode, draft }
+  // Aktueller Modus ueber ein Ref, damit der Karten-Effekt nur einmal laeuft.
+  const actions = useRef({ mapMode })
+  actions.current = { mapMode }
 
   useEffect(() => {
     const container = containerRef.current
@@ -83,18 +86,58 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
     map.on('load', () => setZoom(map.getZoom()))
     map.on('moveend', () => setZoom(map.getZoom()))
 
-    // Klick ins Leere hebt die Auswahl auf. Der Handler haengt an MapLibre und
-    // nicht an deck.gl: die deck.gl-Leinwand liegt zwar oben, hat aber
-    // pointer-events:none - alle Zeigerereignisse laufen ueber MapLibre.
+    // Alle Zeigerereignisse laufen ueber MapLibre: die deck.gl-Leinwand liegt
+    // zwar oben, hat aber pointer-events:none.
     map.on('click', (e) => {
-      const picked = overlay.pickObject({ x: e.point.x, y: e.point.y, radius: 4 })
+      const store = useGame.getState()
+      const picked = overlay.pickObject({ x: e.point.x, y: e.point.y, radius: 6 })
+      const point: [number, number] = [e.lngLat.lng, e.lngLat.lat]
+
+      if (store.mapMode === 'place-station') {
+        store.placeStation(point)
+        return
+      }
+
+      if (store.mapMode === 'draw-track') {
+        // Ein Klick auf einen Bahnhof setzt Start oder Ziel, alles andere ist
+        // ein Stuetzpunkt der Trasse.
+        const station = nearestRailStation(store, point, e.point, map)
+        if (station) store.trackClickNode(station.nodeId)
+        else store.trackAddWaypoint(point)
+        return
+      }
+
       if (!picked) {
-        useGame.getState().selectCity(null)
-        useGame.getState().selectLine(null)
+        store.selectCity(null)
+        store.selectLine(null)
+        store.selectTrack(null)
       }
     })
 
+    // Gummiband beim Streckenziehen. Nur im Bauwerkzeug gepflegt, sonst wuerde
+    // jede Mausbewegung die Layer neu aufbauen.
+    map.on('mousemove', (e) => {
+      const store = useGame.getState()
+      if (store.mapMode === 'draw-track' || store.mapMode === 'place-station') {
+        store.setHoverPoint([e.lngLat.lng, e.lngLat.lat])
+      }
+    })
+
+    // Escape bricht das laufende Bauwerkzeug ab, Rücktaste nimmt einen
+    // Stuetzpunkt zurueck.
+    const onKey = (ev: KeyboardEvent): void => {
+      const store = useGame.getState()
+      if (store.mapMode !== 'draw-track' && store.mapMode !== 'place-station') return
+      if (ev.key === 'Escape') store.cancelBuild()
+      if (ev.key === 'Backspace') {
+        ev.preventDefault()
+        store.trackUndoWaypoint()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+
     return () => {
+      window.removeEventListener('keydown', onKey)
       overlayRef.current = null
       mapRef.current = null
       map.remove()
@@ -136,6 +179,10 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       draft,
       showDemand,
       tone: basemap.tone,
+      selectedTrackId,
+      trackDraft: trackDraft ? { from: trackDraft.from, waypoints: trackDraft.waypoints } : null,
+      hoverPoint: mapMode === 'draw-track' ? hoverPoint : null,
+      onPickTrack: (id) => useGame.getState().selectTrack(id),
       onPickLine: (id) => useGame.getState().selectLine(id),
       onPickCity: (city) => {
         const store = useGame.getState()
@@ -154,11 +201,43 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
         store.selectCity(city.id)
       },
     })
-  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand, basemap.tone])
+  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
 
   useEffect(() => {
     overlayRef.current?.setProps({ layers })
   }, [layers])
 
-  return <div ref={containerRef} className={`map${mapMode === 'draw-line' ? ' map--picking' : ''}`} />
+  const picking = mapMode !== 'idle'
+  return <div ref={containerRef} className={`map${picking ? ' map--picking' : ''}`} />
+}
+
+/**
+ * Bahnhof unter dem Zeiger. Die Suche laeuft ueber Bildschirmentfernung und
+ * nicht ueber deck.gl-Picking, weil die Bahnhofspunkte klein sind und beim
+ * Trassenziehen ein grosszuegigerer Fangbereich viel angenehmer ist.
+ */
+function nearestRailStation(
+  store: ReturnType<typeof useGame.getState>,
+  point: [number, number],
+  screen: { x: number; y: number },
+  map: maplibregl.Map,
+): { nodeId: import('@game/domain').NodeId } | null {
+  const state = store.state
+  if (!state) return null
+
+  const SNAP_PX = 18
+  let best: { nodeId: import('@game/domain').NodeId; distance: number } | null = null
+
+  for (const station of state.network.stations.values()) {
+    if (station.mode === 'bus') continue
+    const projected = map.project([station.position[0], station.position[1]])
+    const dx = projected.x - screen.x
+    const dy = projected.y - screen.y
+    const distance = Math.hypot(dx, dy)
+    if (distance <= SNAP_PX && (!best || distance < best.distance)) {
+      best = { nodeId: station.nodeId, distance }
+    }
+  }
+  void point
+  return best ? { nodeId: best.nodeId } : null
 }

@@ -817,3 +817,51 @@ select {
   padding: 3px 6px;
   font-size: 12px;
 }
+
+/* ── Streckenausbau ──────────────────────────────────────────────────────── */
+.upgrades {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.upgrades li + li {
+  margin-top: 5px;
+}
+
+.upgrades button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.upgrades button:hover:not(:disabled) {
+  border-color: var(--city);
+}
+
+.upgrades button > span:first-child {
+  flex: 1;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--city);
+}

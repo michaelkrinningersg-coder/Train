@@ -60,3 +60,4 @@ export function approximateRoadTimeSec(a: LngLat, b: LngLat): number {
   const averageSpeedKmh = 85
   return (distanceKm(a, b) * detourFactor) / averageSpeedKmh * 3600
 }
+export * from './elevation.js'

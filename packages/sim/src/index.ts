@@ -1,5 +1,6 @@
 export * from './state.js'
 export * from './lineMetrics.js'
 export * from './busDay.js'
+export * from './railCommands.js'
 export * from './commands.js'
 export * from './advance.js'

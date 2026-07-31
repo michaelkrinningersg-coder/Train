@@ -74,19 +74,57 @@ tragen sich, Überangebot wird bestraft.
 
 ---
 
-## Phase 2 — Schienennetz bauen (3–4 Wochen)
+## Phase 2 — Schienennetz bauen ✅ abgeschlossen
 
 **Ziel**: Das Bauwerkzeug.
 
-- Zeichenwerkzeug auf der Karte: Knoten setzen, Kanten ziehen, snappen
-- Bahnhofsplatzierung mit Einzugsgebiets-Visualisierung
-- Streckenparameter (Vmax, Elektrifizierung, Gleiszahl) beim Bau und als Ausbau
-- Baukosten aus Länge × Geländefaktor (`06-terrain`)
-- Laufende Unterhaltskosten je km
-- Netzansicht mit Streckeneigenschaften als Farbcodierung
+- [x] Pipeline `06-terrain`: Höhenraster der Region aus freien AWS-Terrain-Kacheln
+- [x] `packages/geo`: Höhenabfrage, Höhenprofil, Geländebewertung einer Trasse
+- [x] Bahnhofsplatzierung mit Livevorschau von Einzugsgrad, Grundstückspreis und Kosten
+- [x] Zeichenwerkzeug: Startbahnhof anklicken, Stützpunkte setzen, an einem Bahnhof
+      abschließen. Rücktaste nimmt einen Stützpunkt zurück, Escape bricht ab.
+- [x] Streckenparameter (Vmax, Gleiszahl, Elektrifizierung, Signaltechnik) beim Bau
+      und als nachträglicher Ausbau, jeweils mit Bauzeit
+- [x] Baukosten aus Länge × Geländefaktor, laufender Unterhalt je km
+- [x] Umschaltbare OSM-Basiskarte — ohne Gelände, Gewässer und bestehende Bahnstrecken
+      lässt sich keine Trasse planen
 
-**Abnahme**: Ich kann München–Nürnberg bauen, elektrifizieren, auf 200 km/h ausbauen — und
-sehe, was das kostet und jeden Monat kostet.
+**Abnahme erreicht**: München–Augsburg ist baubar (62 km über einen Stützpunkt,
+Gelände ×1,49, 111 Tage Bauzeit, 111 Mio. €), erscheint im Netz mit Unterhalt
+2 488 €/Tag, und lässt sich anschließend elektrifizieren oder auf 200 km/h ausbauen.
+
+### Zur Kostenhöhe
+
+`pnpm calibrate` weist die Infrastrukturkosten jetzt mit aus:
+
+| Korridor | Gelände | einfach, 120 km/h | Vollausbau 200 km/h zweigleisig elektrisch |
+|---|---|---|---|
+| München–Augsburg (56 km) | ×1,36 | 93 Mio. € | 316 Mio. € |
+| Nürnberg–München (151 km) | ×1,85 | 334 Mio. € | 1 108 Mio. € |
+| Bayreuth–Hof (47 km) | ×2,16 | 122 Mio. € | 398 Mio. € |
+
+Reale Neubaustrecken kosten 3 bis 15 Mio. € je Kilometer; im Spiel sind es rund
+1,2 Mio. € — **eine bewusste Abweichung**. Mit realen Zahlen wäre die erste Strecke aus
+Fahrgelderlösen nie zu finanzieren, denn reale Bahnen baut der Staat und nicht der
+Fahrkartenverkauf. Die *Verhältnisse* zwischen den Ausbaustufen bleiben realistisch.
+Der Maßstab hängt an einer einzigen Konstante (`TRACK_BASE_COST_PER_KM`).
+
+Damit ist die erste Bahnstrecke das Ziel mehrerer Spieljahre Busbetrieb — genau die
+gedachte Progression. Zum Ausprobieren ohne Vorlauf gibt es die Entwicklungsoption
+`VITE_STARTING_CASH`.
+
+**Was aus Phase 2 offen blieb:**
+
+- **Keine Abzweige.** Strecken verbinden ausschließlich Bahnhöfe; ein Knoten mitten auf
+  einer Strecke lässt sich nicht setzen. Für ein Netz aus Punkt-zu-Punkt-Strecken reicht
+  das, für echte Verzweigungen kommt der Knotentyp `junction` in Phase 3 dazu.
+- **Keine Überholstellen.** Der Knotentyp existiert im Modell, gebaut werden kann er noch
+  nicht — er wird erst mit der Betriebssimulation sinnvoll.
+- **Keine Gewässerprüfung.** Der Geländefaktor kommt aus der Steigung; eine Trasse quer
+  über den Bodensee kostet noch keinen Brückenzuschlag. Dafür braucht es die
+  Landpolygone aus OSM.
+- Der Ausbau gilt im Datenmodell sofort, befahrbar wird die Strecke erst nach der
+  Bauzeit. Solange keine Züge fahren, ist das nicht spürbar — ab Phase 3 schon.
 
 ---
 

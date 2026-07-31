@@ -1,5 +1,5 @@
 import type { City } from '@game/domain'
-import type { BBox } from '@game/geo'
+import type { BBox, ElevationGrid } from '@game/geo'
 import { useEffect, useState } from 'react'
 
 export interface CityDataset {
@@ -44,4 +44,25 @@ export function useCityDataset(region: string): DatasetState {
   }, [region])
 
   return state
+}
+
+/**
+ * Lädt das Höhenraster der Region (`pnpm data:terrain`). Ohne Raster rechnet
+ * das Spiel mit flachem Gelände weiter — die Baukosten sind dann nur weniger
+ * differenziert, nichts bricht.
+ */
+export async function loadElevation(region: string): Promise<ElevationGrid | null> {
+  try {
+    const [metaRes, binRes] = await Promise.all([
+      fetch(`/seed/elevation.${region}.json`),
+      fetch(`/seed/elevation.${region}.bin`),
+    ])
+    if (!metaRes.ok || !binRes.ok) return null
+
+    const meta = (await metaRes.json()) as Omit<ElevationGrid, 'data'>
+    const buffer = await binRes.arrayBuffer()
+    return { ...meta, data: new Int16Array(buffer) }
+  } catch {
+    return null
+  }
 }

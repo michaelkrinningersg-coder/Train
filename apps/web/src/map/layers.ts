@@ -1,6 +1,6 @@
 import { PathLayer, ScatterplotLayer, TextLayer, LineLayer } from '@deck.gl/layers'
 import type { Layer } from '@deck.gl/core'
-import type { City, CityId, GameState, LineId, StationId } from '@game/domain'
+import { capacityFactor, type City, type CityId, type GameState, type LineId, type LngLat, type NodeId, type StationId, type TrackId } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import { distanceKm } from '@game/geo'
 import { MARKS, rgba, type MarkPalette, type Tone } from '../theme.js'
@@ -77,6 +77,11 @@ export interface LayerContext {
   readonly draft: readonly StationId[]
   readonly showDemand: boolean
   readonly tone: Tone
+  readonly selectedTrackId: TrackId | null
+  /** Entwurf einer Strecke: Startknoten, Stuetzpunkte und Zeigerposition. */
+  readonly trackDraft: { readonly from: NodeId | null; readonly waypoints: readonly LngLat[] } | null
+  readonly hoverPoint: LngLat | null
+  readonly onPickTrack: (id: TrackId) => void
   readonly onPickCity: (city: City | null) => void
   readonly onPickLine: (id: LineId) => void
 }
@@ -90,8 +95,13 @@ export function buildLayers(ctx: LayerContext): Layer[] {
 
   const stations = [...state.network.stations.values()]
   const stationCities = stations
+    .filter((s) => s.mode !== 'rail')
     .map((s) => state.cities.get(s.cityId))
-    .filter((c): c is City => Boolean(c))
+    .filter((x): x is City => Boolean(x))
+
+  const railStations = stations
+    .filter((s) => s.mode !== 'bus')
+    .map((s) => ({ position: [s.position[0], s.position[1]] as [number, number], platforms: s.platforms }))
 
   const linePaths = [...state.lines.values()].flatMap((line) => {
     const path = line.stops
@@ -107,6 +117,16 @@ export function buildLayers(ctx: LayerContext): Layer[] {
     .map((s) => [s.position[0], s.position[1]] as [number, number])
 
   const layers: Layer[] = []
+
+  const tracks = [...state.network.tracks.values()].map((t) => ({
+    id: t.id,
+    path: t.geometry.map((p) => [p[0], p[1]] as [number, number]),
+    // Eine im Bau befindliche Strecke wird gestrichelt wirkend duenner und
+    // blasser gezeichnet - Form und Deckkraft, nicht Farbe, damit die
+    // Unterscheidung auch ohne Farbsehen funktioniert.
+    building: capacityFactor(t, state.day) < 1,
+    tracks: t.tracks,
+  }))
 
   if (showDemand) {
     const arcs = topDemandArcs(state, ctx.demand)
@@ -140,6 +160,84 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       pickable: false,
     }),
   )
+
+  if (tracks.length > 0) {
+    layers.push(
+      new PathLayer<(typeof tracks)[number]>({
+        id: 'rail-casing',
+        data: tracks,
+        getPath: (d) => d.path,
+        getColor: rgba(c.casing, 200),
+        getWidth: (d) => (d.id === ctx.selectedTrackId ? 10 : 6 + d.tracks),
+        widthUnits: 'pixels',
+        capRounded: true,
+        jointRounded: true,
+        pickable: false,
+        updateTriggers: { getWidth: ctx.selectedTrackId },
+      }),
+      new PathLayer<(typeof tracks)[number]>({
+        id: 'rail-tracks',
+        data: tracks,
+        getPath: (d) => d.path,
+        getColor: (d) =>
+          d.id === ctx.selectedTrackId ? rgba(c.selected) : rgba(c.track, d.building ? 110 : 255),
+        // Die Gleiszahl steckt in der Strichstaerke - mehr Gleise, breitere Trasse.
+        getWidth: (d) => (d.id === ctx.selectedTrackId ? 6 : 2.5 + d.tracks * 0.9),
+        widthUnits: 'pixels',
+        capRounded: true,
+        jointRounded: true,
+        pickable: true,
+        onClick: ({ object }) => {
+          if (object) ctx.onPickTrack(object.id)
+          return true
+        },
+        updateTriggers: { getColor: ctx.selectedTrackId, getWidth: ctx.selectedTrackId },
+      }),
+    )
+  }
+
+  // Streckenentwurf mit Gummiband zur Zeigerposition.
+  if (ctx.trackDraft?.from) {
+    const start = state.network.nodes.get(ctx.trackDraft.from)
+    if (start) {
+      const path: [number, number][] = [
+        [start.position[0], start.position[1]],
+        ...ctx.trackDraft.waypoints.map((p) => [p[0], p[1]] as [number, number]),
+        ...(ctx.hoverPoint ? [[ctx.hoverPoint[0], ctx.hoverPoint[1]] as [number, number]] : []),
+      ]
+      if (path.length >= 2) {
+        layers.push(
+          new PathLayer<{ path: [number, number][] }>({
+            id: 'track-draft',
+            data: [{ path }],
+            getPath: (d) => d.path,
+            getColor: rgba(c.selected, 220),
+            getWidth: 3,
+            widthUnits: 'pixels',
+            capRounded: true,
+            jointRounded: true,
+            pickable: false,
+          }),
+        )
+      }
+      layers.push(
+        new ScatterplotLayer<LngLat>({
+          id: 'track-draft-points',
+          data: [start.position, ...ctx.trackDraft.waypoints] as LngLat[],
+          getPosition: (d) => [d[0], d[1]],
+          getRadius: 4,
+          radiusUnits: 'pixels',
+          filled: true,
+          stroked: true,
+          lineWidthUnits: 'pixels',
+          getLineWidth: 1.5,
+          getFillColor: rgba(c.selected),
+          getLineColor: rgba(c.casing),
+          pickable: false,
+        }),
+      )
+    }
+  }
 
   if (linePaths.length > 0) {
     // Umrandung zuerst, dann die farbige Linie darauf. Auf einer detaillierten
@@ -229,6 +327,21 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       lineWidthUnits: 'pixels',
       getLineWidth: 1.6,
       getLineColor: rgba(c.line, 245),
+      pickable: false,
+    }),
+    // Bahnhoefe liegen frei in der Stadt - eigener Punkt, nicht der Stadtpunkt.
+    new ScatterplotLayer<(typeof railStations)[number]>({
+      id: 'rail-stations',
+      data: railStations,
+      getPosition: (d) => d.position,
+      getRadius: (d) => 3.5 + d.platforms * 0.7,
+      radiusUnits: 'pixels',
+      filled: true,
+      stroked: true,
+      lineWidthUnits: 'pixels',
+      getLineWidth: 2,
+      getFillColor: rgba(c.track),
+      getLineColor: rgba(c.casing),
       pickable: false,
     }),
     new TextLayer<City>({

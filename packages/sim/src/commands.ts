@@ -11,6 +11,7 @@ import type {
   Vehicle,
 } from '@game/domain'
 import { busStopCost, BUS_STOP_UPKEEP_PER_DAY, creditLimit, interestRateFor, resaleValue } from '@game/economy'
+import { applyRailCommand, type CommandContext } from './railCommands.js'
 import { newLineId, newPatternId, newStationId, newVehicleId, withMap } from './state.js'
 
 const fail = (reason: string): CommandResult => ({ ok: false, reason })
@@ -25,8 +26,14 @@ function book(state: GameState, entry: Omit<LedgerEntry, 'day'>): GameState {
  * Zustand und liefert einen neuen. Das ist die Grundlage fuer Undo, Replay und
  * einen spaeteren serverautoritativen Modus.
  */
-export function applyCommand(state: GameState, command: Command): CommandResult {
+export function applyCommand(state: GameState, command: Command, ctx: CommandContext = {}): CommandResult {
   switch (command.kind) {
+    case 'place_station':
+    case 'build_track':
+    case 'upgrade_track':
+    case 'demolish_track':
+      return applyRailCommand(state, command, ctx)
+
     case 'place_bus_stop': {
       const city = state.cities.get(command.cityId)
       if (!city) return fail('Unbekannte Stadt.')
@@ -50,6 +57,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
         // Bushaltestellen liegen zentral. Der Zielkonflikt zwischen Lage und
         // Erreichbarkeit kommt in Phase 2 mit den Bahnhoefen.
         catchment: stationCatchment(0, city.radiusKm),
+        distanceToCentreKm: 0,
         buildCost: cost,
         upkeepPerDay: BUS_STOP_UPKEEP_PER_DAY,
       }
@@ -219,8 +227,12 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       return { ok: true, cost: amount, state: book(next, { category: 'repayment', amount: -amount }) }
     }
 
-    default:
-      return fail(`Der Befehl '${command.kind}' kommt erst in einer späteren Phase.`)
+    default: {
+      // Alle Befehle der Union sind abgedeckt. Kommt einer hinzu, schlaegt hier
+      // der Typecheck fehl statt still nichts zu tun.
+      const unhandled: never = command
+      return fail(`Unbekannter Befehl: ${JSON.stringify(unhandled)}`)
+    }
   }
 }
 

@@ -1,5 +1,6 @@
-import { SEGMENTS, type CityId } from '@game/domain'
-import { busStopCost, formatMoney } from '@game/economy'
+import { SEGMENTS, cityRadiusKm, stationCatchment, type CityId } from '@game/domain'
+import { busStopCost, formatMoney, railStationCost } from '@game/economy'
+import { distanceKm } from '@game/geo'
 import { useGame } from '../game/store.js'
 
 const de = (n: number): string => n.toLocaleString('de-DE')
@@ -9,12 +10,15 @@ export function CityPanel({ cityId }: { readonly cityId: CityId }): React.JSX.El
   const demand = useGame((s) => s.demand)
   const dispatch = useGame((s) => s.dispatch)
   const selectCity = useGame((s) => s.selectCity)
+  const beginStation = useGame((s) => s.beginStation)
   if (!state) return null
 
   const city = state.cities.get(cityId)
   if (!city) return null
 
-  const stop = [...state.network.stations.values()].find((s) => s.cityId === cityId)
+  const stations = [...state.network.stations.values()].filter((s) => s.cityId === cityId)
+  const stop = stations.find((s) => s.mode !== 'rail')
+  const railStation = stations.find((s) => s.mode !== 'bus')
   const cost = busStopCost(city.population)
 
   // Erzeugte Reisen: Stufe 1 des Nachfragemodells, direkt aus den Potenzialen.
@@ -73,6 +77,17 @@ export function CityPanel({ cityId }: { readonly cityId: CityId }): React.JSX.El
           onClick={() => dispatch({ kind: 'place_bus_stop', cityId })}
         >
           Haltestelle bauen · {formatMoney(cost)}
+        </button>
+      )}
+
+      {railStation ? (
+        <p className="ok small">
+          ✓ Bahnhof · {railStation.platforms} Bahnsteiggleise · {railStation.distanceToCentreKm.toFixed(1)} km vom
+          Zentrum · Einzugsgrad {Math.round(railStation.catchment * 100)} %
+        </p>
+      ) : (
+        <button type="button" className="primary wide" onClick={() => beginStation(cityId)}>
+          Bahnhof bauen …
         </button>
       )}
 

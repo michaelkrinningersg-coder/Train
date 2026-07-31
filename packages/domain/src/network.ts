@@ -1,4 +1,4 @@
-import type { BlockId, CityId, GameTime, LngLat, Money, NodeId, StationId, TrackId } from './ids.js'
+import type { BlockId, CityId, LngLat, Money, NodeId, StationId, TrackId } from './ids.js'
 
 export type NodeKind =
   | 'station' // Bahnhof, Halt moeglich
@@ -80,12 +80,28 @@ export interface TrackSegment {
   /** Mittlere Steigung in Promille. Reduziert die effektive Geschwindigkeit. */
   readonly gradientPermille: number
 
-  readonly builtAt: GameTime
+  readonly builtOnDay: number
+  /** Tag, ab dem die Strecke befahrbar ist. Davor ist sie im Bau. */
+  readonly readyOnDay: number
   readonly construction?: {
     readonly upgrade: TrackUpgrade
-    readonly finishesAt: GameTime
+    readonly finishesOnDay: number
     readonly capacityFactorDuringWorks: number
   }
+}
+
+/** Wird gerade gebaut oder ausgebaut? */
+export function isUnderConstruction(track: TrackSegment, day: number): boolean {
+  return day < track.readyOnDay || (track.construction !== undefined && day < track.construction.finishesOnDay)
+}
+
+/** Nutzbare Kapazität heute, 0 solange die Strecke im Neubau ist. */
+export function capacityFactor(track: TrackSegment, day: number): number {
+  if (day < track.readyOnDay) return 0
+  if (track.construction && day < track.construction.finishesOnDay) {
+    return track.construction.capacityFactorDuringWorks
+  }
+  return 1
 }
 
 export interface Block {
@@ -107,6 +123,8 @@ export interface Station {
   readonly platforms: number
   /** 0..1 - Anteil der Stadtnachfrage, den dieser Bahnhof erschliesst. */
   readonly catchment: number
+  /** Entfernung zum Stadtzentrum in km - Grundlage von Einzugsgrad und Grundstueckspreis. */
+  readonly distanceToCentreKm: number
   readonly buildCost: Money
   readonly upkeepPerDay: Money
 }

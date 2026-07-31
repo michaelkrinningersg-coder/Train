@@ -15,8 +15,8 @@
  * feste Sollgroesse, sondern Groessenordnungen, die man gegen die Wirklichkeit
  * halten kann. Siehe docs/03-NACHFRAGEMODELL.md Abschnitt 8.
  */
-import { readFileSync } from 'node:fs'
-import { SEGMENTS, SEGMENT_IDS, type City, type CityId } from '@game/domain'
+import { existsSync, readFileSync } from 'node:fs'
+import { SEGMENTS, SEGMENT_IDS, trackUpkeepPerDay, type City, type CityId } from '@game/domain'
 import {
   buildDemandMatrix,
   carAlternative,
@@ -25,7 +25,8 @@ import {
   noTravelAlternative,
   withPotentials,
 } from '@game/demand'
-import { formatMoney } from '@game/economy'
+import { formatMoney, railStationCost, trackBuildCost } from '@game/economy'
+import { distanceKm, terrainStats, type ElevationGrid } from '@game/geo'
 import { advanceDays, applyCommand, createGame, lineMetrics } from '@game/sim'
 
 const data = JSON.parse(readFileSync('data/seed/cities.bavaria.json', 'utf8')) as { cities: City[] }
@@ -152,3 +153,65 @@ corridor(['Kempten', 'Memmingen'], 3)
 
 console.log('\nÜberangebot — soll bestraft werden:')
 corridor(['München', 'Augsburg'], 24, 'intercity', 10)
+
+console.log('\n═══ 4. Schieneninfrastruktur ═══\n')
+
+/** Höhenraster, falls vorhanden - sonst wird flaches Gelände unterstellt. */
+function loadElevation(): ElevationGrid | undefined {
+  const metaPath = 'data/seed/elevation.bavaria.json'
+  const binPath = 'data/seed/elevation.bavaria.bin'
+  if (!existsSync(metaPath) || !existsSync(binPath)) return undefined
+  const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as Omit<ElevationGrid, 'data'>
+  const buf = readFileSync(binPath)
+  return { ...meta, data: new Int16Array(buf.buffer, buf.byteOffset, buf.byteLength / 2) }
+}
+
+const elevation = loadElevation()
+console.log(elevation ? 'Höhenraster geladen.\n' : 'Kein Höhenraster — flaches Gelände unterstellt.\n')
+
+const SPEC_SIMPLE = { maxSpeed: 120, electrified: false, tracks: 1, signalling: 'classic' } as const
+const SPEC_FULL = { maxSpeed: 200, electrified: true, tracks: 2, signalling: 'etcs_l1' } as const
+
+function corridorCost(a: string, b: string): void {
+  const from = cities.find((c) => c.name === a)
+  const to = cities.find((c) => c.name === b)
+  if (!from || !to) {
+    console.log(`  ${a} – ${b}: nicht im Datensatz`)
+    return
+  }
+
+  const path = [from.centre, to.centre]
+  const km = distanceKm(from.centre, to.centre)
+  const terrain = elevation ? terrainStats(elevation, path).terrainFactor : 1
+
+  const simple = trackBuildCost(km, SPEC_SIMPLE, terrain)
+  const full = trackBuildCost(km, SPEC_FULL, terrain)
+  const stations =
+    railStationCost(from.population, 0, 4) + railStationCost(to.population, 0, 4)
+  const upkeep = trackUpkeepPerDay({
+    id: 'x' as never, from: 'a' as never, to: 'b' as never, geometry: path,
+    lengthKm: km, maxSpeed: 120, electrified: false, tracks: 1, signalling: 'classic',
+    terrainFactor: terrain, gradientPermille: 0, builtOnDay: 0, readyOnDay: 0,
+  })
+
+  console.log(
+    `  ${`${a} – ${b}`.padEnd(28)} ${km.toFixed(0).padStart(4)} km  Gelände ×${terrain.toFixed(2)}  ` +
+      `einfach ${formatMoney(simple, { compact: true }).padStart(11)}  ` +
+      `Vollausbau ${formatMoney(full, { compact: true }).padStart(11)}  ` +
+      `Bahnhöfe ${formatMoney(stations, { compact: true }).padStart(10)}  ` +
+      `Unterhalt ${formatMoney(upkeep).padStart(9)}/Tag`,
+  )
+}
+
+corridorCost('München', 'Augsburg')
+corridorCost('München', 'Ingolstadt')
+corridorCost('Nürnberg', 'München')
+corridorCost('München', 'Rosenheim')
+corridorCost('Kempten', 'Memmingen')
+corridorCost('Bayreuth', 'Hof')
+
+console.log(
+  '\nZur Einordnung: eine gut laufende Buslinie erwirtschaftet rund 5 000 €/Tag,\n' +
+    'also etwa 1,8 Mio. €/Jahr. Die erste Bahnstrecke ist damit das Ziel mehrerer\n' +
+    'Spieljahre Busbetrieb — genau so ist die Progression gedacht.',
+)

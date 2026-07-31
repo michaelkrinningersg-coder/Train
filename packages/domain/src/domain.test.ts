@@ -58,7 +58,8 @@ describe('trackUpkeepPerDay', () => {
     signalling: 'classic',
     terrainFactor: 1,
     gradientPermille: 0,
-    builtAt: 0,
+    builtOnDay: 0,
+    readyOnDay: 0,
   }
 
   it('rechnet die Basis linear nach Laenge', () => {

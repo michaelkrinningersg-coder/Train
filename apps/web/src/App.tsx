@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useCityDataset } from './data/dataset.js'
+import { loadElevation, useCityDataset } from './data/dataset.js'
 import { SPEED_INTERVAL_MS, useGame, type Tab } from './game/store.js'
 import { MapView } from './map/MapView.js'
 import { CityPanel } from './ui/CityPanel.js'
@@ -7,12 +7,15 @@ import { FinanceTab } from './ui/FinanceTab.js'
 import { FleetTab } from './ui/FleetTab.js'
 import { Legend } from './ui/Legend.js'
 import { NetworkTab } from './ui/NetworkTab.js'
+import { RailTab } from './ui/RailTab.js'
+import { StationPlacement } from './ui/StationPlacement.js'
 import { TopBar } from './ui/TopBar.js'
 
 const REGION = import.meta.env['VITE_REGION'] ?? 'bavaria'
 
 const TABS: { readonly id: Tab; readonly label: string }[] = [
-  { id: 'network', label: 'Netz' },
+  { id: 'rail', label: 'Schiene' },
+  { id: 'network', label: 'Linien' },
   { id: 'fleet', label: 'Fuhrpark' },
   { id: 'finance', label: 'Finanzen' },
 ]
@@ -28,10 +31,20 @@ export function App(): React.JSX.Element {
   const selectedCityId = useGame((s) => s.selectedCityId)
   const message = useGame((s) => s.message)
   const notify = useGame((s) => s.notify)
+  const mapMode = useGame((s) => s.mapMode)
+  const setElevation = useGame((s) => s.setElevation)
 
   useEffect(() => {
     if (dataset.status === 'ready' && !ready) start(dataset.data.cities)
   }, [dataset, ready, start])
+
+  // Höhenraster für die Baukosten. Fehlt es, rechnet das Spiel mit flachem
+  // Gelände weiter statt zu scheitern.
+  useEffect(() => {
+    void loadElevation(REGION).then((grid) => {
+      if (grid) setElevation(grid)
+    })
+  }, [setElevation])
 
   // Spieluhr. Bewusst ein einfacher Timer: ein Betriebstag rechnet in wenigen
   // Millisekunden, ein Web Worker waere hier noch verfrueht.
@@ -65,7 +78,7 @@ export function App(): React.JSX.Element {
       <main className="stage">
         {ready && <MapView view={dataset.data.view} />}
         <Legend />
-        {selectedCityId && <CityPanel cityId={selectedCityId} />}
+        {mapMode === 'place-station' ? <StationPlacement /> : selectedCityId && <CityPanel cityId={selectedCityId} />}
 
         <aside className="sidebar">
           <nav className="tabs" role="tablist">
@@ -83,6 +96,7 @@ export function App(): React.JSX.Element {
             ))}
           </nav>
           <div className="sidebar__body">
+            {tab === 'rail' && <RailTab />}
             {tab === 'network' && <NetworkTab />}
             {tab === 'fleet' && <FleetTab />}
             {tab === 'finance' && <FinanceTab />}

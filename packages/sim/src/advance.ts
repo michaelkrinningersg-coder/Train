@@ -10,6 +10,7 @@ import {
   vehicleUpkeepPerDay,
 } from '@game/economy'
 import { simulateBusDay } from './busDay.js'
+import { networkUpkeepPerDay } from './railCommands.js'
 
 /** Zinssatz auf einen negativen Kontostand. Teurer als jeder Kredit - mit Absicht. */
 export const OVERDRAFT_RATE = 0.12
@@ -66,6 +67,14 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     costs += stopUpkeep
   }
 
+  // Der Streckenunterhalt laeuft unabhaengig davon, ob ein Zug faehrt - genau
+  // das macht ein zu grosszuegig gebautes Netz gefaehrlich.
+  const trackUpkeep = networkUpkeepPerDay(state)
+  if (trackUpkeep > 0) {
+    entries.push({ category: 'track_upkeep', amount: -trackUpkeep })
+    costs += trackUpkeep
+  }
+
   const interest = dailyInterest(state.loans)
   const overdraft = state.cash < 0 ? Math.round((-state.cash * OVERDRAFT_RATE) / 365) : 0
   if (interest + overdraft > 0) {
@@ -104,12 +113,22 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
   const fleet = new Map(state.fleet)
   for (const [id, vehicle] of fleet) fleet.set(id, ageVehicle(vehicle))
 
+  // Abgeschlossene Ausbauten aus dem Zustand nehmen.
+  const tracks = new Map(state.network.tracks)
+  for (const [id, track] of tracks) {
+    if (track.construction && nextDay >= track.construction.finishesOnDay) {
+      const { construction: _done, ...rest } = track
+      tracks.set(id, rest)
+    }
+  }
+
   return {
     ...state,
     day: nextDay,
     cash,
     loans,
     fleet,
+    network: { ...state.network, tracks },
     ledger: trimLedger([...state.ledger, ...dated], nextDay),
     lastDay: dayResult,
     history: [...state.history, dayResult].slice(-HISTORY_DAYS),

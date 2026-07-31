@@ -80,15 +80,31 @@ docs/              Konzept, Tech-Stack, Modelle, Roadmap
 
 ## So spielt man
 
+**Busse — der Einstieg:**
+
 1. Eine Stadt auf der Karte anklicken → **Haltestelle bauen**
 2. Dasselbe in einer zweiten Stadt
 3. Reiter **Fuhrpark** → Busse kaufen
-4. Reiter **Netz** → **Neue Linie** → die Haltestellen der Reihe nach anklicken → anlegen
+4. Reiter **Linien** → **Neue Linie** → die Haltestellen der Reihe nach anklicken → anlegen
 5. In der Linie Fahrzeuge zuteilen, Takt und Tarif einstellen
 6. Oben rechts **▶** — und zusehen, ob es sich trägt
 
 Der Knopf **Nachfrage** blendet die stärksten Reiserelationen ein. Wo dort dicke Linien
 verlaufen, lohnt sich eine Buslinie.
+
+**Schiene — das Fernziel:**
+
+1. Stadt anklicken → **Bahnhof bauen …**, dann den Standort auf der Karte wählen.
+   Zentral heißt viele Fahrgäste und teures Grundstück, am Stadtrand billig und nur ein
+   Teil der Nachfrage.
+2. Reiter **Schiene** → **Strecke bauen** → Startbahnhof anklicken, Stützpunkte setzen,
+   an einem zweiten Bahnhof abschließen. Rücktaste nimmt einen Stützpunkt zurück,
+   Escape bricht ab.
+3. Fertige Strecken lassen sich elektrifizieren, auf höhere Geschwindigkeit, mehr Gleise
+   oder bessere Signaltechnik ausbauen — jeweils mit Bauzeit.
+
+Bahnbau kostet ein Vielfaches des Busbetriebs; die erste Strecke ist das Ziel mehrerer
+Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm dev`.
 
 ## Dokumentation
 
@@ -104,6 +120,6 @@ verlaufen, lohnt sich eine Buslinie.
 
 ## Status
 
-**Phase 1 abgeschlossen** — spielbar: Haltestellen bauen, Buslinien anlegen, Fahrzeuge
-kaufen, Takt und Preis einstellen, Betriebstage simulieren und die Bilanz verfolgen.
-Als Nächstes Phase 2: das Schienennetz bauen.
+**Phase 2 abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
+Strecken über echtes Gelände trassieren und ausbauen. Als Nächstes Phase 3: Züge,
+Fahrpläne und die Betriebssimulation mit Blockabschnitten.
