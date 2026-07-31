@@ -50,6 +50,16 @@ export interface Alternative {
   readonly transfers: number
   /** 0..1 */
   readonly comfort: number
+  /**
+   * Zuschlag auf die alternativspezifische Konstante, negativ als Abschlag.
+   *
+   * Damit bekommt eine Alternative ein Gedaechtnis: die Zufriedenheit einer
+   * Relation sinkt, wenn Fahrgaeste stehen bleiben oder Zuege zu spaet kommen,
+   * und der Abschlag wirkt so lange nach, bis sie sich erholt hat. Ohne diesen
+   * Weg muesste die Unzufriedenheit als kuenstlich verlaengerte Reisezeit
+   * getarnt werden - das waere dasselbe Ergebnis mit einer Luege im Modell.
+   */
+  readonly ascOffset?: number
 }
 
 /**
@@ -70,26 +80,41 @@ export function generalisedCost(segment: SegmentId, alt: Alternative): number {
 }
 
 /**
- * Anteile aller angebotenen Alternativen. Nicht angebotene Verkehrsmittel
- * fehlen einfach in der Eingabe; Auto und "nicht reisen" sollten immer dabei
- * sein, damit die Anteile eine sinnvolle Basis haben.
+ * Anteil **je einzelner Alternative**, in derselben Reihenfolge wie die Eingabe.
+ *
+ * Das ist die eigentliche Rechnung; `modeShares` fasst sie nur noch nach
+ * Verkehrsmittel zusammen. Getrennt braucht man sie, sobald mehrere Angebote
+ * desselben Verkehrsmittels zur Wahl stehen - zwei Bahnlinien auf derselben
+ * Relation etwa, oder eine Direktverbindung gegen eine Reisekette mit Umstieg.
  */
-export function modeShares(segment: SegmentId, alternatives: readonly Alternative[]): Record<Mode, number> {
+export function alternativeShares(segment: SegmentId, alternatives: readonly Alternative[]): number[] {
+  if (alternatives.length === 0) return []
   const s = SEGMENTS[segment]
-  const shares = { rail: 0, bus: 0, car: 0, none: 0 } as Record<Mode, number>
-  if (alternatives.length === 0) return shares
 
-  const utilities = alternatives.map((alt) => ASC[segment][alt.mode] + s.priceBeta * generalisedCost(segment, alt))
+  const utilities = alternatives.map(
+    (alt) => ASC[segment][alt.mode] + (alt.ascOffset ?? 0) + s.priceBeta * generalisedCost(segment, alt),
+  )
 
   // Verschiebung um das Maximum: mathematisch identisch, aber ohne Overflow.
   const max = Math.max(...utilities)
   const exps = utilities.map((u) => Math.exp(u - max))
   const sum = exps.reduce((a, b) => a + b, 0)
 
-  alternatives.forEach((alt, i) => {
-    shares[alt.mode] += (exps[i] ?? 0) / sum
-  })
+  return exps.map((e) => e / sum)
+}
 
+/**
+ * Anteile aller angebotenen Alternativen, nach Verkehrsmittel zusammengefasst.
+ * Nicht angebotene Verkehrsmittel fehlen einfach in der Eingabe; Auto und
+ * "nicht reisen" sollten immer dabei sein, damit die Anteile eine sinnvolle
+ * Basis haben.
+ */
+export function modeShares(segment: SegmentId, alternatives: readonly Alternative[]): Record<Mode, number> {
+  const shares = { rail: 0, bus: 0, car: 0, none: 0 } as Record<Mode, number>
+  const each = alternativeShares(segment, alternatives)
+  alternatives.forEach((alt, i) => {
+    shares[alt.mode] += each[i] ?? 0
+  })
   return shares
 }
 

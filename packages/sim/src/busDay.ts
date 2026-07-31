@@ -1,50 +1,19 @@
-import { BUS_DWELL_SEC, SEGMENT_IDS, dayBit, fareFor, toDate } from '@game/domain'
-import type { GameState, LineDayResult, LineId, SegmentId } from '@game/domain'
-import {
-  carAlternative,
-  dayFactor,
-  hourShare,
-  modeShares,
-  noTravelAlternative,
-  odKey,
-  waitFromHeadway,
-  type Alternative,
-  type DemandMatrix,
-} from '@game/demand'
-import { departureTimes, effectiveHeadwayMin, fleetSummary, lineMetrics, vehiclesNeeded } from './lineMetrics.js'
-import { railAlternativeFor, type RailServiceIndex } from './railDay.js'
-import { assignPassengers, type AssignmentFlow } from './assignment.js'
+import { BUS_DWELL_SEC, SEGMENT_IDS } from '@game/domain'
+import type { GameState, LineDayResult, SegmentId } from '@game/domain'
+import { assignPassengers, type OdOutcome } from './assignment.js'
+import type { AssignedFlows } from './demandAssignment.js'
+import { crowdingDwellSeconds, type PreparedBusLine, type PreparedIdleLine } from './offers.js'
 
-const HOURS = 24
 const emptySegments = (): Record<SegmentId, number> => {
   const r = {} as Record<SegmentId, number>
   for (const s of SEGMENT_IDS) r[s] = 0
   return r
 }
 
-/**
- * Simuliert einen Betriebstag einer Buslinie.
- *
- * Ablauf: Nachfrage je Halterelation aus der Gravitationsmatrix holen, ueber das
- * Logit-Modell den Busanteil bestimmen, auf Stunden verteilen, und erst dann die
- * Kapazitaet pruefen. Die Reihenfolge ist wichtig - wer zuerst deckelt, sieht
- * nie, wie viel Nachfrage er liegen laesst.
- */
-export function simulateBusDay(
-  state: GameState,
-  demand: DemandMatrix,
-  lineId: LineId,
-  services: RailServiceIndex = new Map(),
-): LineDayResult | null {
-  const line = state.lines.get(lineId)
-  if (!line || line.mode !== 'bus') return null
-
-  const pattern = [...state.patterns.values()].find((p) => p.lineId === lineId)
-  const metrics = lineMetrics(state, line)
-  const warnings: string[] = []
-
-  const empty: LineDayResult = {
-    lineId,
+/** Tagesergebnis einer Linie, die heute gar nicht fährt. */
+export function idleResult(prepared: PreparedIdleLine): LineDayResult {
+  return {
+    lineId: prepared.line.id,
     passengers: emptySegments(),
     totalPassengers: 0,
     leftBehind: 0,
@@ -53,156 +22,99 @@ export function simulateBusDay(
     peakLoadFactor: 0,
     vehicleKm: 0,
     departuresPerDirection: 0,
-    effectiveHeadwayMin: Number.POSITIVE_INFINITY,
-    warnings,
+    effectiveHeadwayMin: prepared.effectiveHeadwayMin,
+    warnings: prepared.warnings,
+    mode: prepared.line.mode,
+    ...(prepared.line.mode === 'rail'
+      ? { punctuality: 1, averageDelaySec: 0, trainsNeeded: prepared.trainsNeeded, conflictCount: 0 }
+      : {}),
   }
+}
 
-  if (!metrics) {
-    warnings.push('Linie hat weniger als zwei gültige Haltestellen.')
-    return empty
-  }
-  if (!pattern?.headway) {
-    warnings.push('Kein Fahrplan hinterlegt.')
-    return empty
-  }
-  if ((pattern.days & dayBit(state.day)) === 0) {
-    return { ...empty, effectiveHeadwayMin: pattern.headway.everyMinutes }
-  }
+/**
+ * Tagesergebnis plus die Abrechnung je Relation.
+ *
+ * Die Relationsergebnisse bleiben bewusst *neben* dem `LineDayResult`: dieses
+ * landet 400 Tage lang in der Historie, und eine Tabelle je Relation und Tag
+ * wäre dort um Größenordnungen das Schwerste am ganzen Spielstand. Gebraucht
+ * werden sie nur für die Fortschreibung der Zufriedenheit, also genau einmal.
+ */
+export interface LineDayOutcome {
+  readonly result: LineDayResult
+  readonly odOutcomes: ReadonlyMap<string, OdOutcome>
+}
 
-  const fleet = fleetSummary(state, pattern.vehicleIds)
-  if (fleet.count === 0) {
-    warnings.push('Der Linie ist kein Fahrzeug zugeteilt.')
-    return empty
-  }
+/**
+ * Rechnet den Betriebstag einer Buslinie ab.
+ *
+ * Die Nachfrage kommt fertig verteilt aus `assignDemand` — diese Funktion
+ * prüft nur noch, wer davon tatsächlich einen Platz bekommt, und rechnet
+ * Erlös und Aufwand zusammen.
+ */
+export function finishBusDay(
+  state: GameState,
+  prepared: PreparedBusLine,
+  flows: AssignedFlows,
+  transferPassengers: number,
+): LineDayOutcome {
+  const { line, offer, detail } = prepared
+  const warnings = [...prepared.warnings]
 
-  const desired = pattern.headway.everyMinutes
-  const headway = effectiveHeadwayMin(desired, metrics.roundTripSec, fleet.count)
-  if (headway > desired + 0.5) {
-    const needed = vehiclesNeeded(desired, metrics.roundTripSec)
-    warnings.push(
-      `Für einen ${desired}-Minuten-Takt fehlen ${needed - fleet.count} Fahrzeuge; gefahren wird ein ${Math.round(headway)}-Minuten-Takt.`,
-    )
-  }
+  const assignment = assignPassengers({
+    forward: flows.forward,
+    backward: flows.backward,
+    seatsPerHour: offer.seatsPerHour,
+    departuresPerHour: offer.departuresPerHour,
+    stopCount: offer.stops.length,
+  })
 
-  const departures = departureTimes(pattern, headway)
-  if (departures.length === 0) {
-    warnings.push('Das Zeitfenster lässt keine Abfahrt zu.')
-    return empty
-  }
+  const vehicleKm = detail.departures.length * 2 * detail.metrics.lengthKm
+  const drivingHours = (detail.departures.length * 2 * detail.metrics.oneWayTimeSec) / 3600
+  const operatingCost = Math.round(
+    vehicleKm * detail.fleet.fuelCostPerKm + drivingHours * detail.fleet.crewCostPerHour,
+  )
 
-  // Abfahrten je Stunde und Richtung.
-  const departuresPerHour = new Float64Array(HOURS)
-  for (const t of departures) {
-    const hour = Math.floor(t / 3600) % HOURS
-    departuresPerHour[hour] = (departuresPerHour[hour] ?? 0) + 1
-  }
-
-  const { weekday, month } = toDate(state.day)
-  const stopCount = metrics.stopIds.length
-  const waitSec = waitFromHeadway(headway)
-
-  // Kumulierte Distanzen und Zeiten, damit jede Relation in O(1) auswertbar ist.
-  const cumKm = [0]
-  const cumSec = [0]
-  for (let i = 0; i < stopCount - 1; i++) {
-    cumKm.push(cumKm[i]! + metrics.legDistancesKm[i]!)
-    cumSec.push(cumSec[i]! + metrics.legTimesSec[i]!)
-  }
-
-  const flowsForward: AssignmentFlow[] = []
-  const flowsBackward: AssignmentFlow[] = []
-
-  for (let a = 0; a < stopCount; a++) {
-    for (let b = 0; b < stopCount; b++) {
-      if (a === b) continue
-
-      const cityA = metrics.cityIds[a]!
-      const cityB = metrics.cityIds[b]!
-      const pair = demand.byKey.get(odKey(cityA, cityB))
-      if (!pair) continue
-
-      const stationA = state.network.stations.get(metrics.stopIds[a]!)
-      const stationB = state.network.stations.get(metrics.stopIds[b]!)
-      if (!stationA || !stationB) continue
-      const reach = stationA.catchment * stationB.catchment
-
-      const lo = Math.min(a, b)
-      const hi = Math.max(a, b)
-      const rideKm = cumKm[hi]! - cumKm[lo]!
-      // Fahrzeit plus Aufenthalt an jedem Zwischenhalt - genau das macht eine
-      // Linie mit vielen Halten fuer Fernrelationen unattraktiv.
-      const rideSec = cumSec[hi]! - cumSec[lo]! + Math.max(0, hi - lo - 1) * BUS_DWELL_SEC
-      const greatCircle = pair.distanceKm
-
-      const price = fareFor(line.fare, rideKm, 'second')
-      const busAlt: Alternative = {
-        mode: 'bus',
-        priceCents: price,
-        travelTimeSec: rideSec,
-        waitTimeSec: waitSec,
-        transfers: 0,
-        comfort: fleet.comfort,
-      }
-      const smallerPopulation = Math.min(
-        state.cities.get(cityA)?.population ?? 0,
-        state.cities.get(cityB)?.population ?? 0,
-      )
-      const alternatives = [
-        busAlt,
-        carAlternative(greatCircle),
-        // Eigene Bahnlinie, wenn es eine gibt - sonst der Bestandsverkehr.
-        railAlternativeFor(services, odKey(cityA, cityB), greatCircle, smallerPopulation),
-        noTravelAlternative,
-      ]
-
-      for (const segment of SEGMENT_IDS) {
-        const daily = pair.trips[segment] * dayFactor(segment, weekday, month) * reach
-        if (daily <= 0) continue
-
-        const share = modeShares(segment, alternatives).bus
-        const riders = daily * share
-        if (riders <= 0.01) continue
-
-        const perHour = new Float64Array(HOURS)
-        for (let h = 0; h < HOURS; h++) perHour[h] = riders * hourShare(segment, h)
-
-        const flow: AssignmentFlow = { fromIndex: a, toIndex: b, perHour, fare: price, segment }
-        if (a < b) flowsForward.push(flow)
-        else flowsBackward.push(flow)
-      }
-    }
-  }
-
-  const seatsPerHour = new Float64Array(HOURS)
-  for (let h = 0; h < HOURS; h++) seatsPerHour[h] = (departuresPerHour[h] ?? 0) * fleet.seats
-
-  const assignment = assignPassengers(flowsForward, flowsBackward, seatsPerHour, stopCount)
-  const { passengers, revenue, leftBehind, peakLoadFactor, linkLoadFactors } = assignment
-
-  const totalPassengers = assignment.totalPassengers
-  const vehicleKm = departures.length * 2 * metrics.lengthKm
-  const drivingHours = (departures.length * 2 * metrics.oneWayTimeSec) / 3600
-  const operatingCost = Math.round(vehicleKm * fleet.fuelCostPerKm + drivingHours * fleet.crewCostPerHour)
-
-  if (peakLoadFactor > 1) {
-    warnings.push(`Überfüllt: in der Spitze ${Math.round(peakLoadFactor * 100)} % der Kapazität.`)
-  } else if (totalPassengers > 0 && peakLoadFactor < 0.15) {
+  const extraDwell = crowdingDwellSeconds(line, detail.metrics.dwellSeconds, BUS_DWELL_SEC)
+  if (assignment.peakLoadFactor > 1) {
+    warnings.push(`Überfüllt: in der Spitze ${Math.round(assignment.peakLoadFactor * 100)} % der Kapazität.`)
+  } else if (assignment.totalPassengers > 0 && assignment.peakLoadFactor < 0.15) {
     warnings.push('Sehr geringe Auslastung — Takt ausdünnen oder kleinere Fahrzeuge einsetzen.')
+  }
+  if (extraDwell > 60) {
+    warnings.push(`Andrang verlängert die Fahrzeit um ${Math.round(extraDwell / 60)} min je Richtung.`)
   }
 
   return {
-    lineId,
-    passengers,
-    totalPassengers,
-    leftBehind,
-    revenue,
-    operatingCost,
-    peakLoadFactor,
-    vehicleKm,
-    departuresPerDirection: departures.length,
-    effectiveHeadwayMin: headway,
-    warnings,
-    mode: 'bus',
-    linkLoadFactors,
+    result: {
+      lineId: line.id,
+      passengers: assignment.passengers,
+      totalPassengers: assignment.totalPassengers,
+      leftBehind: assignment.leftBehind,
+      revenue: assignment.revenue,
+      operatingCost,
+      peakLoadFactor: assignment.peakLoadFactor,
+      vehicleKm,
+      departuresPerDirection: detail.departures.length,
+      effectiveHeadwayMin: offer.headwayMin,
+      warnings,
+      mode: 'bus',
+      linkLoadFactors: assignment.linkLoadFactors,
+      transferPassengers,
+      satisfaction: meanSatisfaction(state, assignment.byOd.keys()),
+      stopFlowPerDeparture: assignment.stopFlowPerDeparture,
+      crowdingDwellSec: extraDwell,
+    },
+    odOutcomes: assignment.byOd,
   }
+}
+
+/** Mittlere Zufriedenheit der Relationen, die diese Linie bedient. */
+export function meanSatisfaction(state: GameState, ods: Iterable<string>): number {
+  let sum = 0
+  let count = 0
+  for (const od of ods) {
+    sum += state.satisfaction.get(od) ?? 1
+    count++
+  }
+  return count > 0 ? sum / count : 1
 }

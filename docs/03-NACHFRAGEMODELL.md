@@ -170,22 +170,34 @@ Optimierungshebel neben der Kapazität.
 
 ## 6. Zuordnung auf konkrete Züge
 
-Umgesetzt in `packages/sim/src/assignment.ts`, gleich für Bus und Bahn:
+Der Ablauf steht in `packages/sim/src/day.ts`; die Rechenschritte verteilen sich
+auf `itineraries.ts`, `demandAssignment.ts` und `assignment.ts`. Er ist für Bus und
+Bahn derselbe:
 
 ```
-Je Haltepaar (a,b) der Linie und je Segment k:
-  1. Nachfragepool der Relation aus der Gravitationsmatrix
-  2. × Wochentag- und Monatsfaktor
-  3. × catchment(Haltestelle a) × catchment(Haltestelle b)
-  4. × Bahn-/Busanteil aus dem Logit-Modell
-     (Reisezeit inklusive mittlerer Verspätung, Wartezeit aus dem Takt)
-  5. auf die 24 Stunden verteilt über die Tagesganglinie des Segments
+Einmal je Betriebstag für das ganze Netz:
+  1. Angebot jeder Linie bestimmen (Fahrzeiten, Takt, Plätze, Pünktlichkeit)
+  2. Verbindungen bilden: direkt und mit einem Umstieg (siehe unten)
 
-Je Stunde und Fahrtrichtung:
-  6. belegung[abschnitt] = Σ aller Gruppen, die diesen Abschnitt durchfahren
-  7. faktor[abschnitt]   = min(1, sitzeInDieserStunde / belegung[abschnitt])
-  8. mitgenommen         = nachfrage · min über alle durchfahrenen Abschnitte
+Je Relation (i,j) und Segment k:
+  3. Nachfragepool aus der Gravitationsmatrix × Wochentag- und Monatsfaktor
+  4. Logit über: alle Verbindungen des eigenen Netzes, Auto,
+     Bestandsverkehr (nur ohne eigene Bahn), Zuhausebleiben
+     — die Zufriedenheit der Relation als Abschlag auf die eigenen Alternativen
+  5. × catchment(Quellhalt) × catchment(Zielhalt) der gewählten Verbindung
+  6. auf die 24 Stunden verteilt über die Tagesganglinie des Segments
+  7. auf jedes Teilstück der Verbindung gebucht
+
+Je Linie, Stunde und Fahrtrichtung:
+  8. belegung[abschnitt] = Σ aller Gruppen, die diesen Abschnitt durchfahren
+  9. faktor[abschnitt]   = min(1, sitzeInDieserStunde / belegung[abschnitt])
+ 10. mitgenommen         = nachfrage · min über alle durchfahrenen Abschnitte
 ```
+
+Schritt 1 bis 4 sind neu in Phase 4. Vorher zog **jede Linie ihren Anteil selbst**
+aus der Matrix. Das ging, solange jede Relation von höchstens einer Linie bedient
+wurde — und genau deshalb konnte niemand umsteigen, und zwei Linien auf demselben
+Korridor bedienten beide die volle Nachfrage.
 
 Die Schritte 6–8 sind der Punkt, an dem sich das Modell von einer Pauschale unterscheidet:
 **ein Fahrgast besetzt nur die Abschnitte, die er wirklich fährt.** Am Zielhalt steigt er aus,
@@ -197,17 +209,90 @@ Strecke fährt, kommt mit, auch wenn zwei Abschnitte weiter niemand mehr zusteig
 Ausführlich mit Beispielen in
 [04-BETRIEBSSIMULATION §5a](04-BETRIEBSSIMULATION.md#5a-fahrgastzuordnung-der-zug-wird-unterwegs-geleert-und-neu-gefüllt).
 
+### Verbindungen und Umsteigen
+
+Umgesetzt in `packages/sim/src/itineraries.ts`. Zwei Entscheidungen prägen es:
+
+**Umgestiegen wird in einer Stadt, nicht an einer Haltestelle.** Bushaltestelle und Bahnhof
+derselben Stadt sind im Datenmodell getrennte Objekte an verschiedenen Orten. Wer den Umstieg
+an die Haltestellen-Identität knüpft, schließt genau den Fall aus, um den es geht — den
+Zubringerbus zum Bahnhof. Liegen die Halte auseinander, kostet der Fußweg Zeit
+(`MIN_INTERCHANGE_SEC` plus 4,5 km/h Gehgeschwindigkeit).
+
+**Höchstens ein Umstieg.** Zwei Umstiege ließen die Kandidatenmenge kubisch wachsen und
+brauchten eine echte Verbindungssuche statt einer Aufzählung, bringen in einem Netz dieser
+Größe aber wenig: die zweite Umsteigestrafe frisst den Gewinn meist auf. Für ein europaweites
+Netz wäre ein RAPTOR-Lauf der Ersatz — die Schnittstelle bliebe dieselbe.
+
+### Warum austauschbare Linien zusammengefasst werden
+
+Ein multinomiales Logit hat eine bekannte Schwäche, die in der Literatur *red bus / blue bus*
+heißt: stellt man zwei praktisch gleiche Alternativen nebeneinander zur Wahl, bekommen sie
+zusammen fast doppelt so viel Zuspruch wie eine allein. Im Spiel hieße das: eine zweite,
+identische Buslinie auf denselben Korridor zu legen verdoppelt die Fahrgastzahlen — nicht
+weil das Angebot besser wäre, sondern weil das Modell zweimal zählt.
+
+Deshalb werden Verbindungen mit **derselben Städtefolge und denselben Verkehrsmitteln** zu
+einer Alternative zusammengefasst, deren Takte sich addieren. Zwei Stundentakte sind ein
+Halbstundentakt; der Zugewinn kommt aus der halbierten Wartezeit, also aus dem echten
+Mechanismus. Die gewählten Reisenden werden anschließend nach Fahrtenangebot auf die
+beteiligten Linien verteilt — wer am Bahnsteig steht, nimmt, was zuerst kommt.
+
+Der Test dazu ist scharf formuliert: *zwei parallele Linien im Stundentakt müssen genau so
+viele Fahrgäste bringen wie eine einzige im Halbstundentakt.*
+
 **Noch nicht umgesetzt** und bewusst aufgeschoben:
 
 - Die Aufteilung auf konkurrierende Zugläufe im Zeitfenster ±30 min proportional zum Nutzen.
   Aktuell zählt die Summe der Sitzplätze einer Stunde. Bei einem Taktfahrplan mit gleichen
   Zügen ist das dasselbe Ergebnis; interessant wird es erst, wenn Eil- und Nahverkehrszüge
   auf derselben Linie fahren.
-- Ein **Zufriedenheitswert** je Relation, der bei Stehenbleiben und Verspätung sinkt und sich
-  langsam erholt. Überfüllung ist heute nur ein Umsatzverlust am selben Tag; sie sollte
-  Kundenbindung kosten und Unterkapazität nachhaltig bestrafen. Verspätung wirkt bereits auf
-  die Nachfrage, aber sofort und ohne Gedächtnis. Beides steht in Phase 4.
+- Zwei und mehr Umstiege.
 - Die Reihenfolge am Bahnsteig: alle Gruppen eines Abschnitts werden gleich behandelt.
+- Ein Umsteiger, der auf dem zweiten Teilstück keinen Platz mehr bekommt, gilt als *halb*
+  bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten Zuordnungsdurchgang;
+  der Fahrschein für das erste Teilstück wäre in beiden Fällen verkauft.
+
+---
+
+## 6a. Zufriedenheit: das Gedächtnis der Nachfrage
+
+Umgesetzt in `packages/sim/src/satisfaction.ts`. Jede Relation trägt einen Wert zwischen 0
+und 1, Startwert 1. Nach jedem Betriebstag:
+
+```
+bedient  = mitgenommen / gewollt          (nur Stunden mit Betrieb)
+qualität = bedient^2,5 · (0,6 + 0,4 · pünktlichkeit)
+
+neu = alt + (qualität − alt) · rate       rate = 0,22 abwärts, 0,015 aufwärts
+```
+
+Der Wert wirkt als Abschlag auf die alternativspezifische Konstante der eigenen Angebote:
+`ascOffset = (zufriedenheit − 1) · 2,2`. Bei 0,7 sind das −0,66 Nutzenpunkte — spürbar, aber
+nicht vernichtend.
+
+Drei Entscheidungen dahinter:
+
+1. **Der Exponent 2,5.** Ohne ihn misst die Zufriedenheit den Tagesdurchschnitt: wer in der
+   Hauptverkehrszeit die Hälfte stehen lässt, über den Tag aber 90 % mitnimmt, käme auf 90 %.
+   Wer einmal nicht in den Bus gepasst hat, erinnert sich daran länger als an die neun Male,
+   in denen es klappte — und er erzählt es weiter. 90 % mitgenommen werden so zu 77 %
+   Zufriedenheit, 60 % zu 28 %.
+
+2. **Die Asymmetrie 0,22 gegen 0,015.** Der Ruf fällt in Tagen und erholt sich in Monaten.
+   Genau dieses Verhältnis macht Unterkapazität zu einem Fehler mit Nachwirkung statt zu
+   einer verpassten Tageseinnahme. Ein überfahrener Korridor lässt sich nicht mit einem
+   einzigen zusätzlichen Bus reparieren.
+
+3. **Nachfrage außerhalb der Betriebszeit zählt nicht.** Dass um 23 Uhr nichts fährt, weiß
+   der Reisende vorher, und die Verkehrsmittelwahl hat den dünnen Takt über die Wartezeit
+   längst bestraft. Ihn hier ein zweites Mal zu bestrafen machte aus jedem Dreistundentakt
+   eine Katastrophe, obwohl kein einziger Fahrgast stehen geblieben ist. Diese Unterscheidung
+   ist der Grund, warum schwach ausgelastete Linien nach Phase 4 exakt dieselben Zahlen
+   liefern wie vorher — der Mechanismus fasst nur an, was wirklich überfüllt ist.
+
+Relationen ohne Bedienung erholen sich ebenfalls: wer einen Korridor aufgibt und Jahre später
+zurückkehrt, findet keinen verbrannten Markt vor, sondern Leute, die sich nicht mehr erinnern.
 
 ---
 
@@ -235,8 +320,8 @@ Optional später: **Klassen** (1./2.) mit getrennter Preissetzung, und Zeitkarte
 Stufen plus die Wirtschaftlichkeit. Er ist zum Lesen gedacht, nicht zum Bestehen: es gibt
 keine Sollgröße, sondern Größenordnungen, die man gegen die Wirklichkeit hält.
 
-Der Bericht hat fünf Abschnitte: Nachfrage, Verkehrsmittelwahl, Buswirtschaftlichkeit,
-Schieneninfrastrukturkosten und — seit Phase 3 — Bahnbetrieb.
+Der Bericht hat sechs Abschnitte: Nachfrage, Verkehrsmittelwahl, Buswirtschaftlichkeit,
+Schieneninfrastrukturkosten, Bahnbetrieb (Phase 3) und Netzwirkungen (Phase 4).
 
 ### Stand nach Phase 1
 
@@ -311,12 +396,44 @@ Drei Dinge liest man daran ab, und alle drei sind so gewollt:
 3. **Über 100 % Abschnittsauslastung hilft ein größerer Zug mehr als ein dichterer Takt.**
    Der Doppelstockzug bringt bei gleichem 30′-Takt 13 743 statt 9 846 Fahrgäste.
 
-**Ehrliche Einschränkung zum Bahnbetrieb:** die Auslastungswerte über 400 % sind kein
-Betriebszustand, den irgendjemand hinnähme — sie sagen nur, dass zwischen München und
-Augsburg vier- bis fünfmal so viel Nachfrage steht wie Sitzplätze angeboten werden. Weil
-Überfüllung heute weder die Haltezeit verlängert noch die Kundenbindung kostet, bleibt sie
-folgenlos außer im entgangenen Umsatz. Das ist die größte offene Schwäche des Modells und
-der erste Punkt der Phase-4-Liste.
+**Einschränkung zum Bahnbetrieb:** die Auslastungswerte über 400 % sind kein Betriebszustand,
+den irgendjemand hinnähme — sie sagen nur, dass zwischen München und Augsburg vier- bis
+fünfmal so viel Nachfrage steht wie Sitzplätze angeboten werden. Seit Phase 4 bleibt das
+nicht folgenlos (siehe unten), aber die Zahl selbst ist weiterhin als *Bedarfsanzeige* zu
+lesen und nicht als realistischer Füllgrad.
+
+### Stand nach Phase 4a — Umsteigen und Überlastung
+
+Abschnitt 6 des Berichts fährt dieselbe Relation ein halbes Jahr lang mit verschieden viel
+Kapazität. Die Zufriedenheit braucht Wochen, um sich einzupendeln, deshalb der lange Vorlauf.
+
+| Angebot München–Augsburg | Fahrgäste/Tag | Spitzenauslastung | Zufriedenheit | Ergebnis |
+|---|---|---|---|---|
+| 120′ mit 2 Bussen | 372 | 129 % | 87 % | +2 144 €/Tag |
+| 60′ mit 4 Bussen | 851 | 153 % | 83 % | +5 710 €/Tag |
+| 30′ mit 8 Bussen | 1 381 | 124 % | 94 % | **+8 232 €/Tag** |
+| 15′ mit 16 Bussen | 1 704 | 80 % | 100 % | +5 365 €/Tag |
+
+Das ist die gewünschte Form: **es gibt ein Optimum, und es liegt nicht am Rand.** Wer zu
+knapp fährt, verliert über Monate Fahrgäste an das Auto; wer zu üppig fährt, verbrennt Geld
+im Betriebsaufwand. Der 30-Minuten-Takt trifft beides.
+
+Der Zubringer zeigt den zweiten Effekt:
+
+| | Fahrgäste/Tag | davon Umsteiger |
+|---|---|---|
+| nur München–Augsburg (30′) | 1 381 | 0 |
+| + Zubringer Landsberg–Augsburg | 1 497 | 80 |
+
+Landsberg hat keine eigene Verbindung nach München und bekommt sie über den Umstieg in
+Augsburg. Beide Linien verdienen daran — vor Phase 4 wäre diese Nachfrage schlicht
+verschwunden.
+
+**Ehrliche Einschränkung:** die Zufriedenheit pendelt sich ungefähr dort ein, wo der
+mitgenommene Anteil liegt. Der Exponent 2,5 und die Gewichte sind gesetzt, nicht gemessen —
+es gibt keine Erhebung dazu, wie lange jemand einem verpassten Bus nachträgt. Was sich
+verteidigen lässt, ist die *Richtung* und die Größenordnung des Verhältnisses von Verfall zu
+Erholung; die absoluten Zahlen sind Balancing.
 
 ### Vorgehen für die nächste Runde
 

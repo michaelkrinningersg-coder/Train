@@ -1,5 +1,5 @@
 import { formatDate, type LineId } from '@game/domain'
-import { isMinor, simulateRailDay, type Conflict, type RailRun } from '@game/sim'
+import { isMinor, simulateRailLine, type Conflict, type RailRun } from '@game/sim'
 import { useMemo } from 'react'
 import { useGame } from '../game/store.js'
 import { THEME } from '../theme.js'
@@ -39,7 +39,7 @@ export function Timetable({ lineId }: { readonly lineId: LineId }): React.JSX.El
     if (!state || !demand) return null
     // Bewusst hier gerechnet statt im Spielzustand abgelegt: die Zuglaeufe eines
     // Tages sind gross, und sie haengen nur vom Zustand ab.
-    return simulateRailDay(state, demand, lineId, new Map())
+    return simulateRailLine(state, demand, lineId)
   }, [state, demand, lineId])
 
   const line = state?.lines.get(lineId)

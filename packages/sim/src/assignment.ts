@@ -31,6 +31,21 @@ export interface AssignmentFlow {
   readonly perHour: Float64Array
   readonly fare: Money
   readonly segment: SegmentId
+  /**
+   * Relation, aus der diese Gruppe stammt ("stadtA|stadtB").
+   *
+   * Nötig, um am Ende des Tages sagen zu können, *welche* Relation schlecht
+   * bedient wurde — die Zufriedenheit hängt an der Relation, nicht an der Linie.
+   * Bei einer Reisekette über zwei Linien tragen beide Teilstücke dieselbe
+   * Relation, und beide können sie verderben.
+   */
+  readonly od: string
+}
+
+/** Nachgefragt und mitgenommen je Relation — Grundlage der Zufriedenheit. */
+export interface OdOutcome {
+  readonly wanted: number
+  readonly carried: number
 }
 
 export interface AssignmentResult {
@@ -38,10 +53,33 @@ export interface AssignmentResult {
   readonly totalPassengers: number
   readonly revenue: Money
   readonly leftBehind: number
+  /** Davon nur deshalb, weil zu dieser Stunde gar nichts fuhr. */
+  readonly outsideService: number
   /** Höchste Auslastung über alle Abschnitte und Stunden. */
   readonly peakLoadFactor: number
   /** Spitzenauslastung je Abschnitt zwischen zwei Halten. */
   readonly linkLoadFactors: readonly number[]
+  /**
+   * Je Relation, was gewollt und was daraus geworden ist — **nur für Stunden
+   * mit Betrieb**. Grundlage der Zufriedenheit.
+   */
+  readonly byOd: ReadonlyMap<string, OdOutcome>
+  /**
+   * Ein- und Aussteigende je Fahrt und Halt in der stärksten Stunde.
+   * Daraus bemisst der nächste Betriebstag seine Haltezeiten.
+   */
+  readonly stopFlowPerDeparture: readonly number[]
+}
+
+export interface AssignmentInput {
+  readonly forward: readonly AssignmentFlow[]
+  readonly backward: readonly AssignmentFlow[]
+  /** Angebotene Sitzplätze je Stunde und Richtung. */
+  readonly seatsPerHour: Float64Array
+  /** Fahrten je Stunde und Richtung — für die Haltezeit aus Andrang. */
+  readonly departuresPerHour: Float64Array
+  /** Zahl der Halte; es gibt stopCount-1 Abschnitte. */
+  readonly stopCount: number
 }
 
 const emptySegments = (): Record<SegmentId, number> => {
@@ -50,26 +88,31 @@ const emptySegments = (): Record<SegmentId, number> => {
   return r
 }
 
-/**
- * @param flows      Nachfragegruppen beider Richtungen, getrennt übergeben
- * @param seatsPerHour Angebotene Sitzplätze je Stunde und Richtung
- * @param stopCount  Zahl der Halte; es gibt stopCount-1 Abschnitte
- */
-export function assignPassengers(
-  flowsForward: readonly AssignmentFlow[],
-  flowsBackward: readonly AssignmentFlow[],
-  seatsPerHour: Float64Array,
-  stopCount: number,
-): AssignmentResult {
+export function assignPassengers(input: AssignmentInput): AssignmentResult {
+  const { forward, backward, seatsPerHour, departuresPerHour, stopCount } = input
   const passengers = emptySegments()
   const linkCount = Math.max(1, stopCount - 1)
+  const stops = Math.max(1, stopCount)
   const linkLoadFactors = new Array<number>(linkCount).fill(0)
+  const stopFlowPerDeparture = new Array<number>(stops).fill(0)
+  const byOd = new Map<string, { wanted: number; carried: number }>()
 
   let revenue = 0
   let leftBehind = 0
+  let outsideService = 0
   let peakLoadFactor = 0
 
-  for (const flows of [flowsForward, flowsBackward]) {
+  const record = (od: string, wanted: number, carried: number): void => {
+    const entry = byOd.get(od)
+    if (entry) {
+      entry.wanted += wanted
+      entry.carried += carried
+    } else {
+      byOd.set(od, { wanted, carried })
+    }
+  }
+
+  for (const flows of [forward, backward]) {
     for (let h = 0; h < HOURS; h++) {
       const capacity = seatsPerHour[h] ?? 0
 
@@ -89,8 +132,16 @@ export function assignPassengers(
       // Ausserhalb der Betriebszeit faehrt nichts. Das ist keine Ueberlastung,
       // sondern fehlendes Angebot - es geht in `leftBehind`, nicht in die
       // Auslastung, sonst waere jede Linie nachts unendlich ueberfuellt.
+      //
+      // Es geht auch *nicht* in die Relationsabrechnung, aus der die
+      // Zufriedenheit entsteht: dass um 23 Uhr nichts faehrt, weiss der Reisende
+      // vorher, und die Verkehrsmittelwahl hat den duennen Takt ueber die
+      // Wartezeit laengst bestraft. Ihn hier ein zweites Mal zu bestrafen machte
+      // aus einem Dreistundentakt eine Katastrophe, obwohl kein einziger
+      // Fahrgast stehen geblieben ist.
       if (capacity <= 0) {
         leftBehind += demandThisHour
+        outsideService += demandThisHour
         continue
       }
 
@@ -105,6 +156,9 @@ export function assignPassengers(
         linkScale[link] = load > 1 ? 1 / load : 1
       }
 
+      // Ein- und Aussteigende dieser Stunde, fuer die Haltezeit des Folgetags.
+      const boarding = new Float64Array(stops)
+
       for (const flow of flows) {
         const wanted = flow.perHour[h] ?? 0
         if (wanted <= 0) continue
@@ -118,6 +172,18 @@ export function assignPassengers(
         leftBehind += wanted - carried
         passengers[flow.segment] += carried
         revenue += carried * flow.fare
+        record(flow.od, wanted, carried)
+
+        // Jeder Fahrgast steigt einmal ein und einmal aus.
+        boarding[flow.fromIndex]! += carried
+        boarding[flow.toIndex]! += carried
+      }
+
+      const runsThisHour = departuresPerHour[h] ?? 0
+      if (runsThisHour > 0) {
+        for (let s = 0; s < stops; s++) {
+          stopFlowPerDeparture[s] = Math.max(stopFlowPerDeparture[s]!, boarding[s]! / runsThisHour)
+        }
       }
     }
   }
@@ -128,7 +194,10 @@ export function assignPassengers(
     totalPassengers,
     revenue: Math.round(revenue),
     leftBehind,
+    outsideService,
     peakLoadFactor,
     linkLoadFactors,
+    byOd,
+    stopFlowPerDeparture,
   }
 }

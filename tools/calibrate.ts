@@ -12,6 +12,7 @@
  *      zur Nachfrage passt?
  *   4. Stehen die Baukosten einer Strecke im richtigen Verhaeltnis dazu?
  *   5. Wo bricht welche Ausbaustufe unter welchem Takt zusammen?
+ *   6. Was kostet Ueberlastung ueber Monate, und was bringt ein Zubringer?
  *
  * Die Ausgabe ist bewusst zum Lesen gedacht, nicht zum Bestehen: es gibt keine
  * feste Sollgroesse, sondern Groessenordnungen, die man gegen die Wirklichkeit
@@ -27,6 +28,7 @@ import {
   trackUpkeepPerDay,
   type City,
   type CityId,
+  type GameState,
   type TrackSpec,
 } from '@game/domain'
 import {
@@ -39,7 +41,7 @@ import {
 } from '@game/demand'
 import { formatMoney, railStationCost, trackBuildCost } from '@game/economy'
 import { distanceKm, terrainStats, type ElevationGrid } from '@game/geo'
-import { advanceDays, applyCommand, createGame, isMinor, lineMetrics, simulateRailDay } from '@game/sim'
+import { advanceDays, applyCommand, createGame, isMinor, lineMetrics, simulateRailLine } from '@game/sim'
 
 const data = JSON.parse(readFileSync('data/seed/cities.bavaria.json', 'utf8')) as { cities: City[] }
 const cities = withPotentials(data.cities)
@@ -327,7 +329,7 @@ function railCorridor(options: {
   let final = patterned.state
   while (new Date(Date.UTC(1990, 0, 1 + final.day)).getUTCDay() !== 2) final = advanceDays(final, demand, 1)
 
-  const result = simulateRailDay(final, demand, line.id, new Map())
+  const result = simulateRailLine(final, demand, line.id)
   if (!result) {
     console.log(`  ${options.label}: keine Simulation moeglich`)
     return
@@ -389,4 +391,117 @@ console.log(
     'Verwaltung und Infrastruktur. Bayreuth–Hof steht dort mit +717 €/Tag und ist\n' +
     'trotzdem ein Verlustgeschäft: allein der Streckenunterhalt kostet 1 882 €/Tag\n' +
     '(Abschnitt 4), von den 122 Mio. € Baukosten ganz zu schweigen.',
+)
+
+console.log('\n═══ 6. Netzwirkungen ═══\n')
+
+/**
+ * Umsteigen und Ueberlastung sind Eigenschaften des Netzes, nicht einer Linie -
+ * deshalb ein eigener Abschnitt. Gemessen wird ueber ein halbes Jahr, weil die
+ * Zufriedenheit Wochen braucht, um sich einzupendeln.
+ */
+function busLine(
+  state: GameState,
+  name: string,
+  cityNames: readonly string[],
+  vehicles: number,
+  headway: number,
+): GameState {
+  let next = state
+  const apply = (command: Parameters<typeof applyCommand>[1]): void => {
+    const r = applyCommand(next, command)
+    if (!r.ok) throw new Error(r.reason)
+    next = r.state
+  }
+
+  const before = new Set(next.fleet.keys())
+  for (const n of cityNames) {
+    const c = cities.find((x) => x.name === n)!
+    if (![...next.network.stations.values()].some((s) => s.name === n && s.mode === 'bus')) {
+      apply({ kind: 'place_bus_stop', cityId: c.id })
+    }
+  }
+  apply({ kind: 'buy_vehicle', classId: 'intercity', units: vehicles })
+  const fresh = [...next.fleet.values()].filter((v) => !before.has(v.id)).map((v) => v.id)
+
+  apply({
+    kind: 'create_line',
+    line: {
+      name,
+      mode: 'bus',
+      stops: cityNames.map((n) => ({
+        stationId: [...next.network.stations.values()].find((s) => s.name === n && s.mode === 'bus')!.id,
+        dwellSeconds: 120,
+        serves: true,
+      })),
+      path: { kind: 'road' },
+      fare: { perKm: { first: 25, second: 15 }, baseFare: 250, priceIndex: 1 },
+      runtimeReserve: 1.07,
+    },
+  })
+  const line = [...next.lines.values()].find((l) => l.name === name)!
+  apply({
+    kind: 'set_pattern',
+    pattern: {
+      lineId: line.id,
+      direction: 'forward',
+      vehicleIds: fresh,
+      days: DAYS_ALL,
+      headway: { everyMinutes: headway, firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 },
+    },
+  })
+  return next
+}
+
+function networkCase(label: string, build: (s: GameState) => GameState, days: number): void {
+  let state = build(createGame({ cities, startingCash: 50_000_000_00 }))
+  state = advanceDays(state, demand, days)
+
+  const week = state.history.slice(-7)
+  const passengers = week.reduce((s, d) => s + d.passengers, 0) / 7
+  const profit = week.reduce((s, d) => s + d.profit, 0) / 7
+  const transfers = week.reduce((s, d) => s + d.lines.reduce((t, l) => t + (l.transferPassengers ?? 0), 0), 0) / 7
+  const satisfactions = [...state.satisfaction.values()]
+  const worst = satisfactions.length > 0 ? Math.min(...satisfactions) : 1
+  const peak = Math.max(0, ...week.flatMap((d) => d.lines.map((l) => l.peakLoadFactor)))
+
+  console.log(
+    `  ${label.padEnd(38)} ${Math.round(passengers).toString().padStart(5)} Fg  ` +
+      `Umsteiger ${Math.round(transfers).toString().padStart(4)}  ` +
+      `Spitze ${(peak * 100).toFixed(0).padStart(4)} %  ` +
+      `Zufriedenheit min ${(worst * 100).toFixed(0).padStart(3)} %  ` +
+      `${formatMoney(profit).padStart(11)}/Tag`,
+  )
+}
+
+console.log('Überlastung — dieselbe Relation, verschieden viel Kapazität (Wochenmittel nach 6 Monaten):')
+for (const [vehicles, headway] of [[2, 120], [4, 60], [8, 30], [16, 15]] as const) {
+  networkCase(
+    `München–Augsburg, ${headway}′ mit ${vehicles} Bussen`,
+    (s) => busLine(s, 'M–A', ['München', 'Augsburg'], vehicles, headway),
+    182,
+  )
+}
+
+console.log('\nUmsteigen — ein Zubringer aus einer Stadt ohne eigene Fernverbindung:')
+networkCase(
+  'nur München–Augsburg',
+  (s) => busLine(s, 'M–A', ['München', 'Augsburg'], 8, 30),
+  182,
+)
+networkCase(
+  '+ Zubringer Landsberg–Augsburg',
+  (s) => busLine(busLine(s, 'M–A', ['München', 'Augsburg'], 8, 30), 'L–A', ['Landsberg am Lech', 'Augsburg'], 3, 60),
+  182,
+)
+
+console.log(
+  '\nDie Zufriedenheit pendelt sich ungefähr dort ein, wo der Anteil der tatsächlich\n' +
+    'mitgenommenen Reisenden liegt — überproportional gewichtet, weil ein einmal\n' +
+    'stehen gelassener Fahrgast länger nachträgt, als eine Durchschnittsrechnung\n' +
+    'nahelegt. Sie fällt in Tagen und erholt sich in Monaten: ein überfahrener\n' +
+    'Korridor lässt sich nicht mit einem einzigen zusätzlichen Bus reparieren.\n' +
+    'Der Zubringer zeigt den zweiten Effekt: Landsberg hat keine eigene Verbindung\n' +
+    'nach München, bekommt sie aber über den Umstieg in Augsburg — und beide Linien\n' +
+    'verdienen daran.',
 )

@@ -129,6 +129,35 @@ Die Überholstelle ist fast immer die richtige Antwort: München–Augsburg eing
 60-Minuten-Takt kommt auf 18 % Pünktlichkeit und 26,5 min Ø-Verspätung — mit **einer**
 Überholstelle in Streckenmitte auf 100 % und 0,2 min.
 
+### Zufriedenheit — warum die Fahrgäste weniger werden
+
+Jede Relation hat einen Ruf. Wer keinen Platz bekommt oder ständig zu spät ankommt, nimmt
+beim nächsten Mal das Auto — und er kommt **deutlich langsamer zurück, als er gegangen ist**.
+Der Wert steht im Linienpanel unter *Gestern*.
+
+Das macht Unterkapazität zu einem Fehler mit Nachwirkung: eine Linie, die einen Sommer lang
+überfüllt fährt, ist danach nicht mit einem zusätzlichen Bus repariert. Und es gibt ein
+Optimum, das nicht am Rand liegt — dieselbe Relation über ein halbes Jahr:
+
+| Angebot München–Augsburg | Fahrgäste/Tag | Spitze | Zufriedenheit | Ergebnis |
+|---|---|---|---|---|
+| 120′ mit 2 Bussen | 372 | 129 % | 87 % | +2 144 €/Tag |
+| 60′ mit 4 Bussen | 851 | 153 % | 83 % | +5 710 €/Tag |
+| **30′ mit 8 Bussen** | 1 381 | 124 % | 94 % | **+8 232 €/Tag** |
+| 15′ mit 16 Bussen | 1 704 | 80 % | 100 % | +5 365 €/Tag |
+
+Zu knapp verliert Fahrgäste, zu üppig verbrennt Geld.
+
+### Umsteigen — warum sich ein Netz lohnt
+
+Fahrgäste können **einmal umsteigen**, und zwar in einer *Stadt*: der Bus kann an der
+Bushaltestelle enden, die Bahn am Bahnhof, der Fußweg dazwischen kostet Zeit. Damit lohnt
+sich ein Zubringerbus aus einer Stadt ohne eigene Fernverbindung — die Nachfrage dorthin gab
+es vorher schlicht nicht.
+
+Im Linienpanel steht unter *davon Umsteiger*, wie viele Fahrgäste einer Linie nur ein
+Teilstück ihrer Reise auf ihr zurücklegen.
+
 Bahnbau kostet ein Vielfaches des Busbetriebs; die erste Strecke ist das Ziel mehrerer
 Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm dev`.
 
@@ -146,9 +175,10 @@ Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm 
 
 ## Status
 
-**Phase 3 abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
+**Phase 4a abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
 Strecken über echtes Gelände trassieren und ausbauen, Züge kaufen, Bahnlinien takten und im
-Bildfahrplan Konflikte finden und durch Überholstellen oder Ausbau auflösen.
+Bildfahrplan Konflikte durch Überholstellen oder Ausbau auflösen. Fahrgäste steigen zwischen
+eigenen Linien um, und Überfüllung kostet Stammkunden und Fahrplanstabilität.
 
-Als Nächstes Phase 4: Umsteigen zwischen eigenen Linien, Störungen, Zufriedenheit und
-Einrichtungen aus Wikidata. Der Phasenplan steht in [docs/06-ROADMAP.md](docs/06-ROADMAP.md).
+Als Nächstes Phase 4b: Störungen, Einrichtungen aus Wikidata, Auslastungs-Heatmap. Der
+Phasenplan steht in [docs/06-ROADMAP.md](docs/06-ROADMAP.md).

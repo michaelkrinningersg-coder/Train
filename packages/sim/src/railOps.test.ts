@@ -18,7 +18,7 @@ import { findConflicts, headwaySeconds, isMinor, type Claim } from './blocks.js'
 import { applyCommand } from './commands.js'
 import { findPath } from './railGraph.js'
 import { buildRuns, planLine, trainsNeeded } from './railRuns.js'
-import { simulateRailDay } from './railDay.js'
+import { simulateRailLine } from './day.js'
 import { legRunTime, timeAtKm } from './runTime.js'
 import { createGame } from './state.js'
 
@@ -118,7 +118,7 @@ function railSetup(options: {
 }
 
 const lineOf = (state: GameState) => [...state.lines.values()][0]!
-const run = (state: GameState) => simulateRailDay(state, demand, lineOf(state).id, new Map())!
+const run = (state: GameState) => simulateRailLine(state, demand, lineOf(state).id)!
 
 beforeEach(() => {
   demand = buildDemandMatrix(CITIES, { minTripsPerDay: 0 })
@@ -309,10 +309,14 @@ describe('Betrieb und Verspätung', () => {
 })
 
 describe('Fahrgastzuordnung', () => {
+  // Eine Fahrt in der Stunde 8 - damit ist "je Fahrt" gleich "je Stunde".
+  const perDeparture = new Float64Array(24)
+  perDeparture[8] = 1
+
   const flow = (from: number, to: number, perHourValue: number): AssignmentFlow => {
     const perHour = new Float64Array(24)
     perHour[8] = perHourValue
-    return { fromIndex: from, toIndex: to, perHour, fare: 1000, segment: 'commuter' }
+    return { fromIndex: from, toIndex: to, perHour, fare: 1000, segment: 'commuter', od: `${from}|${to}` }
   }
 
   it('leert und fuellt den Zug unterwegs: getrennte Abschnitte teilen sich keine Plaetze', () => {
@@ -320,7 +324,7 @@ describe('Fahrgastzuordnung', () => {
     seats[8] = 100
 
     // Zwei Gruppen auf getrennten Abschnitten einer Linie mit drei Halten.
-    const result = assignPassengers([flow(0, 1, 100), flow(1, 2, 100)], [], seats, 3)
+    const result = assignPassengers({ forward: [flow(0, 1, 100), flow(1, 2, 100)], backward: [], seatsPerHour: seats, departuresPerHour: perDeparture, stopCount: 3 })
     expect(result.totalPassengers).toBeCloseTo(200, 6)
     expect(result.leftBehind).toBeCloseTo(0, 6)
   })
@@ -330,7 +334,7 @@ describe('Fahrgastzuordnung', () => {
     seats[8] = 100
 
     // Abschnitt 0-1 ist doppelt ueberbucht, Abschnitt 1-2 ist frei.
-    const result = assignPassengers([flow(0, 1, 200), flow(1, 2, 50)], [], seats, 3)
+    const result = assignPassengers({ forward: [flow(0, 1, 200), flow(1, 2, 50)], backward: [], seatsPerHour: seats, departuresPerHour: perDeparture, stopCount: 3 })
 
     expect(result.linkLoadFactors[0]).toBeCloseTo(2, 6)
     expect(result.linkLoadFactors[1]).toBeCloseTo(0.5, 6)
@@ -344,14 +348,14 @@ describe('Fahrgastzuordnung', () => {
     seats[8] = 100
 
     // Die Gruppe 0-2 faehrt ueber beide Abschnitte; 0-1 ist eng.
-    const result = assignPassengers([flow(0, 1, 150), flow(0, 2, 50)], [], seats, 3)
+    const result = assignPassengers({ forward: [flow(0, 1, 150), flow(0, 2, 50)], backward: [], seatsPerHour: seats, departuresPerHour: perDeparture, stopCount: 3 })
     const throughScale = 100 / 200
     expect(result.totalPassengers).toBeCloseTo(200 * throughScale, 6)
   })
 
   it('zaehlt Nachfrage ausserhalb der Betriebszeit als stehen geblieben, nicht als Ueberlastung', () => {
     const seats = new Float64Array(24) // ueberall 0
-    const result = assignPassengers([flow(0, 1, 40)], [], seats, 2)
+    const result = assignPassengers({ forward: [flow(0, 1, 40)], backward: [], seatsPerHour: seats, departuresPerHour: perDeparture, stopCount: 2 })
     expect(result.leftBehind).toBeCloseTo(40, 6)
     expect(result.peakLoadFactor).toBe(0)
   })

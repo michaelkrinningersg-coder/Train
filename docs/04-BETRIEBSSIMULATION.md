@@ -214,9 +214,19 @@ verschwindet dadurch nach ein paar Halten von selbst; eine strukturelle bleibt.
 Logit-Rechnung aufgeschlagen. Eine unpünktliche Linie verliert Fahrgäste an Auto und Bus — das
 ist der wirtschaftliche Grund, eine Überholstelle zu bauen, statt die roten Punkte zu ignorieren.
 
-**Noch nicht umgesetzt**: Störungen als seedbasierter Zufall (Fahrzeugzustand, Streckenalter)
-und Haltezeitverlängerung durch Fahrgastandrang. Beides ist für Phase 4 vorgesehen; die
-Ereignisschleife nimmt sie ohne Umbau auf, weil beides nur zusätzliche Belegungszeit ist.
+**Haltezeit aus Andrang** (Phase 4a, `packages/domain/src/dwell.ts`): Fahrgäste strömen mit
+einer festen Rate durch die Türen — 4/s beim Zug, 0,6/s beim Bus, wo sich beim Einstieg alles
+an einer Tür staut. Was über die geplante Haltezeit hinausgeht, verspätet den Zug, gedeckelt
+bei vier Minuten. Damit kostet Überfüllung nicht nur Umsatz, sondern auch Fahrplanstabilität.
+
+Die Zahlen dafür stammen aus den Fahrgastzahlen des **Vortags**, und das ist Absicht: die
+Haltezeit hängt vom Andrang ab, der Andrang über die Reisezeit von der Haltezeit. Statt diesen
+Fixpunkt zu iterieren, plant das Spiel mit den Zahlen von gestern — genau wie ein echter
+Betrieb seinen Fahrplan schreibt. Der Zustand hält sie in `GameState.crowding`.
+
+**Noch nicht umgesetzt**: Störungen als seedbasierter Zufall (Fahrzeugzustand, Streckenalter).
+Die Ereignisschleife nimmt sie ohne Umbau auf, weil eine Störung nur zusätzliche
+Belegungszeit ist.
 
 ---
 
@@ -250,9 +260,14 @@ sieht der Spieler, ob ihm ein längerer Zug hilft (ein Abschnitt über 100 %) od
 Linie (nur die Mitte voll, die Enden leer).
 
 Nachfrage außerhalb der Betriebszeit zählt als **stehen geblieben**, nicht als Überlastung —
-sonst wäre jede Linie nachts unendlich überfüllt. Nicht modelliert ist die Reihenfolge am
-Bahnsteig: real entscheidet, wer zuerst da ist, ob ein Fernreisender oder ein Kurzstreckenfahrer
-den letzten Platz bekommt.
+sonst wäre jede Linie nachts unendlich überfüllt. Sie zählt auch nicht gegen die Zufriedenheit
+(siehe [03 §6a](03-NACHFRAGEMODELL.md#6a-zufriedenheit-das-gedächtnis-der-nachfrage)). Nicht
+modelliert ist die Reihenfolge am Bahnsteig: real entscheidet, wer zuerst da ist, ob ein
+Fernreisender oder ein Kurzstreckenfahrer den letzten Platz bekommt.
+
+Seit Phase 4a hat Überfüllung zwei Nachwirkungen: sie **verlängert die Haltezeit** (siehe
+Abschnitt 5) und sie **kostet Stammkunden**. Wer wiederholt keinen Platz bekommt, weicht aufs
+Auto aus, und er kommt deutlich langsamer zurück, als er gegangen ist.
 
 ---
 

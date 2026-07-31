@@ -162,17 +162,13 @@ Im Bildfahrplan ist der Unterschied ohne jede Kennzahl zu sehen: vorher ein Säg
 aus Zügen, die einander den Abschnitt wegnehmen, nachher gleichmäßig versetzte Geraden, die
 sich sauber an der Überholstelle kreuzen.
 
-**Was aus Phase 3 offen blieb:**
+**Was aus Phase 3 offen blieb** (erledigt in Phase 4a, wo vermerkt):
 
-- **Kein Umsteigen zwischen eigenen Linien.** Jede Relation wird weiterhin nur direkt
-  bedient — der Punkt aus Phase 1 ist offen geblieben. Die Wegsuche im Schienennetz ist da,
-  aber sie sucht Wege für *Züge*, nicht für Fahrgäste. Ein Reiseketten-Router mit
-  Umsteigestrafe ist ein eigenes Stück Arbeit und gehört zu Phase 4.
+- ~~**Kein Umsteigen zwischen eigenen Linien.**~~ → Phase 4a
+- ~~**Keine Haltezeitverlängerung durch Andrang.**~~ → Phase 4a
 - **Keine Störungen.** Verspätung entsteht ausschließlich aus dem Fahrplan. Ein
   überalterter Fuhrpark auf einer maroden Strecke fährt bislang genauso pünktlich wie ein
   neuer. Die Ereignisschleife nimmt Störungen ohne Umbau auf.
-- **Keine Haltezeitverlängerung durch Andrang.** Die Haltezeit ist mit 60 s fest, obwohl
-  800 aussteigende Fahrgäste real länger brauchen.
 - **Die Reihenfolge am Bahnsteig fehlt.** Bei Überfüllung werden alle Gruppen eines
   Abschnitts gleich behandelt; real bekommt der den Platz, der zuerst da war.
 - **Keine Streckenauslastungs-Heatmap.** Die Auslastung je Abschnitt wird berechnet und im
@@ -191,19 +187,66 @@ Das ist der Punkt, an dem aus einem Wirtschaftsspiel *dieses* Spiel wird.
 
 ---
 
-## Phase 4 — Tiefe (3–4 Wochen)
+## Phase 4a — Umsteigen und Überlastung ✅ abgeschlossen
+
+**Ziel**: Aus Einzellinien wird ein Netz, und Überfüllung bekommt Folgen.
+
+- [x] **Zentrale Nachfrageverteilung**: das Angebot aller Linien wird einmal je Betriebstag
+      zusammen bewertet, statt dass jede Linie ihren Anteil selbst aus der Matrix zieht
+- [x] **Reiseketten mit einem Umstieg**, umgestiegen wird in einer *Stadt* — damit ist der
+      Zubringerbus zum Bahnhof möglich, obwohl Bushaltestelle und Bahnhof getrennte Objekte
+      an verschiedenen Orten sind
+- [x] Austauschbare Verbindungen werden zu einer Alternative mit gemeinsamem Takt
+      zusammengefasst (gegen das *red bus / blue bus*-Problem des Logit-Modells)
+- [x] **Zufriedenheit je Relation**: fällt bei Stehenbleiben und Unpünktlichkeit, erholt sich
+      rund fünfzehnmal langsamer, wirkt als Abschlag im Logit
+- [x] **Haltezeit aus Andrang**: Ein- und Aussteigende verlängern den Aufenthalt und damit
+      die Umlaufzeit, bemessen an den Fahrgastzahlen des Vortags
+- [x] Beides im Linienpanel sichtbar, mit Erklärung, was zu tun ist
+
+**Abnahme erreicht** — dieselbe Relation, ein halbes Jahr, verschieden viel Kapazität:
+
+| Angebot München–Augsburg | Fahrgäste/Tag | Spitze | Zufriedenheit | Ergebnis |
+|---|---|---|---|---|
+| 120′ mit 2 Bussen | 372 | 129 % | 87 % | +2 144 €/Tag |
+| 60′ mit 4 Bussen | 851 | 153 % | 83 % | +5 710 €/Tag |
+| 30′ mit 8 Bussen | 1 381 | 124 % | 94 % | **+8 232 €/Tag** |
+| 15′ mit 16 Bussen | 1 704 | 80 % | 100 % | +5 365 €/Tag |
+
+**Es gibt jetzt ein Optimum, und es liegt nicht am Rand.** Wer zu knapp fährt, verliert über
+Monate Fahrgäste ans Auto; wer zu üppig fährt, verbrennt Geld. Damit kann man sich verzocken —
+und der Fehler zeigt sich erst Wochen später, was ihn erst gefährlich macht.
+
+Und das Umsteigen trägt: ein Zubringer Landsberg–Augsburg bringt der Bahnlinie
+München–Augsburg 80 Umsteiger am Tag, die es vorher schlicht nicht gab.
+
+**Was aus Phase 4a offen blieb:**
+
+- **Zwei und mehr Umstiege.** Die Aufzählung wächst kubisch; dafür bräuchte es eine echte
+  Verbindungssuche (RAPTOR). In einem Netz dieser Größe frisst die zweite Umsteigestrafe
+  den Gewinn ohnehin meist auf.
+- **Gestrandete Umsteiger.** Wer auf dem zweiten Teilstück keinen Platz mehr bekommt, gilt
+  als halb bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten
+  Zuordnungsdurchgang.
+- **Die Reihenfolge am Bahnsteig** fehlt weiterhin: bei Überfüllung werden alle gleich
+  behandelt.
+- **Die Zufriedenheitsparameter sind gesetzt, nicht gemessen.** Es gibt keine Erhebung dazu,
+  wie lange jemand einem verpassten Bus nachträgt. Verteidigen lässt sich die Richtung und
+  das Verhältnis von Verfall zu Erholung, nicht die absoluten Zahlen.
+
+---
+
+## Phase 4b — Tiefe (2–3 Wochen)
 
 - Segmente vollständig mit Tages-, Wochen- und Saisonganglinie
 - Einrichtungen aus Wikidata mit ihren Boost-Faktoren
-- Zufriedenheit je Relation, Folgen von Überfüllung und Unpünktlichkeit
 - Störungen und ihre Ausbreitung; Instandhaltung als Gegenmittel
-- **Umsteigen zwischen eigenen Linien** — Reisekettenrouting mit Umsteigestrafe.
-  Der größte offene Punkt aus Phase 1 und 3; erst damit wird aus Einzellinien ein Netz.
 - Streckenauslastung als Heatmap über die Karte
-- Bus-Bahn-Konkurrenz im eigenen Netz (Zubringer statt Wettbewerb) — die Angebotsindizes
-  dafür stehen, es fehlt die Zubringerlogik
+- Bus-Bahn-Konkurrenz im eigenen Netz bewusst gestalten (Zubringertarife, abgestimmte
+  Anschlüsse statt zufälliger Wartezeit)
 
-**Abnahme**: Das Spiel hat einen Schwierigkeitsgrad. Man kann sich verzocken.
+**Abnahme**: Ein überalterter Fuhrpark auf einer überlasteten Strecke wird spürbar
+unzuverlässig, und man sieht auf der Karte, wo es klemmt.
 
 ---
 

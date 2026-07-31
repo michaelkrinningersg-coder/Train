@@ -9,8 +9,8 @@ import {
   trimLedger,
   vehicleUpkeepPerDay,
 } from '@game/economy'
-import { simulateBusDay } from './busDay.js'
-import { buildRailServiceIndex, railOverhead, simulateRailDay } from './railDay.js'
+import { simulateDay } from './day.js'
+import { railOverhead } from './railDay.js'
 import { networkUpkeepPerDay } from './railCommands.js'
 
 /** Zinssatz auf einen negativen Kontostand. Teurer als jeder Kredit - mit Absicht. */
@@ -27,23 +27,20 @@ export const HISTORY_DAYS = 400
  */
 export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
   const entries: Omit<LedgerEntry, 'day'>[] = []
-  const lineResults: LineDayResult[] = []
 
   let revenue = 0
   let costs = 0
   let passengers = 0
 
-  // Das eigene Bahnangebot steht einmal fest, bevor Bus und Bahn zugeordnet
-  // werden - sonst konkurrierten die Linien je nach Reihenfolge unterschiedlich.
-  const services = buildRailServiceIndex(state)
+  // Ein Durchgang fuer das ganze Netz: Angebot, Reiseketten, Wahl, Kapazitaet.
+  // Die Linien einzeln zu rechnen ginge nicht mehr - eine Reisekette gehoert
+  // keiner Linie.
+  const day = simulateDay(state, demand)
+  const lineResults = day.lines
 
-  for (const line of state.lines.values()) {
-    const result =
-      line.mode === 'rail'
-        ? simulateRailDay(state, demand, line.id, services)
-        : simulateBusDay(state, demand, line.id, services)
-    if (!result) continue
-    lineResults.push(result)
+  for (const result of lineResults) {
+    const line = state.lines.get(result.lineId)
+    if (!line) continue
 
     if (result.revenue > 0) {
       entries.push({ category: 'ticket_revenue', amount: result.revenue, lineId: line.id })
@@ -137,6 +134,8 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     loans,
     fleet,
     network: { ...state.network, tracks },
+    satisfaction: day.satisfaction,
+    crowding: day.crowding,
     ledger: trimLedger([...state.ledger, ...dated], nextDay),
     lastDay: dayResult,
     history: [...state.history, dayResult].slice(-HISTORY_DAYS),

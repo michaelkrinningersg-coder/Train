@@ -100,6 +100,15 @@ export interface LineDayResult {
   readonly trainsNeeded?: number
   /** Spitzenauslastung je Abschnitt zwischen zwei Halten. */
   readonly linkLoadFactors?: readonly number[]
+
+  /** Fahrgaeste dieser Linie, die auf einer Reisekette ueber mehrere Linien sitzen. */
+  readonly transferPassengers?: number
+  /** Mittlere Zufriedenheit der von dieser Linie bedienten Relationen, 0..1. */
+  readonly satisfaction?: number
+  /** Ein- und Aussteigende je Fahrt und Halt in der Spitzenstunde. */
+  readonly stopFlowPerDeparture?: readonly number[]
+  /** Zusaetzliche Haltezeit aus Andrang, ueber alle Halte summiert. */
+  readonly crowdingDwellSec?: number
 }
 
 export interface DayResult {
@@ -130,6 +139,29 @@ export interface GameState {
 
   /** Zuglaeufe der Betriebssimulation. Bleibt bis Phase 3 leer. */
   readonly runs: ReadonlyMap<RunId, TrainRun>
+
+  /**
+   * Zufriedenheit je Relation ("stadtA|stadtB"), 0..1, Standard 1.
+   *
+   * Sinkt, wenn Fahrgaeste stehen bleiben oder Zuege unpuenktlich sind, und
+   * erholt sich deutlich langsamer, als sie faellt. Sie wirkt als Abschlag auf
+   * den Nutzen des eigenen Angebots im Logit-Modell - wer eine Relation ein
+   * halbes Jahr ueberfuellt bedient, bekommt die Fahrgaeste nicht mit einem
+   * einzigen zusaetzlichen Zug zurueck.
+   */
+  readonly satisfaction: ReadonlyMap<string, number>
+
+  /**
+   * Ein- und Aussteigende je Fahrt und Halt aus dem Vortag, je Linie.
+   *
+   * Daraus wird die Haltezeit des naechsten Betriebstags bemessen. Der Umweg
+   * ueber den Vortag ist Absicht: die Haltezeit haengt von den Fahrgastzahlen ab,
+   * die Fahrgastzahlen ueber die Reisezeit von der Haltezeit. Statt diesen
+   * Fixpunkt zu iterieren, plant das Spiel den Fahrplan mit den Zahlen von
+   * gestern - genau wie ein echter Betrieb.
+   */
+  readonly crowding: ReadonlyMap<LineId, readonly number[]>
+
   readonly ledger: readonly LedgerEntry[]
   /** Ergebnis des zuletzt simulierten Betriebstags. */
   readonly lastDay: DayResult | null

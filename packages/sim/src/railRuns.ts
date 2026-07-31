@@ -2,6 +2,7 @@ import {
   RAIL_DWELL_SEC,
   RAIL_TURNAROUND_SEC,
   SIGNAL_REACTION_SEC,
+  dwellWithCrowding,
   expandDepartures,
   runId as brandRun,
   trainClass,
@@ -16,9 +17,12 @@ import {
   type TrainClass,
   type VehicleId,
 } from '@game/domain'
-import { blockBoundaries, sectionResource, blockResource, type Claim } from './blocks.js'
+import { blockBoundaries, sectionResource, blockResource, freeFrom, type Claim } from './blocks.js'
 import { resolveLinePath } from './railGraph.js'
 import { legRunTime, timeAtKm, type LegRun } from './runTime.js'
+
+/** Ab dieser Verspätung gilt ein Halt als unpünktlich. */
+export const PUNCTUALITY_THRESHOLD_SEC = 6 * 60
 
 export interface RailStopTime {
   readonly stationId: StationId
@@ -58,6 +62,8 @@ export interface LinePlan {
   /** Reine Fahrzeit inklusive Reserve und Aufenthalten, eine Richtung. */
   readonly oneWaySeconds: number
   readonly roundTripSeconds: number
+  /** Haltezeit je Halt in Fahrtrichtung dieses Plans. */
+  readonly dwellSeconds: readonly number[]
   readonly problems: readonly string[]
 }
 
@@ -72,7 +78,17 @@ const GRAPH_STEP_KM = 1
  * kurvigen Strecke schneller. Deshalb wird der Weg mit dem konkreten Fahrzeug
  * gesucht und nicht abstrakt.
  */
-export function planLine(state: GameState, line: Line, direction: 'forward' | 'backward' = 'forward'): LinePlan {
+export function planLine(
+  state: GameState,
+  line: Line,
+  direction: 'forward' | 'backward' = 'forward',
+  /**
+   * Ein- und Aussteigende je Fahrt und Halt aus dem Vortag, in Vorwärtsrichtung
+   * der Linie. Ohne Angabe gilt die Mindesthaltezeit — so verhält sich eine
+   * frisch angelegte Linie am ersten Tag.
+   */
+  stopFlowPerDeparture: readonly number[] = [],
+): LinePlan {
   const problems: string[] = []
 
   const pattern = [...state.patterns.values()].find((p) => p.lineId === line.id)
@@ -80,13 +96,28 @@ export function planLine(state: GameState, line: Line, direction: 'forward' | 'b
   const train = vehicle ? (trainClass(vehicle.classId) ?? null) : null
   if (!train) problems.push('Der Linie ist kein Zug zugeteilt.')
 
+  const forwardDwell = line.stops.map((stop, i) =>
+    dwellWithCrowding('rail', stop.dwellSeconds, RAIL_DWELL_SEC, stopFlowPerDeparture[i] ?? 0),
+  )
+  const dwellSeconds = direction === 'forward' ? forwardDwell : [...forwardDwell].reverse()
+
   const ordered = direction === 'forward' ? line.stops : [...line.stops].reverse()
   const stations = ordered.map((s) => state.network.stations.get(s.stationId))
   if (stations.some((s) => !s)) problems.push('Ein Halt fehlt im Netz.')
 
   const stopNodes = stations.filter((s): s is NonNullable<typeof s> => Boolean(s)).map((s) => s.nodeId)
   if (stopNodes.length < 2) {
-    return { line, train, stopNodes, legs: [], lengthKm: 0, oneWaySeconds: 0, roundTripSeconds: 0, problems }
+    return {
+      line,
+      train,
+      stopNodes,
+      legs: [],
+      lengthKm: 0,
+      oneWaySeconds: 0,
+      roundTripSeconds: 0,
+      dwellSeconds,
+      problems,
+    }
   }
 
   const { legs: paths, complete, blockedByConstruction } = resolveLinePath(state, stopNodes, train ?? undefined)
@@ -105,7 +136,8 @@ export function planLine(state: GameState, line: Line, direction: 'forward' | 'b
   const reserve = line.runtimeReserve
 
   const driving = legs.reduce((s, l) => s + l.runSeconds * reserve, 0)
-  const dwell = Math.max(0, stopNodes.length - 2) * RAIL_DWELL_SEC
+  // Aufenthalt nur an den Zwischenhalten - an den Endpunkten zaehlt die Wendezeit.
+  const dwell = dwellSeconds.slice(1, -1).reduce((s, d) => s + d, 0)
   const oneWaySeconds = driving + dwell
 
   return {
@@ -116,6 +148,7 @@ export function planLine(state: GameState, line: Line, direction: 'forward' | 'b
     lengthKm,
     oneWaySeconds,
     roundTripSeconds: 2 * oneWaySeconds + 2 * RAIL_TURNAROUND_SEC,
+    dwellSeconds,
     problems,
   }
 }
@@ -142,6 +175,7 @@ export function buildRuns(
   line: Line,
   pattern: ServicePattern,
   headwayMin: number,
+  stopFlowPerDeparture: readonly number[] = [],
 ): RailRun[] {
   const runs: RailRun[] = []
   const vehicles = pattern.vehicleIds
@@ -151,8 +185,8 @@ export function buildRuns(
   if (departures.length === 0) return runs
 
   const plans = {
-    forward: planLine(state, line, 'forward'),
-    backward: planLine(state, line, 'backward'),
+    forward: planLine(state, line, 'forward', stopFlowPerDeparture),
+    backward: planLine(state, line, 'backward', stopFlowPerDeparture),
   }
   if (plans.forward.legs.length === 0 || !plans.forward.train) return runs
 
@@ -293,7 +327,7 @@ function buildRun(
     const isLast = legIndex === plan.legs.length - 1
     const node = plan.stopNodes[legIndex + 1]!
     const station = stationAt(node)
-    const dwell = isLast ? 0 : RAIL_DWELL_SEC
+    const dwell = isLast ? 0 : (plan.dwellSeconds[legIndex + 1] ?? RAIL_DWELL_SEC)
     const arrival = clock
     clock += dwell
 
@@ -371,4 +405,113 @@ function isForwardOnTrack(
 
 function oppositeEnd(track: { from: NodeId; to: NodeId }, entry: NodeId): NodeId {
   return track.from === entry ? track.to : track.from
+}
+
+export interface DelayResult {
+  readonly delays: ReadonlyMap<string, number>
+  readonly punctuality: number
+  readonly averageDelaySec: number
+}
+
+/**
+ * Verspätungsausbreitung als ereignisgesteuerte Belegung.
+ *
+ * Verarbeitet werden nicht die Züge in Abfahrtsreihenfolge, sondern die
+ * **Belegungen in zeitlicher Reihenfolge**. Das ist kein Detail: kreuzen sich
+ * zwei Züge an einer Überholstelle, erreicht der eine den Abschnitt Sekunden
+ * vor dem anderen. Wer nach Abfahrtszeit sortiert, lässt womöglich den bereits
+ * eingefahrenen Zug auf den noch nicht abgefahrenen warten — und macht aus
+ * zwanzig Sekunden Kreuzungstoleranz eine halbe Stunde Verspätung.
+ *
+ * Findet ein Zug ein Betriebsmittel belegt, wartet er, und alles Folgende
+ * verschiebt sich mit. So entsteht Folgeverspätung: nicht als Zufallszahl,
+ * sondern weil zwei Züge dieselbe Stelle brauchen. Die Fahrzeitreserve baut sie
+ * unterwegs wieder ab.
+ */
+export function resolveDelays(
+  runs: readonly RailRun[],
+  legRunSeconds: readonly number[],
+  reserve: number,
+): DelayResult {
+  const occupied = new Map<string, Claim[]>()
+  const delays = new Map<string, number>()
+
+  // Belegungen je Zug, chronologisch. Der Zeiger wandert beim Abarbeiten weiter.
+  const sortedClaims = runs.map((run) => [...run.claims].sort((a, b) => a.from - b.from))
+  const cursor = runs.map(() => 0)
+  const delay = runs.map(() => 0)
+
+  const pending = (): number => {
+    let best = -1
+    let bestTime = Infinity
+    for (let i = 0; i < runs.length; i++) {
+      const index = cursor[i]!
+      if (index >= sortedClaims[i]!.length) continue
+      const time = sortedClaims[i]![index]!.from + delay[i]!
+      if (time < bestTime) {
+        bestTime = time
+        best = i
+      }
+    }
+    return best
+  }
+
+  let guard = 0
+  const limit = runs.reduce((n, r) => n + r.claims.length, 0) + 16
+
+  for (;;) {
+    if (guard++ > limit) break
+    const i = pending()
+    if (i < 0) break
+
+    const claim = sortedClaims[i]![cursor[i]!]!
+    const existing = occupied.get(claim.resource) ?? []
+    const from = claim.from + delay[i]!
+    const to = claim.to + delay[i]!
+
+    const earliest = freeFrom(existing, from, to, claim.capacity, claim.direction, claim.kind === 'section')
+    if (earliest > from) delay[i] = delay[i]! + (earliest - from)
+
+    const shifted: Claim = { ...claim, from: claim.from + delay[i]!, to: claim.to + delay[i]! }
+    if (existing.length > 0) existing.push(shifted)
+    else occupied.set(claim.resource, [shifted])
+    cursor[i] = cursor[i]! + 1
+  }
+
+  let punctualStops = 0
+  let totalStops = 0
+  let delaySum = 0
+  const recoveryPerLeg = legRunSeconds.map((s) => s * (reserve - 1))
+
+  runs.forEach((run, i) => {
+    delays.set(run.id, delay[i]!)
+    let remaining = delay[i]!
+    run.stops.forEach((_stop, index) => {
+      totalStops++
+      if (remaining <= PUNCTUALITY_THRESHOLD_SEC) punctualStops++
+      delaySum += remaining
+      remaining = Math.max(0, remaining - (recoveryPerLeg[index] ?? 0))
+    })
+  })
+
+  return {
+    delays,
+    punctuality: totalStops > 0 ? punctualStops / totalStops : 1,
+    averageDelaySec: totalStops > 0 ? delaySum / totalStops : 0,
+  }
+}
+
+/** Verschiebt die Fahrplanlagen um die ermittelte Verspätung — für den Bildfahrplan. */
+export function applyDelays(runs: readonly RailRun[], delays: ReadonlyMap<string, number>): RailRun[] {
+  return runs.map((run) => {
+    const d = delays.get(run.id) ?? 0
+    if (d === 0) return run
+    return {
+      ...run,
+      departure: run.departure + d,
+      arrival: run.arrival + d,
+      stops: run.stops.map((s) => ({ ...s, arrival: s.arrival + d, departure: s.departure + d })),
+      graph: run.graph.map((g) => ({ ...g, seconds: g.seconds + d })),
+    }
+  })
 }

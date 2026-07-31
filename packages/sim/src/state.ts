@@ -28,6 +28,8 @@ export function createGame(options: NewGameOptions): GameState {
     lines: new Map(),
     patterns: new Map(),
     runs: new Map(),
+    satisfaction: new Map(),
+    crowding: new Map(),
     ledger: [],
     lastDay: null,
     history: [],

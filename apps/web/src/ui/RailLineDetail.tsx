@@ -2,6 +2,7 @@ import { availableTrains, toDate, trainClass, type LineId, type VehicleId } from
 import { formatMoney } from '@game/economy'
 import { planLine, trainsNeeded } from '@game/sim'
 import { patternOf, useGame } from '../game/store.js'
+import { QualityFacts, QualityNote } from './ServiceQuality.js'
 
 const HEADWAYS = [15, 20, 30, 60, 120] as const
 const hhmm = (sec: number): string => `${String(Math.floor(sec / 3600)).padStart(2, '0')}:00`
@@ -180,7 +181,9 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
               <dt>Betriebskosten</dt>
               <dd className="num">{formatMoney(result.operatingCost)}</dd>
             </div>
+            <QualityFacts result={result} />
           </dl>
+          <QualityNote result={result} />
 
           {result.linkLoadFactors && result.linkLoadFactors.length > 0 && (
             <>

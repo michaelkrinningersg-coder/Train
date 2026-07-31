@@ -3,6 +3,7 @@ import { busClass } from '@game/domain'
 import { formatMoney } from '@game/economy'
 import { lineMetrics, vehiclesNeeded } from '@game/sim'
 import { patternOf, useGame } from '../game/store.js'
+import { QualityFacts, QualityNote } from './ServiceQuality.js'
 
 const HEADWAYS = [15, 20, 30, 60, 120, 180] as const
 
@@ -231,7 +232,9 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
               <dt>Abfahrten je Richtung</dt>
               <dd className="num">{result.departuresPerDirection}</dd>
             </div>
+            <QualityFacts result={result} />
           </dl>
+          <QualityNote result={result} />
           {result.warnings.map((w) => (
             <p key={w} className="warn small">
               ⚠ {w}

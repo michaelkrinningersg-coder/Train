@@ -1,4 +1,4 @@
-import { BUS_DWELL_SEC, BUS_TIME_FACTOR, busClass } from '@game/domain'
+import { BUS_DWELL_SEC, BUS_TIME_FACTOR, busClass, dwellWithCrowding } from '@game/domain'
 import type { CityId, GameState, Line, ServicePattern, StationId, VehicleId } from '@game/domain'
 import { CAR_SPEED_KMH, ROAD_DETOUR } from '@game/demand'
 import { distanceKm } from '@game/geo'
@@ -14,6 +14,8 @@ export interface LineMetrics {
   readonly legTimesSec: readonly number[]
   /** Luftlinie zwischen aufeinanderfolgenden Halten, fuer die Auto-Referenz. */
   readonly legGreatCircleKm: readonly number[]
+  /** Haltezeit je Halt, inklusive Zuschlag aus Andrang. */
+  readonly dwellSeconds: readonly number[]
   readonly lengthKm: number
   readonly oneWayTimeSec: number
   readonly roundTripSec: number
@@ -26,7 +28,12 @@ export interface LineMetrics {
  * genaehert (siehe docs/05-DATENPIPELINE.md Abschnitt 4). Der Austausch gegen
  * echte Routingzeiten beruehrt nur diese Funktion.
  */
-export function lineMetrics(state: GameState, line: Line): LineMetrics | null {
+export function lineMetrics(
+  state: GameState,
+  line: Line,
+  /** Ein- und Aussteigende je Fahrt und Halt aus dem Vortag. */
+  stopFlowPerDeparture: readonly number[] = [],
+): LineMetrics | null {
   const stations = line.stops.map((s) => state.network.stations.get(s.stationId))
   if (stations.some((s) => !s) || stations.length < 2) return null
 
@@ -44,10 +51,14 @@ export function lineMetrics(state: GameState, line: Line): LineMetrics | null {
     legTimesSec.push((road / CAR_SPEED_KMH) * 3600 * BUS_TIME_FACTOR)
   }
 
+  const dwellSeconds = line.stops.map((stop, i) =>
+    dwellWithCrowding('bus', stop.dwellSeconds, BUS_DWELL_SEC, stopFlowPerDeparture[i] ?? 0),
+  )
+
   const lengthKm = legDistancesKm.reduce((a, b) => a + b, 0)
   const driving = legTimesSec.reduce((a, b) => a + b, 0)
   // Aufenthalt nur an den Zwischenhalten - an den Endpunkten zaehlt die Wendezeit.
-  const dwell = Math.max(0, stations.length - 2) * BUS_DWELL_SEC
+  const dwell = dwellSeconds.slice(1, -1).reduce((a, b) => a + b, 0)
   const oneWayTimeSec = driving + dwell
 
   return {
@@ -56,6 +67,7 @@ export function lineMetrics(state: GameState, line: Line): LineMetrics | null {
     legDistancesKm,
     legGreatCircleKm,
     legTimesSec,
+    dwellSeconds,
     lengthKm,
     oneWayTimeSec,
     roundTripSec: 2 * oneWayTimeSec + 2 * TURNAROUND_SEC,
