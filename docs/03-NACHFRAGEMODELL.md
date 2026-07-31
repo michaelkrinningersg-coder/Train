@@ -273,15 +273,67 @@ Reise neu.
 Der Test dazu ist scharf formuliert: *zwei parallele Linien im Stundentakt müssen genau so
 viele Fahrgäste bringen wie eine einzige im Halbstundentakt.*
 
+### Anschlüsse: die Umsteigezeit entsteht aus der Phasenlage
+
+Umgesetzt in `packages/sim/src/connections.ts`. Bis dahin kostete jeder Umstieg den halben
+Takt der Anschlusslinie — eine Stundentaktlinie also im Mittel dreißig Minuten, ganz gleich wie
+die beiden Fahrpläne zueinander lagen. Ein abgestimmter Anschluss war damit im Modell genauso
+gut wie ein zufälliger.
+
+Jetzt wird gerechnet, was tatsächlich passiert:
+
+```
+ankunft   = ersteAbfahrt(A) + fahrzeitBis(halt, richtung) + k · takt(A)
+bereit    = ankunft + umsteigezeit          (Mindestzeit + Fußweg zwischen den Halten)
+abfahrt   = ersteAbfahrt(B) + fahrzeitBis(halt, richtung) + j · takt(B)
+
+wartezeit = umsteigezeit + ((abfahrt − bereit) mod takt(B))
+```
+
+Bei gleichem Takt ist die Wartezeit für jede Fahrt dieselbe — das ist der Normalfall eines
+Taktfahrplans und der Grund, warum sich ein Anschluss überhaupt planen lässt. Bei ungleichen
+Takten verschiebt sich die Lage von Fahrt zu Fahrt; dann wird über eine volle Periode
+(kgV der beiden Takte) gemittelt.
+
+Die Gegenrichtung wird aus der Hinrichtung abgeleitet, weil der Fahrplan symmetrisch ist:
+gleiche Fahrzeit, gleiche Aufenthalte, gleiches Abfahrtsraster. Ein Gegenzug, der am anderen
+Ende zur selben Zeit losfährt, erreicht Halt *i* genau `Umlaufzeit − Ankunft(i)` später.
+
+**Was das für das Balancing bedeutet:** über alle Phasenlagen gemittelt ergibt sich wieder der
+halbe Takt plus Umsteigezeit. Gemessen an einem 60-Minuten-Takt: 32,0 min gegenüber 32 min
+nach der alten Pauschale. Die Mechanik verschiebt also nichts — sie gibt dem Spieler die Wahl
+*innerhalb* dieser Verteilung. Genau das macht aus einer Rechengröße eine Spielmechanik.
+
+**Und sie hat eine eingebaute Härte.** Dieselben zwei Linien, nur die Abfahrtsminute des
+Zubringers verschoben:
+
+| Abfahrt | Umstieg hin | zurück | **Summe** | Umsteiger/Tag |
+|---|---|---|---|---|
+| :00 | 23 min | 3 min | **26 min** | 54 |
+| :10 | 13 min | 13 min | **26 min** | 52 |
+| :20 | 3 min | 23 min | **26 min** | 52 |
+| :30 | 53 min | 33 min | **86 min** | 32 |
+| :40 | 43 min | 43 min | **86 min** | 31 |
+| :50 | 33 min | 53 min | **86 min** | 31 |
+
+Bei gleichem Takt beider Linien ist die **Summe** beider Umsteigerichtungen weitgehend
+festgelegt; die Fahrgastzahlen folgen ihr und nicht der einzelnen Richtung. Man kann die gute
+Hälfte der Phasenlagen treffen — und innerhalb davon wählen, welche Richtung man bevorzugt.
+Beide Richtungen zugleich kurz zu bekommen geht nur, wenn Fahrzeit und Takt zueinander passen.
+Das ist genau die Rechnung hinter einem Integralen Taktfahrplan.
+
 **Noch nicht umgesetzt** und bewusst aufgeschoben:
 
 - Die Aufteilung auf konkurrierende Zugläufe im Zeitfenster ±30 min proportional zum Nutzen.
   Aktuell zählt die Summe der Sitzplätze einer Stunde. Bei einem Taktfahrplan mit gleichen
   Zügen ist das dasselbe Ergebnis; interessant wird es erst, wenn Eil- und Nahverkehrszüge
   auf derselben Linie fahren.
-- **Anschlüsse.** Die Suche kennt Takte, keine Abfahrtszeiten — ein abgestimmter Anschluss ist
-  darin genauso gut wie ein zufälliger. Das ist die größte offene Vereinfachung des
-  Umsteigemodells und die Voraussetzung für einen echten Integralen Taktfahrplan.
+- **Anschlusssicherung.** Die Anschlusslinie fährt immer nach Plan; sie wartet nie auf einen
+  verspäteten Zubringer. Real ist das eine Abwägung — Anschluss halten und die eigene
+  Verspätung weitertragen, oder pünktlich losfahren und die Umsteiger stehen lassen. Solange
+  es die nicht gibt, ist ein Anschluss mit null Puffer im Modell genauso sicher wie einer mit
+  zehn Minuten, und deshalb wird ein knapper Anschluss auch nicht als riskant markiert:
+  das behauptete eine Gefahr, die hier nicht existiert.
 - Die Reihenfolge am Bahnsteig: alle Gruppen eines Abschnitts werden gleich behandelt.
 - Ein Umsteiger, der auf einem späteren Teilstück keinen Platz mehr bekommt, gilt als *anteilig*
   bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten Zuordnungsdurchgang;

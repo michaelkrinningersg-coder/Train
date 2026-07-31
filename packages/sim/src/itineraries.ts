@@ -7,8 +7,8 @@ import {
   waitFromHeadway,
   type Alternative,
 } from '@game/demand'
-import { distanceKm } from '@game/geo'
-import { legFare, rideSeconds, type LineOffer } from './offers.js'
+import { connectionWaitSec, interchangeSeconds } from './connections.js'
+import { legFare, rideSeconds, type Direction, type LineOffer } from './offers.js'
 
 /**
  * Reiseketten über das eigene Netz.
@@ -61,10 +61,6 @@ export const MAX_ROUTES_PER_CITY = 4
 export const MAX_MEMBERS_PER_ROUTE = 4
 /** Mittlere Umsteigestrafe für die Rangfolge während der Suche. */
 export const TRANSFER_PENALTY_SEC = 900
-/** Mindestzeit für einen Umstieg, auch am selben Bahnsteig. */
-export const MIN_INTERCHANGE_SEC = 120
-/** Fußweg zwischen zwei Halten derselben Stadt. */
-export const INTERCHANGE_WALK_KMH = 4.5
 /** Mehr Wahlmöglichkeiten je Relation bringen im Logit kaum noch Unterschied. */
 export const MAX_ITINERARIES_PER_OD = 3
 
@@ -79,6 +75,12 @@ export interface ItineraryLeg {
 export interface Itinerary {
   readonly od: string
   readonly legs: readonly ItineraryLeg[]
+  /**
+   * Wartezeit vor jeder Teilstrecke. Die erste ist der halbe Takt — man weiß
+   * nicht, wann man losfahren will. Jede weitere ist die **Anschlusszeit**: was
+   * zwischen Aussteigen und Weiterfahrt tatsächlich vergeht.
+   */
+  readonly legWaits: readonly number[]
   /** Prägendes Verkehrsmittel: das der längsten Teilstrecke. */
   readonly mode: 'bus' | 'rail'
   readonly travelTimeSec: number
@@ -105,6 +107,10 @@ export function itineraryAlternative(itinerary: Itinerary, ascOffset: number): A
   }
 }
 
+/** Fährt diese Teilstrecke in Linienrichtung oder dagegen? */
+export const directionOf = (leg: ItineraryLeg): Direction =>
+  leg.fromIndex < leg.toIndex ? 'forward' : 'backward'
+
 function singleLeg(offer: LineOffer, a: number, b: number): ItineraryLeg {
   return {
     lineId: offer.lineId,
@@ -115,22 +121,20 @@ function singleLeg(offer: LineOffer, a: number, b: number): ItineraryLeg {
   }
 }
 
-/** Fußweg zwischen zwei Halten derselben Stadt, plus Mindestumsteigezeit. */
-function interchangeSeconds(state: GameState, fromStation: string, toStation: string): number {
-  if (fromStation === toStation) return MIN_INTERCHANGE_SEC
-  const a = state.network.stations.get(fromStation as never)
-  const b = state.network.stations.get(toStation as never)
-  if (!a || !b) return MIN_INTERCHANGE_SEC
-  const km = distanceKm(a.position, b.position)
-  return MIN_INTERCHANGE_SEC + (km / INTERCHANGE_WALK_KMH) * 3600
-}
-
-function combine(offers: readonly LineOffer[], od: string, legs: readonly ItineraryLeg[], extraTimeSec: number): Itinerary {
+function combine(
+  offers: readonly LineOffer[],
+  od: string,
+  legs: readonly ItineraryLeg[],
+  legWaits: readonly number[],
+): Itinerary {
   const byId = new Map(offers.map((o) => [o.lineId, o]))
   const parts = legs.map((leg) => ({ leg, offer: byId.get(leg.lineId)! }))
 
-  const travelTimeSec = legs.reduce((s, l) => s + l.timeSec, 0) + extraTimeSec
-  const waitTimeSec = parts.reduce((s, p) => s + waitFromHeadway(p.offer.headwayMin), 0)
+  // Die Umsteigezeit steckt in `legWaits` und nicht in der Fahrzeit: Warten am
+  // Bahnsteig wiegt im Nutzenmodell schwerer als Sitzen im Zug, und genau das
+  // soll ein schlechter Anschluss kosten.
+  const travelTimeSec = legs.reduce((s, l) => s + l.timeSec, 0)
+  const waitTimeSec = legWaits.reduce((s, w) => s + w, 0)
   const fareCents = legs.reduce((s, l) => s + l.fareCents, 0)
 
   // Komfort nach Fahrzeit gewichtet - eine kurze Busanfahrt verdirbt keine
@@ -145,6 +149,7 @@ function combine(offers: readonly LineOffer[], od: string, legs: readonly Itiner
   return {
     od,
     legs,
+    legWaits,
     mode: longest.offer.mode,
     travelTimeSec,
     waitTimeSec,
@@ -253,8 +258,6 @@ function mergeOptions(offers: readonly LineOffer[], chains: readonly Itinerary[]
       return { lines, total }
     })
 
-    const waitTimeSec = perPosition.reduce((s, p) => s + waitFromHeadway(60 / p.total), 0)
-
     const rawShares = list.map((chain) =>
       chain.legs.reduce((product, leg, i) => {
         const position = perPosition[i]!
@@ -266,6 +269,16 @@ function mergeOptions(offers: readonly LineOffer[], chains: readonly Itinerary[]
 
     const weight = (pick: (c: Itinerary) => number): number =>
       list.reduce((sum, chain, i) => sum + pick(chain) * shares[i]!, 0)
+
+    // Die Wartezeit vor der ersten Teilstrecke sinkt, wenn mehrere Linien sie
+    // bedienen — ihre Takte addieren sich. Bei den Anschlüssen geht das nicht
+    // auf: dort zählt, wie gut die konkreten Fahrpläne zueinander passen, und
+    // das ist für jede Linienkombination eine eigene Zahl. Deshalb dort der
+    // gewichtete Mittelwert. Er liegt etwas über der Wahrheit, weil ein
+    // Fahrgast in Wirklichkeit den erstbesten Anschluss nimmt.
+    const waitTimeSec =
+      waitFromHeadway(60 / perPosition[0]!.total) +
+      perPosition.slice(1).reduce((sum, _p, i) => sum + weight((c) => c.legWaits[i + 1] ?? 0), 0)
 
     const first = list[0]!
     options.push({
@@ -337,7 +350,7 @@ export function buildItineraries(
       const od = odKey(origin, destination)
       result.set(
         od,
-        labels.map((label) => combine(offers, od, label.legs, label.extraTimeSec)),
+        labels.map((label) => combine(offers, od, label.legs, label.legWaits)),
       )
     }
   }
@@ -371,8 +384,8 @@ interface Label {
   readonly legs: readonly ItineraryLeg[]
   /** Städtefolge und Verkehrsmittel — Ketten mit gleichem Weg sind austauschbar. */
   readonly routeKey: string
-  /** Summe der Umsteigezeiten. */
-  readonly extraTimeSec: number
+  /** Wartezeit vor jeder Teilstrecke, erste = halber Takt, danach Anschlusszeit. */
+  readonly legWaits: readonly number[]
   /** Zwischensummen, damit die Bewertung ohne Neuaufbau der Kette auskommt. */
   readonly travelSec: number
   readonly waitSec: number
@@ -407,6 +420,8 @@ function searchFrom(
 ): Map<CityId, Label[]> {
   const reached = new Map<CityId, Routes>()
   let frontier: CityId[] = [origin]
+  const byLineId = new Map<LineId, LineOffer>()
+  for (const list of boardings.values()) for (const b of list) byLineId.set(b.offer.lineId, b.offer)
 
   for (let round = 0; round <= maxTransfers; round++) {
     const marked = new Set<CityId>()
@@ -426,6 +441,8 @@ function searchFrom(
           const interchange = arrival
             ? interchangeSeconds(state, arrival.lastStationId, offer.stops[stopIndex]!.stationId)
             : 0
+          const lastLeg = arrival?.legs[arrival.legs.length - 1]
+          const lastOffer = lastLeg ? byLineId.get(lastLeg.lineId) : undefined
 
           for (let target = 0; target < offer.stops.length; target++) {
             if (target === stopIndex) continue
@@ -437,15 +454,26 @@ function searchFrom(
             const step = `${city}>${destination.cityId}:${offer.mode}`
             const routeKey = arrival ? `${arrival.routeKey}+${step}` : step
 
-            const extraTimeSec = (arrival?.extraTimeSec ?? 0) + interchange
-            const travelSec = (arrival?.travelSec ?? 0) + leg.timeSec + interchange
-            const waitSec = (arrival?.waitSec ?? 0) + waitFromHeadway(offer.headwayMin)
+            // Die erste Teilstrecke: halber Takt, weil niemand weiss, wann er
+            // losfahren will. Jede weitere: die echte Anschlusszeit aus der
+            // Phasenlage der beiden Fahrplaene.
+            const wait = arrival
+              ? connectionWaitSec(
+                  { offer: lastOffer!, stopIndex: lastLeg!.toIndex, direction: directionOf(lastLeg!) },
+                  { offer, stopIndex, direction: directionOf(leg) },
+                  interchange,
+                )
+              : waitFromHeadway(offer.headwayMin)
+
+            const legWaits = arrival ? [...arrival.legWaits, wait] : [wait]
+            const travelSec = (arrival?.travelSec ?? 0) + leg.timeSec
+            const waitSec = (arrival?.waitSec ?? 0) + wait
             const fareCents = (arrival?.fareCents ?? 0) + leg.fareCents
 
             const label: Label = {
               legs,
               routeKey,
-              extraTimeSec,
+              legWaits,
               travelSec,
               waitSec,
               fareCents,

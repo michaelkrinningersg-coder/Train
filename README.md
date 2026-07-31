@@ -161,6 +161,27 @@ durch Bayern werden 22 Städtepaare direkt bedient, 56 mit einem Umstieg und **8
 Im Linienpanel steht unter *davon Umsteiger*, wie viele Fahrgäste einer Linie nur ein
 Teilstück ihrer Reise auf ihr zurücklegen.
 
+### Anschlüsse — die billigste Stellschraube im Spiel
+
+Wie lange ein Umstieg dauert, hängt davon ab, wie die beiden Fahrpläne **zueinander** liegen.
+Im Linienpanel gibt es dafür die **Abfahrtsminute** und direkt darunter die Tabelle
+**Anschlüsse**: sie zeigt für jeden Halt und jede dort ebenfalls haltende Linie, wie lange man
+in beide Umsteigerichtungen wartet. Die Zahlen ändern sich sofort, wenn man die Abfahrtsminute
+verschiebt — und das kostet keinen Cent.
+
+Dieselben zwei Linien, nur die Abfahrtsminute des Zubringers verändert:
+
+| Abfahrt | → auf die Fernlinie | ← zurück | Summe | Umsteiger/Tag |
+|---|---|---|---|---|
+| **:00** | 23 min | 3 min | 26 min | **54** |
+| :20 | 3 min | 23 min | 26 min | 52 |
+| :40 | 43 min | 43 min | 86 min | **31** |
+
+Bei gleichem Takt beider Linien ist die **Summe** beider Richtungen weitgehend festgelegt. Man
+trifft die gute Hälfte der Phasenlagen — und entscheidet dann, welche Richtung man bevorzugt.
+Beide zugleich kurz zu bekommen geht nur, wenn Fahrzeit und Takt zueinander passen. Genau das
+ist die Idee hinter einem Integralen Taktfahrplan.
+
 ### Bahnhöfe ausbauen
 
 Bahnsteiggleise bestimmen, wie viele Züge gleichzeitig im Bahnhof stehen dürfen — an einem

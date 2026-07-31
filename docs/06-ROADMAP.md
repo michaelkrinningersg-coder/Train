@@ -205,7 +205,10 @@ Das ist der Punkt, an dem aus einem Wirtschaftsspiel *dieses* Spiel wird.
       rund fünfzehnmal langsamer, wirkt als Abschlag im Logit
 - [x] **Haltezeit aus Andrang**: Ein- und Aussteigende verlängern den Aufenthalt und damit
       die Umlaufzeit, bemessen an den Fahrgastzahlen des Vortags
-- [x] Beides im Linienpanel sichtbar, mit Erklärung, was zu tun ist
+- [x] **Anschlüsse als Spielmechanik**: die Umsteigezeit entsteht aus der Phasenlage der
+      beiden Fahrpläne, nicht mehr pauschal aus dem halben Takt. Der Spieler stellt die
+      Abfahrtsminute ein und sieht die Anschlusszeiten unmittelbar daneben.
+- [x] Alles im Linienpanel sichtbar, mit Erklärung, was zu tun ist
 
 **Abnahme erreicht** — dieselbe Relation, ein halbes Jahr, verschieden viel Kapazität:
 
@@ -227,11 +230,27 @@ Und das Umsteigen skaliert: in einem bayerischen Busnetz aus 11 Linien werden 22
 direkt bedient, 56 mit einem Umstieg, **84 mit zwei**. Die Suche kostet dafür 1,3 ms; ein
 ganzer Betriebstag rechnet in 5 ms.
 
+Die Anschlüsse sind die dritte Stellschraube und die billigste — die Abfahrtsminute zu
+verschieben kostet keinen Cent. Dieselben zwei Linien, nur die Phasenlage verändert:
+
+| Abfahrtsminute des Zubringers | Umstieg hin | zurück | Summe | Umsteiger/Tag |
+|---|---|---|---|---|
+| :00 | 23 min | 3 min | 26 min | **54** |
+| :20 | 3 min | 23 min | 26 min | 52 |
+| :40 | 43 min | 43 min | 86 min | **31** |
+
+Über alle Phasenlagen gemittelt kommt wieder der halbe Takt heraus — die Mechanik verschiebt
+das Balancing nicht, sie gibt dem Spieler die Wahl innerhalb davon. Bei gleichem Takt beider
+Linien ist die *Summe* beider Umsteigerichtungen weitgehend festgelegt: man trifft die gute
+Hälfte der Phasenlagen und entscheidet dann, welche Richtung man bevorzugt. Das ist die
+Rechnung hinter einem Integralen Taktfahrplan.
+
 **Was aus Phase 4a offen blieb:**
 
-- **Keine Anschlüsse.** Die Verbindungssuche kennt Takte, keine Abfahrtszeiten — ein
-  abgestimmter Anschluss ist darin genauso gut wie ein zufälliger. Das ist die größte offene
-  Vereinfachung und die Voraussetzung für einen Integralen Taktfahrplan als Spielmechanik.
+- **Keine Anschlusssicherung.** Die Anschlusslinie fährt immer nach Plan und wartet nie auf
+  einen verspäteten Zubringer. Damit ist ein Anschluss mit null Puffer genauso sicher wie
+  einer mit zehn Minuten — die Abwägung „Anschluss halten oder pünktlich weiterfahren" fehlt
+  noch.
 - **Gestrandete Umsteiger.** Wer auf einem späteren Teilstück keinen Platz mehr bekommt, gilt
   als anteilig bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten
   Zuordnungsdurchgang.

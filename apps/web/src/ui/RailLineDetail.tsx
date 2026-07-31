@@ -2,6 +2,8 @@ import { availableTrains, toDate, trainClass, type LineId, type VehicleId } from
 import { formatMoney } from '@game/economy'
 import { planLine, trainsNeeded } from '@game/sim'
 import { patternOf, useGame } from '../game/store.js'
+import { Connections } from './Connections.js'
+import { DepartureOffset } from './DepartureOffset.js'
 import { QualityFacts, QualityNote } from './ServiceQuality.js'
 
 const HEADWAYS = [15, 20, 30, 60, 120] as const
@@ -94,6 +96,7 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
           </button>
         ))}
       </div>
+      <DepartureOffset lineId={lineId} />
       {pattern?.headway && (
         <p className="muted small">
           Betrieb {hhmm(pattern.headway.firstDeparture)} bis {hhmm(pattern.headway.lastDeparture)} ·{' '}
@@ -150,6 +153,8 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
           })}
         </ul>
       )}
+
+      <Connections lineId={lineId} />
 
       <h3>Gestern</h3>
       {result ? (

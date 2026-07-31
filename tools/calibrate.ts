@@ -12,7 +12,8 @@
  *      zur Nachfrage passt?
  *   4. Stehen die Baukosten einer Strecke im richtigen Verhaeltnis dazu?
  *   5. Wo bricht welche Ausbaustufe unter welchem Takt zusammen?
- *   6. Was kostet Ueberlastung ueber Monate, und was bringt ein Zubringer?
+ *   6. Was kostet Ueberlastung ueber Monate, was bringt ein Zubringer, und
+ *      was macht die Abfahrtsminute mit den Anschluessen?
  *
  * Die Ausgabe ist bewusst zum Lesen gedacht, nicht zum Bestehen: es gibt keine
  * feste Sollgroesse, sondern Groessenordnungen, die man gegen die Wirklichkeit
@@ -41,7 +42,17 @@ import {
 } from '@game/demand'
 import { formatMoney, railStationCost, trackBuildCost } from '@game/economy'
 import { distanceKm, terrainStats, type ElevationGrid } from '@game/geo'
-import { advanceDays, applyCommand, createGame, isMinor, lineMetrics, simulateRailLine } from '@game/sim'
+import {
+  advanceDays,
+  applyCommand,
+  createGame,
+  isMinor,
+  lineConnections,
+  lineMetrics,
+  prepareLines,
+  simulateDay,
+  simulateRailLine,
+} from '@game/sim'
 
 const data = JSON.parse(readFileSync('data/seed/cities.bavaria.json', 'utf8')) as { cities: City[] }
 const cities = withPotentials(data.cities)
@@ -406,6 +417,7 @@ function busLine(
   cityNames: readonly string[],
   vehicles: number,
   headway: number,
+  departureMinute = 0,
 ): GameState {
   let next = state
   const apply = (command: Parameters<typeof applyCommand>[1]): void => {
@@ -447,7 +459,11 @@ function busLine(
       direction: 'forward',
       vehicleIds: fresh,
       days: DAYS_ALL,
-      headway: { everyMinutes: headway, firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 },
+      headway: {
+        everyMinutes: headway,
+        firstDeparture: 5 * 3600 + departureMinute * 60,
+        lastDeparture: 21 * 3600,
+      },
     },
   })
   return next
@@ -494,6 +510,27 @@ networkCase('nur München–Augsburg', trunk, 182)
 networkCase('+ Zubringer Landsberg–Augsburg', withFeeder, 182)
 networkCase('+ Anschluss München–Rosenheim', withTail, 182)
 
+console.log('\nAnschlüsse — dieselben zwei Linien, nur die Abfahrtsminute des Zubringers verschoben:')
+for (const minute of [0, 10, 20, 30, 40, 50]) {
+  const build = (s: GameState): GameState =>
+    busLine(busLine(s, 'M–A', ['München', 'Augsburg'], 8, 60), 'L–A', ['Landsberg am Lech', 'Augsburg'], 3, 60, minute)
+
+  const state = advanceDays(build(createGame({ cities, startingCash: 50_000_000_00 })), demand, 21)
+  const offers = prepareLines(state).flatMap((p) => (p.kind === 'idle' ? [] : [p.offer]))
+  const feeder = [...state.lines.values()].find((l) => l.name === 'L–A')!
+  const link = lineConnections(state, offers, feeder.id).find((c) => c.stationName === 'Augsburg')!
+  const day = simulateDay(state, demand)
+
+  console.log(
+    `  Abfahrt :${String(minute).padStart(2, '0')}` +
+      `   Umstieg auf die Fernlinie ${((link.toOtherSec ?? 0) / 60).toFixed(0).padStart(3)} min` +
+      `  zurück ${((link.fromOtherSec ?? 0) / 60).toFixed(0).padStart(3)} min` +
+      `  Summe ${(((link.toOtherSec ?? 0) + (link.fromOtherSec ?? 0)) / 60).toFixed(0).padStart(3)} min` +
+      `  ·  Umsteiger ${Math.round(day.lines.reduce((s, l) => s + (l.transferPassengers ?? 0), 0)).toString().padStart(4)}` +
+      `  Fahrgäste ${Math.round(day.lines.reduce((s, l) => s + l.totalPassengers, 0)).toString().padStart(5)}`,
+  )
+}
+
 console.log(
   '\nDie Zufriedenheit pendelt sich ungefähr dort ein, wo der Anteil der tatsächlich\n' +
     'mitgenommenen Reisenden liegt — überproportional gewichtet, weil ein einmal\n' +
@@ -504,5 +541,15 @@ console.log(
     'Verbindung nach München, bekommt sie aber über den Umstieg in Augsburg. Die\n' +
     'dritte Linie bringt mehr als ihre eigene Relation — Landsberg erreicht über\n' +
     'zwei Umstiege auch Rosenheim. Genau das ist der Unterschied zwischen einer\n' +
-    'Sammlung von Korridoren und einem Netz.',
+    'Sammlung von Korridoren und einem Netz.\n\n' +
+    'Der Anschlussblock ist die dritte Stellschraube und die billigste: die\n' +
+    'Abfahrtsminute zu verschieben kostet keinen Cent. Über alle Phasenlagen\n' +
+    'gemittelt ergibt sich wieder der halbe Takt — die Mechanik verschiebt also\n' +
+    'nicht das Balancing, sie gibt dem Spieler die Wahl innerhalb davon. Und sie\n' +
+    'hat eine eingebaute Härte: bei gleichem Takt beider Linien ist die *Summe*\n' +
+    'beider Umsteigerichtungen weitgehend festgelegt. Man kann wählen, welche\n' +
+    'Richtung man bevorzugt, und man kann die gute Hälfte der Phasenlagen treffen\n' +
+    '— aber beide Richtungen zugleich kurz zu bekommen geht nur, wenn Fahrzeit\n' +
+    'und Takt zueinander passen. Das ist genau die Rechnung hinter einem\n' +
+    'Integralen Taktfahrplan.',
 )

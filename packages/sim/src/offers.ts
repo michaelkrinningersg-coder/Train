@@ -74,6 +74,39 @@ export interface LineOffer {
   readonly departuresPerDirection: number
   readonly averageDelaySec: number
   readonly punctuality: number
+  /**
+   * Uhrzeit der ersten Abfahrt am Linienanfang.
+   *
+   * Zusammen mit dem Takt legt sie die **Phasenlage** der Linie fest: wann genau
+   * in der Stunde sie an jedem Halt steht. Für sich genommen ist das eine
+   * Nebensächlichkeit — erst im Zusammenspiel mit einer zweiten Linie entscheidet
+   * sie darüber, ob ein Umstieg fünf oder fünfundfünfzig Minuten kostet.
+   */
+  readonly firstDepartureSec: number
+  /** Fahrzeit vom ersten zum letzten Halt, inklusive Aufenthalten. */
+  readonly oneWaySec: number
+}
+
+export type Direction = 'forward' | 'backward'
+
+/**
+ * Wann fährt die Linie an diesem Halt ab, in dieser Richtung?
+ *
+ * Die Gegenrichtung ist aus der Hinrichtung abgeleitet, weil der Fahrplan
+ * symmetrisch ist: dieselbe Fahrzeit, dieselben Aufenthalte, dasselbe
+ * Abfahrtsraster. Ein Gegenzug, der am anderen Ende zur selben Zeit losfährt,
+ * erreicht Halt i genau `Umlaufzeit − Ankunft(i)` später.
+ */
+export function departureAt(offer: LineOffer, stopIndex: number, direction: Direction): number {
+  const stop = offer.stops[stopIndex]!
+  const offset = direction === 'forward' ? stop.departureSec : offer.oneWaySec - stop.arrivalSec
+  return offer.firstDepartureSec + offset
+}
+
+export function arrivalAt(offer: LineOffer, stopIndex: number, direction: Direction): number {
+  const stop = offer.stops[stopIndex]!
+  const offset = direction === 'forward' ? stop.arrivalSec : offer.oneWaySec - stop.departureSec
+  return offer.firstDepartureSec + offset
 }
 
 export interface BusDetail {
@@ -237,6 +270,8 @@ function prepareBus(state: GameState, line: Line, crowding: readonly number[]): 
       departuresPerDirection: departures.length,
       averageDelaySec: 0,
       punctuality: 1,
+      firstDepartureSec: pattern.headway.firstDeparture,
+      oneWaySec: stops[stops.length - 1]?.arrivalSec ?? 0,
     },
     detail: { metrics, fleet, departures },
   }
@@ -327,6 +362,8 @@ function prepareRail(state: GameState, line: Line, crowding: readonly number[]):
       departuresPerDirection: forward.length,
       averageDelaySec,
       punctuality,
+      firstDepartureSec: zero,
+      oneWaySec: stops[stops.length - 1]?.arrivalSec ?? 0,
     },
     detail: { plan, train: plan.train, runs: delayed, conflicts, trainsNeeded: needed, seats },
   }

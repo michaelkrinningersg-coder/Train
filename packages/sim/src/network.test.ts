@@ -20,6 +20,11 @@ import { buildDemandMatrix, generalisedCost, odKey, withPotentials, type DemandM
 import { beforeEach, describe, expect, it } from 'vitest'
 import { advanceDays } from './advance.js'
 import { applyCommand } from './commands.js'
+import {
+  MIN_INTERCHANGE_SEC,
+  connectionQuality,
+  lineConnections,
+} from './connections.js'
 import { simulateDay } from './day.js'
 import { assignDemand } from './demandAssignment.js'
 import {
@@ -30,7 +35,7 @@ import {
   MAX_TRANSFERS,
   type Itinerary,
 } from './itineraries.js'
-import { prepareLines, type LineOffer } from './offers.js'
+import { arrivalAt, departureAt, prepareLines, type LineOffer } from './offers.js'
 import {
   observedQuality,
   satisfactionOffset,
@@ -476,5 +481,102 @@ describe('Zufriedenheit', () => {
     expect(oneWeek).toBeLessThan(ruined + 0.15)
     // ... nach einem halben Jahr schon.
     expect(halfYear).toBeGreaterThan(0.95)
+  })
+})
+
+// ── Anschlüsse ──────────────────────────────────────────────────────────────
+
+describe('Anschlüsse', () => {
+  /** Verschiebt die Abfahrtsminute einer Linie. */
+  function shift(state: GameState, lineName: string, minute: number): GameState {
+    const line = lineNamed(state, lineName)
+    const pattern = [...state.patterns.values()].find((p) => p.lineId === line.id)!
+    const hour = Math.floor(pattern.headway!.firstDeparture / 3600)
+    const result = applyCommand(state, {
+      kind: 'set_pattern',
+      pattern: { ...pattern, headway: { ...pattern.headway!, firstDeparture: hour * 3600 + minute * 60 } },
+    })
+    if (!result.ok) throw new Error(result.reason)
+    return result.state
+  }
+
+  const feederConnection = (state: GameState): number => {
+    const offers = offersOf(state)
+    const list = lineConnections(state, offers, lineNamed(state, 'Zubringer').id)
+    // Der Zubringer endet in der Umsteigestadt - dort kommt man nur in
+    // Hinrichtung an, deshalb ist `outboundSec` hier immer gesetzt.
+    return list.find((c) => c.stationName === HUB)!.toOtherSec!
+  }
+
+  it('macht die Umsteigezeit von der Abfahrtsminute abhängig', () => {
+    const base = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const waits = [0, 15, 30, 45].map((m) => feederConnection(shift(base, 'Zubringer', m)))
+
+    // Verschiedene Phasenlagen, verschiedene Anschluesse - vorher war das eine
+    // Konstante (halber Takt).
+    expect(new Set(waits.map((w) => Math.round(w / 60))).size).toBeGreaterThan(1)
+    expect(Math.max(...waits) - Math.min(...waits)).toBeGreaterThan(20 * 60)
+  })
+
+  it('mittelt sich über alle Phasenlagen zum halben Takt plus Umsteigezeit', () => {
+    // Die wichtigste Eigenschaft fuer das Balancing: die Mechanik verschiebt
+    // nicht den Mittelwert, sie gibt dem Spieler die Wahl innerhalb davon.
+    const base = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const all = Array.from({ length: 60 }, (_, m) => feederConnection(shift(base, 'Zubringer', m)))
+    const mean = all.reduce((s, w) => s + w, 0) / all.length
+
+    expect(mean / 60).toBeGreaterThan(28)
+    expect(mean / 60).toBeLessThan(36)
+  })
+
+  it('senkt die Umsteigezeit nie unter die Mindestumsteigezeit', () => {
+    const base = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const all = Array.from({ length: 60 }, (_, m) => feederConnection(shift(base, 'Zubringer', m)))
+    expect(Math.min(...all)).toBeGreaterThanOrEqual(MIN_INTERCHANGE_SEC)
+  })
+
+  it('bringt einem guten Anschluss mehr Umsteiger als einem schlechten', () => {
+    const base = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const byMinute = Array.from({ length: 12 }, (_, i) => shift(base, 'Zubringer', i * 5))
+
+    const rated = byMinute.map((state) => ({
+      wait: feederConnection(state),
+      transfers: simulateDay(state, demand).lines.reduce((s, l) => s + (l.transferPassengers ?? 0), 0),
+    }))
+
+    const best = rated.reduce((a, b) => (a.wait <= b.wait ? a : b))
+    const worst = rated.reduce((a, b) => (a.wait >= b.wait ? a : b))
+
+    expect(best.transfers).toBeGreaterThan(worst.transfers)
+  })
+
+  it('bewertet die Umsteigezeit nachvollziehbar', () => {
+    expect(connectionQuality(5 * 60)).toBe('good')
+    expect(connectionQuality(15 * 60)).toBe('fair')
+    expect(connectionQuality(40 * 60)).toBe('poor')
+  })
+
+  it('rechnet die Gegenrichtung aus dem symmetrischen Fahrplan', () => {
+    const state = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const offers = offersOf(state)
+    const feeder = offers.find((o) => o.lineId === lineNamed(state, 'Zubringer').id)!
+
+    // Der Gegenzug startet am anderen Ende zur selben Zeit und erreicht Halt 0
+    // nach einer vollen Fahrzeit.
+    expect(departureAt(feeder, 0, 'forward')).toBe(feeder.firstDepartureSec)
+    expect(arrivalAt(feeder, 0, 'backward')).toBeCloseTo(feeder.firstDepartureSec + feeder.oneWaySec, 6)
+  })
+
+  it('addiert bei zwei Umstiegen auch zwei Anschlusszeiten', () => {
+    const state = network({ feeder: true, tail: true })
+    const chain = chainsOf(state)
+      .get(odKey(id(FEEDER), id(FAR)))!
+      .find((c) => c.transfers === 2)!
+
+    expect(chain.legWaits).toHaveLength(3)
+    // Erste Wartezeit ist der halbe Takt, die beiden anderen sind Anschluesse.
+    expect(chain.waitTimeSec).toBeCloseTo(chain.legWaits.reduce((s, w) => s + w, 0), 6)
+    expect(chain.legWaits[1]!).toBeGreaterThanOrEqual(MIN_INTERCHANGE_SEC)
+    expect(chain.legWaits[2]!).toBeGreaterThanOrEqual(MIN_INTERCHANGE_SEC)
   })
 })

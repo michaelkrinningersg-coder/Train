@@ -3,6 +3,8 @@ import { busClass } from '@game/domain'
 import { formatMoney } from '@game/economy'
 import { lineMetrics, vehiclesNeeded } from '@game/sim'
 import { patternOf, useGame } from '../game/store.js'
+import { Connections } from './Connections.js'
+import { DepartureOffset } from './DepartureOffset.js'
 import { QualityFacts, QualityNote } from './ServiceQuality.js'
 
 const HEADWAYS = [15, 20, 30, 60, 120, 180] as const
@@ -34,7 +36,13 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
 
   const setWindow = (key: 'firstDeparture' | 'lastDeparture', hour: number): void => {
     if (!pattern?.headway) return
-    dispatch({ kind: 'set_pattern', pattern: { ...pattern, headway: { ...pattern.headway, [key]: hour * 3600 } } })
+    // Die Abfahrtsminute nicht mit ueberschreiben - sie ist der Hebel fuer die
+    // Anschluesse und geht sonst beim Verstellen der Betriebszeit verloren.
+    const minute = key === 'firstDeparture' ? pattern.headway.firstDeparture % 3600 : 0
+    dispatch({
+      kind: 'set_pattern',
+      pattern: { ...pattern, headway: { ...pattern.headway, [key]: hour * 3600 + minute } },
+    })
   }
 
   const toggleVehicle = (id: VehicleId): void => {
@@ -86,6 +94,8 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
           ))}
         </div>
       </div>
+
+      <DepartureOffset lineId={lineId} />
 
       <div className="field">
         <span className="field__label">Betriebszeit</span>
@@ -201,6 +211,8 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
           })}
         </ul>
       )}
+
+      <Connections lineId={lineId} />
 
       <h3>Gestern</h3>
       {result ? (
