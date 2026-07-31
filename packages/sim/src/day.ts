@@ -1,4 +1,4 @@
-import type { GameState, LineDayResult, LineId } from '@game/domain'
+import type { GameState, LineDayResult, LineId, VehicleId } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import { finishBusDay, idleResult } from './busDay.js'
 import { applyConnectionHolding, type LineHold } from './connections.js'
@@ -40,10 +40,27 @@ export interface DaySimulation {
   readonly options: ReadonlyMap<string, readonly ItineraryOption[]>
   /** Was jede Linie an Verspätung durch gehaltene Anschlüsse aufnimmt. */
   readonly holds: ReadonlyMap<LineId, LineHold>
+  /** Fahrzeuge, die heute liegengeblieben sind und in die Werkstatt müssen. */
+  readonly breakdowns: readonly Breakdown[]
   /** Zufriedenheit nach diesem Tag — Eingabe für den nächsten. */
   readonly satisfaction: ReadonlyMap<string, number>
   /** Ein- und Aussteigende je Fahrt und Halt — Eingabe für die Haltezeiten morgen. */
   readonly crowding: ReadonlyMap<LineId, readonly number[]>
+}
+
+/**
+ * Ein Fahrzeugschaden, wie ihn der Tagesabschluss verarbeitet.
+ *
+ * Er wirkt **ab morgen**: die restlichen Läufe des Tages fahren noch. Sie
+ * mitzustreichen hieße, den Fahrplan mitten am Tag neu zu bauen — mit allen
+ * Belegungen und Anschlüssen, die daran hängen. Für ein Spiel, in dem der
+ * Spieler Fahrpläne und keine Einzelfahrten disponiert, ist der Tag die
+ * richtige Auflösung.
+ */
+export interface Breakdown {
+  readonly vehicleId: VehicleId
+  readonly lineId: LineId
+  readonly days: number
 }
 
 const NO_FLOWS: AssignedFlows = { forward: [], backward: [] }
@@ -108,12 +125,23 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
     }
   }
 
+  const breakdowns: Breakdown[] = prepared.flatMap((p) =>
+    p.kind !== 'rail'
+      ? []
+      : p.detail.disruptions.flatMap((d) =>
+          d.workshopDays > 0 && d.vehicleId
+            ? [{ vehicleId: d.vehicleId, lineId: p.line.id, days: d.workshopDays }]
+            : [],
+        ),
+  )
+
   const observed: ReadonlyMap<string, ServiceObservation> = observations
   return {
     lines,
     prepared,
     options,
     holds,
+    breakdowns,
     satisfaction: updateSatisfaction(state.satisfaction, observed),
     crowding,
   }

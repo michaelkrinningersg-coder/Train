@@ -278,9 +278,45 @@ beschränkt.
 
 Ein Fahrzeug im Werk **altert nicht** — es fährt ja nicht.
 
-**Nicht modelliert**: dass eine Störung zwei Fahrzeuge zugleich trifft, dass sie sich über Tage
-zieht, oder dass ein Fahrzeug unplanmäßig ausfällt und sofort in die Werkstatt muss. Die
-Werkstatt betritt man bisher nur freiwillig.
+### Der unplanmäßige Werkstattaufenthalt
+
+Bis Phase 4c ging ein Fahrzeug nur **freiwillig** ins Werk. Damit war die Reserve eine
+Versicherung gegen einen Fall, der nie eintrat — man hielt sie für die selbst bestellte
+Hauptuntersuchung vor, und die lässt sich terminieren.
+
+Jetzt bricht eine Störung, die am **Fahrzeug** liegt und mindestens eine halbe Stunde dauert,
+das Fahrzeug ab: `BREAKDOWN_THRESHOLD_SEC`. Darunter ist es eine Störung, die der Zug
+aussitzt; darüber ein Schaden, mit dem er nicht weiterfährt. Die Schwelle ist gesetzt, nicht
+gemessen — verteidigen lässt sich, dass es *eine* gibt: ohne sie wäre entweder jede
+Kleinigkeit ein Werkstattfall oder keiner.
+
+Die Reparaturdauer (`breakdownDays`, 2 bis 24 Tage) hängt zu zwei Dritteln am Zustand und zu
+einem Drittel an der Schwere. Das Verhältnis ist Absicht: an einem gepflegten Fahrzeug ist ein
+Schaden ein Schaden, an einem heruntergefahrenen kommt beim Zerlegen das nächste zum Vorschein.
+
+Drei Entscheidungen, die dabei nicht auf der Hand liegen:
+
+- **Je Zuglauf gilt sein eigenes Fahrzeug.** Vorher galt der Zustand des ersten Fahrzeugs für
+  alle Läufe der Linie; damit ließ sich ein schrottreifer Zug hinter fünf guten verstecken,
+  und ein einzelner Werkstattfall wäre nicht zuzuordnen gewesen.
+- **Ein Fahrzeug bleibt am selben Tag nur einmal liegen.** Es fährt mehrere Läufe; der erste
+  Schaden nimmt es aus dem Verkehr, ein zweiter wäre ein Schaden an einem Fahrzeug im Werk.
+- **Der Schaden wirkt ab dem nächsten Betriebstag.** Die restlichen Läufe des Tages fahren
+  noch. Sie zu streichen hieße, den Fahrplan mitten am Tag neu zu bauen — mit allen
+  Belegungen und Anschlüssen, die daran hängen.
+
+Die Reparatur kostet Geld (`repairCost`, unter einer Hauptuntersuchung) und hebt den Zustand
+nur um `REPAIR_RESTORES` = 3 Prozentpunkte. Sie ist keine kleine Hauptuntersuchung: wer nach
+einem Schaden ein durchgesehenes Fahrzeug zurückbekäme, hätte einen Anreiz, auf den Schaden zu
+warten, statt ihm zuvorzukommen.
+
+Im Fuhrpark steht deshalb **warum** ein Fahrzeug im Werk steht — „HU" oder „Schaden". Das eine
+hat der Spieler bestellt, das andere ist ihm passiert; ohne die Unterscheidung wüsste er nicht,
+ob er gerade etwas falsch gemacht hat.
+
+**Nicht modelliert**: dass eine Störung zwei Fahrzeuge zugleich trifft, dass ein Schaden die
+laufenden Fahrten des Tages ausfallen lässt, oder dass ein Fahrzeug abgeschleppt werden muss
+und dabei die Strecke blockiert.
 
 ### Anschlusssicherung: die einzige Verspätung, die der Spieler bestellt
 

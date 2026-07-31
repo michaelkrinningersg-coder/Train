@@ -61,6 +61,28 @@ export function serviceDays(vehicle: Vehicle): number {
   return Math.round(14 + 130 * gap)
 }
 
+/**
+ * Eine unplanmäßige Reparatur macht das Fahrzeug wieder fahrbereit — mehr nicht.
+ *
+ * Sie ist keine kleine Hauptuntersuchung. Wer nach einem Schaden dachte, das
+ * Fahrzeug sei jetzt „durchgesehen", hätte einen Anreiz, auf den Schaden zu
+ * warten statt ihm zuvorzukommen. Deshalb hebt die Reparatur den Zustand nur um
+ * so viel, wie der Schaden selbst gekostet hat.
+ */
+export const REPAIR_RESTORES = 0.03
+
+/**
+ * Kosten einer unplanmäßigen Reparatur.
+ *
+ * Teurer je Ausfalltag, weil eine lange Reparatur eine große ist. Der Anteil am
+ * Neupreis liegt unter dem einer Hauptuntersuchung — repariert wird ein Schaden,
+ * nicht das Fahrzeug.
+ */
+export function repairCost(vehicle: Vehicle, purchasePrice: Money, days: number): Money {
+  const severity = Math.min(1, Math.max(0, days) / 20)
+  return Math.round(purchasePrice * vehicle.units * (0.012 + 0.05 * severity))
+}
+
 /** Alterung pro Betriebstag. Ein Bus ist nach rund 15 Jahren durch. */
 export const CONDITION_LOSS_PER_DAY = 1 / (15 * 365)
 

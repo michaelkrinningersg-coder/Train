@@ -8,6 +8,7 @@ import {
   isAvailable,
   platformsInService,
   trainClass,
+  vehicleId,
   type City,
   type GameState,
   type LngLat,
@@ -24,8 +25,12 @@ import { findPath } from './railGraph.js'
 import { buildRuns, planLine, resolveDelays, trainsNeeded } from './railRuns.js'
 import {
   BASE_FAILURE_RATE,
+  BREAKDOWN_MAX_DAYS,
+  BREAKDOWN_MIN_DAYS,
+  BREAKDOWN_THRESHOLD_SEC,
   DISRUPTION_MAX_SEC,
   DISRUPTION_MIN_SEC,
+  breakdownDays,
   disruptionSeconds,
   failureRate,
   roll,
@@ -537,15 +542,15 @@ describe('Störungen und Instandhaltung', () => {
   })
 
   it('trifft eine heruntergewirtschaftete Linie über ein Jahr deutlich öfter', () => {
-    const runIds = Array.from({ length: 34 }, (_, i) => `p1-${i}`)
+    const runs = Array.from({ length: 34 }, (_, i) => ({ id: `p1-${i}`, vehicleId: vehicleId('v1') }))
     const count = (condition: number): number => {
       let total = 0
       for (let day = 0; day < 365; day++) {
         total += rollDisruptions({
           seed: 1,
           day,
-          runIds,
-          vehicle: { condition } as never,
+          runs,
+          vehicleOf: () => ({ id: vehicleId('v1'), condition }) as never,
           trackAgeYears: 5,
           loadFactor: 0.7,
         }).length
@@ -801,5 +806,139 @@ describe('Ersatzfahrzeuge', () => {
     const after = advanceDays(away, demand, 5)
     expect(after.fleet.get(id)!.inWorkshopUntil).toBeUndefined()
     expect(isAvailable(after.fleet.get(id)!, after.day)).toBe(true)
+  })
+})
+
+describe('Fahrzeugschäden', () => {
+  /** Setzt den Zustand aller Fahrzeuge. */
+  const wear = (state: GameState, condition: number): GameState => ({
+    ...state,
+    fleet: new Map([...state.fleet].map(([k, v]) => [k, { ...v, condition }])),
+  })
+
+  it('bemisst die Werkstattzeit nach Zustand und Schwere', () => {
+    // Ein gepflegtes Fahrzeug ist schnell wieder da, ein heruntergefahrenes
+    // nicht - beim Zerlegen kommt dort das naechste zum Vorschein.
+    expect(breakdownDays(35 * 60, 0.2)).toBeGreaterThan(breakdownDays(35 * 60, 0.9))
+    // Und eine schwere Stoerung dauert laenger als eine knapp ausgeloeste.
+    expect(breakdownDays(DISRUPTION_MAX_SEC, 0.5)).toBeGreaterThan(breakdownDays(BREAKDOWN_THRESHOLD_SEC, 0.5))
+
+    for (const [sec, condition] of [
+      [BREAKDOWN_THRESHOLD_SEC, 1],
+      [DISRUPTION_MAX_SEC, 0],
+    ] as const) {
+      const days = breakdownDays(sec, condition)
+      expect(days).toBeGreaterThanOrEqual(BREAKDOWN_MIN_DAYS)
+      expect(days).toBeLessThanOrEqual(BREAKDOWN_MAX_DAYS)
+    }
+  })
+
+  it('schickt nur schwere Fahrzeugstörungen in die Werkstatt', () => {
+    const runs = Array.from({ length: 600 }, (_, i) => ({ id: `p1-${i}`, vehicleId: vehicleId(`v${i}`) }))
+    const all = rollDisruptions({
+      seed: 7,
+      day: 3,
+      runs,
+      vehicleOf: (id) => ({ id, condition: 0.2 }) as never,
+      trackAgeYears: 20,
+      loadFactor: 1,
+    })
+
+    expect(all.length).toBeGreaterThan(0)
+    const broken = all.filter((d) => d.workshopDays > 0)
+    expect(broken.length).toBeGreaterThan(0)
+    // Ein Schaden ist immer am Fahrzeug und immer schwer.
+    for (const d of broken) {
+      expect(d.cause).toBe('vehicle')
+      expect(d.seconds).toBeGreaterThanOrEqual(BREAKDOWN_THRESHOLD_SEC)
+    }
+    // Und eine kurze Stoerung haelt nur auf.
+    expect(all.some((d) => d.seconds < BREAKDOWN_THRESHOLD_SEC && d.workshopDays === 0)).toBe(true)
+  })
+
+  it('lässt ein gepflegtes Fahrzeug nicht liegenbleiben', () => {
+    // Bei gutem Zustand liegt die Ursache an der Strecke - die haelt auf, aber
+    // sie nimmt kein Fahrzeug aus dem Umlauf.
+    const runs = Array.from({ length: 600 }, (_, i) => ({ id: `p1-${i}`, vehicleId: vehicleId(`v${i}`) }))
+    const all = rollDisruptions({
+      seed: 7,
+      day: 3,
+      runs,
+      vehicleOf: (id) => ({ id, condition: 0.95 }) as never,
+      trackAgeYears: 30,
+      loadFactor: 1,
+    })
+    expect(all.length).toBeGreaterThan(0)
+    expect(all.every((d) => d.workshopDays === 0)).toBe(true)
+  })
+
+  it('nimmt dasselbe Fahrzeug am selben Tag nur einmal aus dem Verkehr', () => {
+    // Ein Fahrzeug faehrt mehrere Laeufe am Tag. Der erste Schaden nimmt es aus
+    // dem Verkehr; ein zweiter waere ein Schaden an einem Fahrzeug im Werk.
+    const one = vehicleId('v1')
+    const runs = Array.from({ length: 400 }, (_, i) => ({ id: `p1-${i}`, vehicleId: one }))
+    const broken = rollDisruptions({
+      seed: 7,
+      day: 3,
+      runs,
+      vehicleOf: (id) => ({ id, condition: 0.15 }) as never,
+      trackAgeYears: 20,
+      loadFactor: 1,
+    }).filter((d) => d.workshopDays > 0)
+
+    expect(broken).toHaveLength(1)
+  })
+
+  it('stellt das liegengebliebene Fahrzeug am nächsten Tag ins Werk und stellt es in Rechnung', () => {
+    const state = wear(railSetup({ spec: DOUBLE }), 0.15)
+
+    let current = state
+    let found: GameState | null = null
+    for (let i = 0; i < 60 && !found; i++) {
+      current = advanceDays(current, demand, 1)
+      if ([...current.fleet.values()].some((v) => v.workshopReason === 'repair')) found = current
+    }
+
+    expect(found).not.toBeNull()
+    const broken = [...found!.fleet.values()].find((v) => v.workshopReason === 'repair')!
+    expect(broken.inWorkshopUntil!).toBeGreaterThan(found!.day)
+    expect(isAvailable(broken, found!.day)).toBe(false)
+
+    // Eine Reparatur kostet Geld, macht das Fahrzeug aber nicht wie neu.
+    const repair = found!.ledger.filter((e) => e.note?.startsWith('Schaden'))
+    expect(repair.length).toBeGreaterThan(0)
+    expect(repair.every((e) => e.amount < 0)).toBe(true)
+    expect(broken.condition).toBeLessThan(0.3)
+  })
+
+  it('gibt das Fahrzeug nach der Reparatur wieder frei', () => {
+    let state = wear(railSetup({ spec: DOUBLE }), 0.15)
+    for (let i = 0; i < 60; i++) {
+      state = advanceDays(state, demand, 1)
+      if ([...state.fleet.values()].some((v) => v.workshopReason === 'repair')) break
+    }
+    const broken = [...state.fleet.values()].find((v) => v.workshopReason === 'repair')!
+    const back = advanceDays(state, demand, broken.inWorkshopUntil! - state.day)
+
+    const same = back.fleet.get(broken.id)!
+    expect(same.inWorkshopUntil).toBeUndefined()
+    expect(same.workshopReason).toBeUndefined()
+    expect(isAvailable(same, back.day)).toBe(true)
+  })
+
+  it('macht aus einem heruntergefahrenen Fuhrpark spürbar mehr Ausfalltage', () => {
+    const ausfalltage = (condition: number): number => {
+      let state = wear(railSetup({ spec: DOUBLE }), condition)
+      let days = 0
+      for (let i = 0; i < 200; i++) {
+        state = advanceDays(state, demand, 1)
+        days += [...state.fleet.values()].filter((v) => !isAvailable(v, state.day)).length
+      }
+      return days
+    }
+
+    // Das ist der Grund, warum die Hauptuntersuchung ihr Geld wert ist: nicht
+    // die Verspaetungsminuten, sondern die Tage ohne Fahrzeug.
+    expect(ausfalltage(0.2)).toBeGreaterThan(ausfalltage(0.95))
   })
 })

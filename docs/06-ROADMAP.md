@@ -303,8 +303,8 @@ damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
 
 - ~~Keine Migration im Ernstfall erprobt.~~ Format 2 (Anschlusssicherung) hat der Stelle in
   Phase 4c ihre erste echte Aufgabe gegeben; ein Test lädt einen Stand aus Format 1.
-- **Kein unplanmäßiger Werkstattaufenthalt.** Eine Störung hält den Zug auf, schickt ihn aber
-  nie in die Werkstatt. Die Werkstatt betritt man bisher nur freiwillig.
+- ~~Kein unplanmäßiger Werkstattaufenthalt.~~ Erledigt in Phase 4c: eine schwere Störung am
+  Fahrzeug schickt es für 2 bis 24 Tage ins Werk. Erst damit hat die Reserve einen Zweck.
 - **Einrichtungen sind statisch.** Eine Universität wird nicht gegründet, ein Werk nicht
   geschlossen. Für eine Kampagne über Jahrzehnte wäre das der nächste Schritt.
 - **Die Größeneinstufung hängt an lückenhaften Daten.** Besucherzahlen stehen bei den
@@ -334,6 +334,10 @@ pünktlich weiterfahren —, kam im Spiel nicht vor.
 - **Risiko im Anschlusspanel**: ab 15 % verpasster Umsteiger ist ein Anschluss als riskant
   markiert, egal wie kurz er auf dem Papier ist.
 - **Spielstandformat 2** mit dem ersten echten Migrationsschritt.
+- **Unplanmäßiger Werkstattaufenthalt**: eine schwere Störung am Fahrzeug nimmt es für 2 bis
+  24 Tage aus dem Verkehr. Störungen werden dafür je Zuglauf mit *seinem* Fahrzeug gewürfelt,
+  nicht mehr pauschal mit dem ersten der Linie. Im Fuhrpark steht, ob ein Fahrzeug wegen HU
+  oder wegen eines Schadens steht.
 
 **Was der Spieler davon hat:** Ein Fahrplan ist nicht mehr beliebig eng zu legen. Wer knappe
 Anschlüsse baut, muss entweder Puffer legen (kostet alle Umsteiger Zeit) oder warten lassen
@@ -348,6 +352,8 @@ Anschlüsse baut, muss entweder Puffer legen (kostet alle Umsteiger Zeit) oder w
   deren Zahl steht erst nach dem Fahrplan fest.
 - **Keine Ansage im Bildfahrplan.** Der gehaltene Anschluss steht als Verspätungsminute in den
   Kennzahlen, ist aber im Zeit-Weg-Diagramm nicht als solcher zu erkennen.
+- **Ein Schaden streicht keine Fahrt.** Er wirkt ab dem nächsten Betriebstag; die restlichen
+  Läufe des Tages fahren noch.
 
 ---
 

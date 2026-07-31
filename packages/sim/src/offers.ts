@@ -351,8 +351,8 @@ function prepareRail(state: GameState, line: Line, crowding: readonly number[]):
   const disruptions = rollDisruptions({
     seed: state.seed,
     day: state.day,
-    runIds: runs.map((r) => r.id),
-    vehicle: pattern.vehicleIds[0] ? state.fleet.get(pattern.vehicleIds[0]) : undefined,
+    runs: runs.map((r) => ({ id: r.id, vehicleId: r.vehicleId })),
+    vehicleOf: (id) => state.fleet.get(id),
     trackAgeYears: lineTrackAgeYears(state, line),
     loadFactor: capacity > 0 ? Math.min(3, yesterday / Math.max(1, capacity)) : 0,
   })

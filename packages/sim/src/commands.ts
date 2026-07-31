@@ -154,6 +154,7 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
         ...vehicle,
         condition: SERVICE_RESTORES_TO,
         inWorkshopUntil: state.day + serviceDays(vehicle),
+        workshopReason: 'service' as const,
       }
       const next = { ...state, fleet: withMap(state.fleet, vehicle.id, serviced) }
       return {

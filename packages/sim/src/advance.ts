@@ -7,7 +7,10 @@ import {
   dailyInterest,
   LINE_OVERHEAD_PER_DAY,
   maturedLoans,
+  REPAIR_RESTORES,
+  repairCost,
   trimLedger,
+  vehicleSpec,
   vehicleUpkeepPerDay,
 } from '@game/economy'
 import { simulateDay } from './day.js'
@@ -104,6 +107,44 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
   }
 
   const nextDay = state.day + 1
+
+  const fleet = new Map(state.fleet)
+  for (const [id, vehicle] of fleet) {
+    if (vehicle.inWorkshopUntil !== undefined && nextDay >= vehicle.inWorkshopUntil) {
+      const { inWorkshopUntil: _back, workshopReason: _why, ...rest } = vehicle
+      fleet.set(id, rest)
+      continue
+    }
+    // Ein Fahrzeug im Werk faehrt nicht und nutzt sich deshalb auch nicht ab.
+    fleet.set(id, isAvailable(vehicle, state.day) ? ageVehicle(vehicle) : vehicle)
+  }
+
+  // Fahrzeugschaeden zuletzt, damit sie die Alterungsschleife ueberschreiben und
+  // nicht umgekehrt. Ein Fahrzeug, das heute liegengeblieben ist, steht morgen
+  // im Werk - erst damit bekommt die Reserve ihren Zweck.
+  for (const breakdown of day.breakdowns) {
+    const vehicle = fleet.get(breakdown.vehicleId)
+    if (!vehicle) continue
+    const price = vehicleSpec(vehicle)?.purchasePrice ?? 0
+    const cost = repairCost(vehicle, price, breakdown.days)
+    entries.push({
+      category: 'vehicle_upkeep',
+      amount: -cost,
+      lineId: breakdown.lineId,
+      note: `Schaden — ${breakdown.days} Tage Werkstatt`,
+    })
+    costs += cost
+    fleet.set(breakdown.vehicleId, {
+      ...vehicle,
+      // Repariert wird der Schaden, nicht das Fahrzeug.
+      condition: Math.min(1, vehicle.condition + REPAIR_RESTORES),
+      inWorkshopUntil: nextDay + breakdown.days,
+      workshopReason: 'repair',
+    })
+  }
+
+  // Erst jetzt abrechnen: die Reparaturen von eben gehoeren in dieselbe
+  // Tagesbilanz. Der Kontostand kommt ausschliesslich aus dem Journal.
   const dated: LedgerEntry[] = entries.map((e) => ({ day: state.day, ...e }))
   const cash: Money = state.cash + dated.reduce((s, e) => s + e.amount, 0)
 
@@ -114,17 +155,6 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     costs,
     profit: revenue - costs,
     passengers,
-  }
-
-  const fleet = new Map(state.fleet)
-  for (const [id, vehicle] of fleet) {
-    if (vehicle.inWorkshopUntil !== undefined && nextDay >= vehicle.inWorkshopUntil) {
-      const { inWorkshopUntil: _back, ...rest } = vehicle
-      fleet.set(id, rest)
-      continue
-    }
-    // Ein Fahrzeug im Werk faehrt nicht und nutzt sich deshalb auch nicht ab.
-    fleet.set(id, isAvailable(vehicle, state.day) ? ageVehicle(vehicle) : vehicle)
   }
 
   // Abgeschlossene Ausbauten aus dem Zustand nehmen.

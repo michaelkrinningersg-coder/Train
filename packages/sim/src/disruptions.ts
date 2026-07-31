@@ -1,4 +1,4 @@
-import type { GameState, Line, TrackSegment, Vehicle } from '@game/domain'
+import type { GameState, Line, TrackSegment, Vehicle, VehicleId } from '@game/domain'
 
 /**
  * Störungen.
@@ -76,10 +76,50 @@ export function disruptionSeconds(dice: number): number {
   return DISRUPTION_MIN_SEC + (DISRUPTION_MAX_SEC - DISRUPTION_MIN_SEC) * dice ** 2
 }
 
+/**
+ * Ab dieser Störungsdauer bleibt es nicht bei einer Verspätung.
+ *
+ * Eine Viertelstunde Aufenthalt ist eine Störung, die der Zug aussitzt; eine
+ * halbe Stunde ist ein Schaden, mit dem er nicht weiterfährt. Die Schwelle ist
+ * gesetzt, nicht gemessen — verteidigen lässt sich, dass es *eine* gibt: ohne
+ * sie wäre entweder jede Kleinigkeit ein Werkstattfall oder keiner.
+ */
+export const BREAKDOWN_THRESHOLD_SEC = 30 * 60
+
+/** Kürzeste Reparaturdauer — ein Tag Diagnose, ein Tag Arbeit. */
+export const BREAKDOWN_MIN_DAYS = 2
+/** Und die längste, bei einem heruntergefahrenen Fahrzeug. */
+export const BREAKDOWN_MAX_DAYS = 24
+
+/**
+ * Wie lange ein Schaden das Fahrzeug festhält.
+ *
+ * Zwei Faktoren: wie schwer die Störung war, und in welchem Zustand das Fahrzeug
+ * ist. Der zweite ist der wichtigere — an einem gepflegten Fahrzeug ist ein
+ * Schaden ein Schaden, an einem heruntergefahrenen kommt beim Zerlegen das
+ * nächste zum Vorschein.
+ */
+export function breakdownDays(seconds: number, condition: number): number {
+  const severity = Math.min(1, Math.max(0, seconds - BREAKDOWN_THRESHOLD_SEC) / (DISRUPTION_MAX_SEC - BREAKDOWN_THRESHOLD_SEC))
+  const wear = 1 - Math.max(0, Math.min(1, condition))
+  const span = BREAKDOWN_MAX_DAYS - BREAKDOWN_MIN_DAYS
+  return Math.round(BREAKDOWN_MIN_DAYS + span * (0.35 * severity + 0.65 * wear))
+}
+
 export interface Disruption {
   readonly runId: string
   readonly seconds: number
   readonly cause: 'vehicle' | 'track'
+  /** Welches Fahrzeug es getroffen hat — für den Werkstattfall. */
+  readonly vehicleId: VehicleId | null
+  /**
+   * Tage in der Werkstatt, 0 wenn der Zug weiterfahren konnte.
+   *
+   * Erst hiermit bekommt die Reserve ihren Zweck: bis jetzt ging ein Fahrzeug
+   * nur freiwillig ins Werk, und wer ein Ersatzfahrzeug vorhielt, hielt es für
+   * einen Fall vor, der nie eintrat.
+   */
+  readonly workshopDays: number
 }
 
 /** Mittleres Alter der befahrenen Strecken einer Linie, in Jahren. */
@@ -96,31 +136,54 @@ export function lineTrackAgeYears(state: GameState, line: Line): number {
 /**
  * Würfelt die Störungen eines Betriebstags.
  *
- * Je Zuglauf einmal. Trifft es, verlängert sich seine Belegung — und was daraus
- * an Folgeverspätung entsteht, rechnet die Ereignisschleife ohnehin schon.
+ * Je Zuglauf einmal, und je Zuglauf mit **seinem** Fahrzeug. Das war vorher
+ * anders: der Zustand des ersten Fahrzeugs galt für alle Läufe der Linie. Damit
+ * ließ sich ein schrottreifer Zug hinter fünf guten verstecken, und ein einzelner
+ * Werkstattfall wäre nicht zuzuordnen gewesen.
+ *
+ * Trifft es, verlängert sich die Belegung — und was daraus an Folgeverspätung
+ * entsteht, rechnet die Ereignisschleife ohnehin schon. Ist die Störung schwer
+ * genug und liegt sie am Fahrzeug, fährt es überhaupt nicht weiter.
  */
 export function rollDisruptions(options: {
   readonly seed: number
   readonly day: number
-  readonly runIds: readonly string[]
-  readonly vehicle: Vehicle | undefined
+  readonly runs: readonly { readonly id: string; readonly vehicleId: VehicleId | null }[]
+  readonly vehicleOf: (id: VehicleId) => Vehicle | undefined
   readonly trackAgeYears: number
   readonly loadFactor: number
 }): Disruption[] {
-  const condition = options.vehicle?.condition ?? 1
-  const rate = failureRate({ condition, trackAgeYears: options.trackAgeYears, loadFactor: options.loadFactor })
-
   const out: Disruption[] = []
-  for (const runId of options.runIds) {
-    const dice = roll(options.seed, options.day, runId)
+  // Ein Fahrzeug faehrt mehrere Laeufe am Tag. Der erste Schaden nimmt es aus
+  // dem Verkehr - danach kann es nicht noch einmal liegenbleiben.
+  const broken = new Set<VehicleId>()
+
+  for (const run of options.runs) {
+    const vehicle = run.vehicleId ? options.vehicleOf(run.vehicleId) : undefined
+    const condition = vehicle?.condition ?? 1
+    const rate = failureRate({ condition, trackAgeYears: options.trackAgeYears, loadFactor: options.loadFactor })
+
+    const dice = roll(options.seed, options.day, run.id)
     if (dice >= rate) continue
     // Ein zweiter, unabhaengiger Wurf fuer die Dauer - sonst waeren knapp
     // ausgeloeste Stoerungen immer die langen.
-    const severity = roll(options.seed, options.day, runId, 'dauer')
+    const severity = roll(options.seed, options.day, run.id, 'dauer')
+    const seconds = disruptionSeconds(severity)
+    const cause = condition < 0.6 ? 'vehicle' : 'track'
+
+    const breaks =
+      cause === 'vehicle' &&
+      seconds >= BREAKDOWN_THRESHOLD_SEC &&
+      vehicle !== undefined &&
+      !broken.has(vehicle.id)
+    if (breaks) broken.add(vehicle.id)
+
     out.push({
-      runId,
-      seconds: disruptionSeconds(severity),
-      cause: condition < 0.6 ? 'vehicle' : 'track',
+      runId: run.id,
+      seconds,
+      cause,
+      vehicleId: run.vehicleId,
+      workshopDays: breaks ? breakdownDays(seconds, condition) : 0,
     })
   }
   return out

@@ -208,7 +208,9 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
                   <span>{cls?.displayName ?? v.classId}</span>
                   <span className="muted num">{cls?.seats ?? 0} Sitze</span>
                   <span className={`num ${away ? 'neg' : 'muted'}`}>
-                    {away ? `im Werk bis ${formatDate(v.inWorkshopUntil!)}` : `${Math.round(v.condition * 100)} %`}
+                    {away
+                      ? `${v.workshopReason === 'repair' ? 'Schaden' : 'HU'} bis ${formatDate(v.inWorkshopUntil!)}`
+                      : `${Math.round(v.condition * 100)} %`}
                   </span>
                 </label>
                 {assigned.has(v.id) && pattern && <VehicleSwap patternId={pattern.id} outgoing={v.id} />}

@@ -79,6 +79,18 @@ export function finishRailDay(
     )
   }
 
+  // Ein Schaden ist keine Stoerung mehr, sondern ein fehlendes Fahrzeug. Er
+  // gehoert deshalb in eine eigene Warnung, und die nennt die Dauer: danach
+  // richtet sich, ob ein Ersatzfahrzeug noch hilft.
+  const broken = detail.disruptions.filter((d) => d.workshopDays > 0)
+  if (broken.length > 0) {
+    const longest = Math.max(...broken.map((d) => d.workshopDays))
+    warnings.push(
+      `${broken.length} Fahrzeug${broken.length === 1 ? '' : 'e'} liegengeblieben — bis zu ${longest} Tage in der Werkstatt. ` +
+        'Ohne Ersatzfahrzeug fährt die Linie so lange dünneren Takt.',
+    )
+  }
+
   const vehicleKm = detail.runs.reduce((s, r) => s + r.lengthKm, 0)
   const drivingHours = detail.runs.reduce((s, r) => s + (r.arrival - r.departure), 0) / 3600
   const operatingCost = Math.round(

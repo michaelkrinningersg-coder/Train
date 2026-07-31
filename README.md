@@ -244,6 +244,11 @@ Das ist die eigentliche Entscheidung an der Instandhaltung:
 | **Reserve vorhalten** | Unterhalt für ein Fahrzeug, das meist steht | Takt bleibt, wenn eines ins Werk geht |
 | **keine Reserve** | nichts | wochenlang dünnerer Takt, also Fahrgäste |
 
+Und die Werkstatt kommt nicht nur, wenn man sie ruft: eine schwere Störung am Fahrzeug lässt
+es **liegenbleiben**. Zwei bis vierundzwanzig Tage, je schlechter der Zustand, desto länger.
+Im Fuhrpark steht dann „Schaden" statt „HU" — das eine hat man bestellt, das andere ist einem
+passiert.
+
 Im Linienpanel steht neben jedem zugeteilten Fahrzeug **ersetzen**. Damit tauscht man es gegen
 ein freies — für die Werkstattzeit, oder um einen alten Bus gegen einen neuen zu wechseln, ohne
 die Linie erst leerzuräumen.

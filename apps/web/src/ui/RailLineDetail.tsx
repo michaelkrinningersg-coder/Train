@@ -150,7 +150,9 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
                   <span>{cls?.displayName ?? v.classId}</span>
                   <span className="muted num">{(cls?.seats.first ?? 0) + (cls?.seats.second ?? 0)} Sitze</span>
                   <span className={`num ${away ? 'neg' : 'muted'}`}>
-                    {away ? `im Werk bis ${formatDate(v.inWorkshopUntil!)}` : `${cls?.topSpeedKmh ?? 0} km/h`}
+                    {away
+                      ? `${v.workshopReason === 'repair' ? 'Schaden' : 'HU'} bis ${formatDate(v.inWorkshopUntil!)}`
+                      : `${cls?.topSpeedKmh ?? 0} km/h`}
                   </span>
                 </label>
                 {assigned.has(v.id) && pattern && <VehicleSwap patternId={pattern.id} outgoing={v.id} />}

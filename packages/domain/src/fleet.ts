@@ -55,6 +55,15 @@ export interface Vehicle {
    * Ersatzfahrzeug und tauscht es ein.
    */
   readonly inWorkshopUntil?: number
+  /**
+   * Warum es im Werk steht.
+   *
+   * Der Unterschied ist keiner der Buchhaltung: eine Hauptuntersuchung hat der
+   * Spieler bestellt und eingeplant, ein Schaden ist ihm passiert. Ohne diese
+   * Unterscheidung stuende im Fuhrpark nur „im Werk bis" — und wer nicht
+   * mitgeschrieben hat, weiss nicht, ob er gerade etwas falsch gemacht hat.
+   */
+  readonly workshopReason?: 'service' | 'repair'
 }
 
 /** Faehrt dieses Fahrzeug an diesem Tag? */

@@ -134,7 +134,9 @@ export function FleetTab(): React.JSX.Element | null {
                   <td className={`num ${v.condition < 0.4 ? 'neg' : v.condition < 0.7 ? '' : 'pos'}`}>
                     {Math.round(v.condition * 100)} %
                     {v.inWorkshopUntil !== undefined && state.day < v.inWorkshopUntil && (
-                      <div className="muted small">im Werk bis {formatDate(v.inWorkshopUntil)}</div>
+                      <div className={`small ${v.workshopReason === 'repair' ? 'neg' : 'muted'}`}>
+                        {v.workshopReason === 'repair' ? 'Schaden' : 'HU'} — im Werk bis {formatDate(v.inWorkshopUntil)}
+                      </div>
                     )}
                   </td>
                   <td>
