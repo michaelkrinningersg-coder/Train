@@ -1,3 +1,4 @@
+import { isAvailable } from '@game/domain'
 import type { DayResult, GameState, LedgerEntry, LineDayResult, Money } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import {
@@ -116,7 +117,15 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
   }
 
   const fleet = new Map(state.fleet)
-  for (const [id, vehicle] of fleet) fleet.set(id, ageVehicle(vehicle))
+  for (const [id, vehicle] of fleet) {
+    if (vehicle.inWorkshopUntil !== undefined && nextDay >= vehicle.inWorkshopUntil) {
+      const { inWorkshopUntil: _back, ...rest } = vehicle
+      fleet.set(id, rest)
+      continue
+    }
+    // Ein Fahrzeug im Werk faehrt nicht und nutzt sich deshalb auch nicht ab.
+    fleet.set(id, isAvailable(vehicle, state.day) ? ageVehicle(vehicle) : vehicle)
+  }
 
   // Abgeschlossene Ausbauten aus dem Zustand nehmen.
   const tracks = new Map(state.network.tracks)

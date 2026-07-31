@@ -1,4 +1,4 @@
-import { DAYS_ALL, DAYS_WEEKDAY, fareFor, type LineId, type VehicleId } from '@game/domain'
+import { DAYS_ALL, DAYS_WEEKDAY, fareFor, formatDate, type LineId, type VehicleId } from '@game/domain'
 import { busClass } from '@game/domain'
 import { formatMoney } from '@game/economy'
 import { lineMetrics, vehiclesNeeded } from '@game/sim'
@@ -6,6 +6,7 @@ import { patternOf, useGame } from '../game/store.js'
 import { Connections } from './Connections.js'
 import { DepartureOffset } from './DepartureOffset.js'
 import { QualityFacts, QualityNote } from './ServiceQuality.js'
+import { VehicleSwap } from './VehicleSwap.js'
 
 const HEADWAYS = [15, 20, 30, 60, 120, 180] as const
 
@@ -198,14 +199,18 @@ export function LineDetail({ lineId }: { readonly lineId: LineId }): React.JSX.E
         <ul className="picklist">
           {free.map((v) => {
             const cls = busClass(v.classId)
+            const away = v.inWorkshopUntil !== undefined && state.day < v.inWorkshopUntil
             return (
               <li key={v.id}>
                 <label>
                   <input type="checkbox" checked={assigned.has(v.id)} onChange={() => toggleVehicle(v.id)} />
                   <span>{cls?.displayName ?? v.classId}</span>
                   <span className="muted num">{cls?.seats ?? 0} Sitze</span>
-                  <span className="muted num">{Math.round(v.condition * 100)} %</span>
+                  <span className={`num ${away ? 'neg' : 'muted'}`}>
+                    {away ? `im Werk bis ${formatDate(v.inWorkshopUntil!)}` : `${Math.round(v.condition * 100)} %`}
+                  </span>
                 </label>
+                {assigned.has(v.id) && pattern && <VehicleSwap patternId={pattern.id} outgoing={v.id} />}
               </li>
             )
           })}

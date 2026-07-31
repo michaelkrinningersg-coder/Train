@@ -231,6 +231,26 @@ Zwei Gegenmittel:
 Beides kostet, und beides ist teurer, je länger man wartet. Ein heruntergefahrener Fuhrpark
 wird über ein Jahr rund viermal so oft gestört wie ein gepflegter.
 
+### Ersatzfahrzeuge
+
+Die Hauptuntersuchung **nimmt das Fahrzeug aus dem Umlauf** — zwei Wochen beim Durchsehen,
+mehrere Monate bei einer Grundinstandsetzung. Es bleibt der Linie zugeteilt, fährt aber nicht
+mit, und die Linie fährt so lange dünneren Takt.
+
+Das ist die eigentliche Entscheidung an der Instandhaltung:
+
+| | kostet | bringt |
+|---|---|---|
+| **Reserve vorhalten** | Unterhalt für ein Fahrzeug, das meist steht | Takt bleibt, wenn eines ins Werk geht |
+| **keine Reserve** | nichts | wochenlang dünnerer Takt, also Fahrgäste |
+
+Im Linienpanel steht neben jedem zugeteilten Fahrzeug **ersetzen**. Damit tauscht man es gegen
+ein freies — für die Werkstattzeit, oder um einen alten Bus gegen einen neuen zu wechseln, ohne
+die Linie erst leerzuräumen.
+
+Bei Bahnlinien zählt dabei die **Reihenfolge**: das erste verfügbare Fahrzeug bestimmt die
+Zugklasse und damit Fahrzeit und Sitzplätze der ganzen Linie.
+
 ## Dokumentation
 
 | Dokument | Inhalt |

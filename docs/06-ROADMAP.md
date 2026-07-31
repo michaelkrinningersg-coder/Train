@@ -275,6 +275,9 @@ Fuhrpark will gepflegt werden.
 - [x] **Störungen** aus Fahrzeugzustand, Streckenalter und Auslastung — deterministisch
       gewürfelt, damit ein Spielstand ein Spielstand bleibt
 - [x] **Instandhaltung**: Hauptuntersuchung für Fahrzeuge, Oberbauerneuerung für Strecken
+- [x] **Ersatzfahrzeuge**: die Hauptuntersuchung nimmt das Fahrzeug wochenlang aus dem Umlauf,
+      und `replace_vehicle` setzt an derselben Stelle ein anderes ein — damit wird das
+      Vorhalten einer Reserve zur Entscheidung
 
 **Abnahme erreicht**: Eine Sitzung lässt sich speichern und am nächsten Tag fortsetzen.
 Erlangen zieht mit 102 000 Einwohnern mehr Studenten an als Ingolstadt mit 123 000, weil es
@@ -301,9 +304,8 @@ damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
 
 - **Keine Migration im Ernstfall erprobt.** Die Stelle ist da und leer — das erste Format
   hat nichts zu heben. Ob sie trägt, zeigt sich erst beim zweiten.
-- **Ein Fahrzeug bleibt während der Hauptuntersuchung im Umlauf.** Real steht es wochenlang
-  in der Werkstatt. Es herauszunehmen würde die Linie stilllegen, und das wäre keine
-  Entscheidung mehr, sondern eine Falle — dafür bräuchte es erst Reservefahrzeuge.
+- **Kein unplanmäßiger Werkstattaufenthalt.** Eine Störung hält den Zug auf, schickt ihn aber
+  nie in die Werkstatt. Die Werkstatt betritt man bisher nur freiwillig.
 - **Einrichtungen sind statisch.** Eine Universität wird nicht gegründet, ein Werk nicht
   geschlossen. Für eine Kampagne über Jahrzehnte wäre das der nächste Schritt.
 - **Die Größeneinstufung hängt an lückenhaften Daten.** Besucherzahlen stehen bei den

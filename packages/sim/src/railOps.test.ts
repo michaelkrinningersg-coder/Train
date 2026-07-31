@@ -5,6 +5,7 @@ import {
   cityId,
   capacityFactor,
   cityRadiusKm,
+  isAvailable,
   platformsInService,
   trainClass,
   type City,
@@ -626,5 +627,178 @@ describe('Störungen und Instandhaltung', () => {
     const result = applyCommand(state, { kind: 'renew_track', trackId: track.id })
     if (!result.ok) throw new Error(result.reason)
     expect(capacityFactor(result.state.network.tracks.get(track.id)!, result.state.day)).toBeLessThan(1)
+  })
+})
+
+describe('Ersatzfahrzeuge', () => {
+  const patternOf = (state: GameState) => [...state.patterns.values()][0]!
+
+  it('nimmt ein Fahrzeug für die Dauer der Hauptuntersuchung aus dem Umlauf', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const id = [...state.fleet.keys()][0]!
+    const worn: GameState = {
+      ...state,
+      fleet: new Map([...state.fleet].map(([k, v]) => [k, k === id ? { ...v, condition: 0.3 } : v])),
+    }
+
+    const result = applyCommand(worn, { kind: 'service_vehicle', vehicleId: id })
+    if (!result.ok) throw new Error(result.reason)
+
+    const vehicle = result.state.fleet.get(id)!
+    expect(vehicle.inWorkshopUntil).toBeGreaterThan(result.state.day)
+    expect(isAvailable(vehicle, result.state.day)).toBe(false)
+  })
+
+  it('lässt die Linie mit einem Fahrzeug weniger dünner takten', () => {
+    // Takt und Zugzahl so gewaehlt, dass die Zugzahl tatsaechlich bindet -
+    // sonst faengt die Reserve im Umlauf den Ausfall unbemerkt ab.
+    const state = railSetup({ spec: DOUBLE, headway: 15, trains: 5 })
+    const before = run(state)
+
+    const id = patternOf(state).vehicleIds[0]!
+    const inWorkshop: GameState = {
+      ...state,
+      fleet: new Map(
+        [...state.fleet].map(([k, v]) => [k, k === id ? { ...v, inWorkshopUntil: state.day + 60 } : v]),
+      ),
+    }
+    const after = run(inWorkshop)
+
+    expect(after.effectiveHeadwayMin).toBeGreaterThan(before.effectiveHeadwayMin)
+    expect(after.departuresPerDirection).toBeLessThan(before.departuresPerDirection)
+    expect(after.warnings.join(' ')).toMatch(/im Werk/)
+  })
+
+  it('stellt den Takt mit einem Ersatzfahrzeug wieder her', () => {
+    let state = railSetup({ spec: DOUBLE, headway: 15, trains: 5 })
+    const before = run(state)
+
+    // Ein sechster Zug als Reserve, nicht zugeteilt.
+    const bought = applyCommand(state, { kind: 'buy_vehicle', classId: 'emu_regional', units: 1 })
+    if (!bought.ok) throw new Error(bought.reason)
+    state = bought.state
+
+    const pattern = patternOf(state)
+    const outgoing = pattern.vehicleIds[0]!
+    const spare = [...state.fleet.keys()].find((id) => !pattern.vehicleIds.includes(id))!
+
+    const away: GameState = {
+      ...state,
+      fleet: new Map(
+        [...state.fleet].map(([k, v]) => [k, k === outgoing ? { ...v, inWorkshopUntil: state.day + 60 } : v]),
+      ),
+    }
+    expect(run(away).departuresPerDirection).toBeLessThan(before.departuresPerDirection)
+
+    const swapped = applyCommand(away, {
+      kind: 'replace_vehicle',
+      patternId: pattern.id,
+      outgoing,
+      incoming: spare,
+    })
+    if (!swapped.ok) throw new Error(swapped.reason)
+
+    expect(run(swapped.state).departuresPerDirection).toBe(before.departuresPerDirection)
+  })
+
+  it('setzt das Ersatzfahrzeug an dieselbe Stelle des Umlaufs', () => {
+    let state = railSetup({ spec: DOUBLE, trains: 3 })
+    const bought = applyCommand(state, { kind: 'buy_vehicle', classId: 'hst_250', units: 1 })
+    if (!bought.ok) throw new Error(bought.reason)
+    state = bought.state
+
+    const pattern = patternOf(state)
+    const outgoing = pattern.vehicleIds[1]!
+    const spare = [...state.fleet.keys()].find((id) => !pattern.vehicleIds.includes(id))!
+
+    const result = applyCommand(state, { kind: 'replace_vehicle', patternId: pattern.id, outgoing, incoming: spare })
+    if (!result.ok) throw new Error(result.reason)
+
+    // Die Reihenfolge zaehlt: das erste verfuegbare Fahrzeug bestimmt die
+    // Zugklasse und damit Fahrzeit und Sitzplaetze der ganzen Linie.
+    expect(patternOf(result.state).vehicleIds[1]).toBe(spare)
+    expect(patternOf(result.state).vehicleIds).toHaveLength(pattern.vehicleIds.length)
+  })
+
+  it('nimmt den Ersatzzug als Klassenvorgabe, wenn der Stammzug im Werk steht', () => {
+    let state = railSetup({ spec: DOUBLE, trains: 1, trainClassId: 'dmu_light' })
+    const bought = applyCommand(state, { kind: 'buy_vehicle', classId: 'hst_250', units: 1 })
+    if (!bought.ok) throw new Error(bought.reason)
+    state = bought.state
+
+    const pattern = patternOf(state)
+    const stamm = pattern.vehicleIds[0]!
+    const spare = [...state.fleet.keys()].find((id) => !pattern.vehicleIds.includes(id))!
+
+    const assigned = applyCommand(state, {
+      kind: 'assign_vehicles',
+      patternId: pattern.id,
+      vehicleIds: [stamm, spare],
+    })
+    if (!assigned.ok) throw new Error(assigned.reason)
+
+    const langsam = planLine(assigned.state, lineOf(assigned.state)).oneWaySeconds
+
+    const away: GameState = {
+      ...assigned.state,
+      fleet: new Map(
+        [...assigned.state.fleet].map(([k, v]) => [
+          k,
+          k === stamm ? { ...v, inWorkshopUntil: assigned.state.day + 60 } : v,
+        ]),
+      ),
+    }
+    expect(planLine(away, lineOf(away)).oneWaySeconds).toBeLessThan(langsam)
+  })
+
+  it('verweigert einen Tausch gegen ein belegtes oder artfremdes Fahrzeug', () => {
+    const state = railSetup({ spec: DOUBLE, cities: ['Muenchen', 'Augsburg'], trains: 2 })
+    const pattern = patternOf(state)
+    const [a, b] = pattern.vehicleIds as [typeof pattern.vehicleIds[number], typeof pattern.vehicleIds[number]]
+
+    // Schon auf derselben Linie.
+    expect(applyCommand(state, { kind: 'replace_vehicle', patternId: pattern.id, outgoing: a, incoming: b }).ok).toBe(
+      false,
+    )
+    // Und ein Fahrzeug, das gar nicht auf der Linie faehrt, laesst sich nicht ersetzen.
+    const bought = applyCommand(state, { kind: 'buy_vehicle', classId: 'emu_regional', units: 1 })
+    if (!bought.ok) throw new Error(bought.reason)
+    const spare = [...bought.state.fleet.keys()].find((id) => !pattern.vehicleIds.includes(id))!
+    expect(
+      applyCommand(bought.state, {
+        kind: 'replace_vehicle',
+        patternId: pattern.id,
+        outgoing: spare,
+        incoming: spare,
+      }).ok,
+    ).toBe(false)
+  })
+
+  it('lässt ein Fahrzeug im Werk nicht altern', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const id = [...state.fleet.keys()][0]!
+    const away: GameState = {
+      ...state,
+      fleet: new Map(
+        [...state.fleet].map(([k, v]) => [k, k === id ? { ...v, inWorkshopUntil: state.day + 30 } : v]),
+      ),
+    }
+    const before = away.fleet.get(id)!.condition
+    const after = advanceDays(away, demand, 10)
+    expect(after.fleet.get(id)!.condition).toBe(before)
+  })
+
+  it('gibt das Fahrzeug nach der Werkstattzeit wieder frei', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const id = [...state.fleet.keys()][0]!
+    const away: GameState = {
+      ...state,
+      fleet: new Map(
+        [...state.fleet].map(([k, v]) => [k, k === id ? { ...v, inWorkshopUntil: state.day + 5 } : v]),
+      ),
+    }
+    const after = advanceDays(away, demand, 5)
+    expect(after.fleet.get(id)!.inWorkshopUntil).toBeUndefined()
+    expect(isAvailable(after.fleet.get(id)!, after.day)).toBe(true)
   })
 })

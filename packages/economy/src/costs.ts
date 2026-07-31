@@ -49,6 +49,18 @@ export function serviceCost(vehicle: Vehicle, purchasePrice: Money): Money {
   return Math.round(purchasePrice * vehicle.units * (0.04 + 0.36 * gap))
 }
 
+/**
+ * Wie lange eine Hauptuntersuchung dauert.
+ *
+ * Ein Durchsehen sind zwei Wochen, eine Grundinstandsetzung mehrere Monate. Das
+ * ist der eigentliche Preis der Instandhaltung: nicht das Geld, sondern das
+ * fehlende Fahrzeug. Wer keine Reserve hat, faehrt so lange duenneren Takt.
+ */
+export function serviceDays(vehicle: Vehicle): number {
+  const gap = Math.max(0, SERVICE_RESTORES_TO - vehicle.condition)
+  return Math.round(14 + 130 * gap)
+}
+
 /** Alterung pro Betriebstag. Ein Bus ist nach rund 15 Jahren durch. */
 export const CONDITION_LOSS_PER_DAY = 1 / (15 * 365)
 

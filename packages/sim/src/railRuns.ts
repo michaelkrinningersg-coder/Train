@@ -4,6 +4,7 @@ import {
   SIGNAL_REACTION_SEC,
   dwellWithCrowding,
   expandDepartures,
+  isAvailable,
   platformsInService,
   runId as brandRun,
   trainClass,
@@ -93,7 +94,11 @@ export function planLine(
   const problems: string[] = []
 
   const pattern = [...state.patterns.values()].find((p) => p.lineId === line.id)
-  const vehicle = pattern?.vehicleIds[0] ? state.fleet.get(pattern.vehicleIds[0]) : undefined
+  // Der erste *verfuegbare* Zug bestimmt die Klasse. Steht der Stammzug im
+  // Werk, faehrt der Ersatzzug - und mit ihm seine Fahrzeit und Sitzplaetze.
+  const vehicle = pattern?.vehicleIds
+    .map((id) => state.fleet.get(id))
+    .find((v) => v !== undefined && isAvailable(v, state.day))
   const train = vehicle ? (trainClass(vehicle.classId) ?? null) : null
   if (!train) problems.push('Der Linie ist kein Zug zugeteilt.')
 

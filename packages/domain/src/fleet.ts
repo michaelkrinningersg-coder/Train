@@ -46,6 +46,20 @@ export interface Vehicle {
   /** 1,0 neu bis 0,0 schrottreif. Beeinflusst Unterhalt und Stoeranfaelligkeit. */
   readonly condition: number
   readonly assignedPatternId?: PatternId
+  /**
+   * Im Werk bis zu diesem Spieltag — solange faehrt das Fahrzeug nicht.
+   *
+   * Es bleibt seiner Linie zugeteilt: wer es abzieht und spaeter wieder
+   * zuteilt, hat nichts gewonnen. Die Linie faehrt einfach mit einem Fahrzeug
+   * weniger, also duenneren Takt — es sei denn, der Spieler hat ein
+   * Ersatzfahrzeug und tauscht es ein.
+   */
+  readonly inWorkshopUntil?: number
+}
+
+/** Faehrt dieses Fahrzeug an diesem Tag? */
+export function isAvailable(vehicle: Vehicle, day: number): boolean {
+  return vehicle.inWorkshopUntil === undefined || day >= vehicle.inWorkshopUntil
 }
 
 export function totalSeats(cls: TrainClass, units: number): number {

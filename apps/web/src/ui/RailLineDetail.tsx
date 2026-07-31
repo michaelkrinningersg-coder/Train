@@ -1,10 +1,11 @@
-import { availableTrains, toDate, trainClass, type LineId, type VehicleId } from '@game/domain'
+import { availableTrains, formatDate, toDate, trainClass, type LineId, type VehicleId } from '@game/domain'
 import { formatMoney } from '@game/economy'
 import { planLine, trainsNeeded } from '@game/sim'
 import { patternOf, useGame } from '../game/store.js'
 import { Connections } from './Connections.js'
 import { DepartureOffset } from './DepartureOffset.js'
 import { QualityFacts, QualityNote } from './ServiceQuality.js'
+import { VehicleSwap } from './VehicleSwap.js'
 
 const HEADWAYS = [15, 20, 30, 60, 120] as const
 const hhmm = (sec: number): string => `${String(Math.floor(sec / 3600)).padStart(2, '0')}:00`
@@ -140,14 +141,18 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
         <ul className="picklist">
           {freeTrains.map((v) => {
             const cls = trainClass(v.classId)
+            const away = v.inWorkshopUntil !== undefined && state.day < v.inWorkshopUntil
             return (
               <li key={v.id}>
                 <label>
                   <input type="checkbox" checked={assigned.has(v.id)} onChange={() => toggleTrain(v.id)} />
                   <span>{cls?.displayName ?? v.classId}</span>
                   <span className="muted num">{(cls?.seats.first ?? 0) + (cls?.seats.second ?? 0)} Sitze</span>
-                  <span className="muted num">{cls?.topSpeedKmh ?? 0} km/h</span>
+                  <span className={`num ${away ? 'neg' : 'muted'}`}>
+                    {away ? `im Werk bis ${formatDate(v.inWorkshopUntil!)}` : `${cls?.topSpeedKmh ?? 0} km/h`}
+                  </span>
                 </label>
+                {assigned.has(v.id) && pattern && <VehicleSwap patternId={pattern.id} outgoing={v.id} />}
               </li>
             )
           })}

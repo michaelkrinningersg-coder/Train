@@ -251,10 +251,36 @@ währenddessen auf die halbe Kapazität). Beides wird teurer, je länger man war
 heruntergefahrenen Fahrzeug erreicht die Untersuchung ein Drittel des Neupreises, und dort
 fängt der Vergleich mit dem Neukauf an.
 
+### Werkstatt und Ersatzfahrzeuge
+
+Die Hauptuntersuchung **nimmt das Fahrzeug aus dem Umlauf** — zwei Wochen beim Durchsehen,
+mehrere Monate bei einer Grundinstandsetzung (`serviceDays`). Das ist der eigentliche Preis
+der Instandhaltung: nicht das Geld, sondern das fehlende Fahrzeug.
+
+Das Fahrzeug bleibt dabei seiner Linie **zugeteilt**. Es abzuziehen und später wieder
+zuzuteilen brächte nichts; die Linie fährt einfach mit einem Fahrzeug weniger, also dünneren
+Takt — das rechnet `effectiveHeadway` ohnehin schon. Genau dort liegt die Entscheidung:
+
+| | kostet | bringt |
+|---|---|---|
+| **Reserve vorhalten** | Unterhalt für ein Fahrzeug, das meist steht | Takt bleibt, wenn eines ins Werk geht |
+| **keine Reserve** | nichts | wochenlang dünnerer Takt, also Fahrgäste |
+
+`replace_vehicle` tauscht ein Fahrzeug an **derselben Stelle** des Umlaufs. Die Reihenfolge ist
+nicht gleichgültig: bei Bahnlinien bestimmt das erste *verfügbare* Fahrzeug die Zugklasse und
+damit Fahrzeit und Sitzplätze der ganzen Linie. Steht der Stammzug im Werk, fährt der Ersatzzug
+— und mit ihm seine Fahrzeit. Wer den Spitzenreiter tauscht, soll das absichtlich tun und nicht,
+weil der Ersatz hinten angehängt wurde.
+
+Derselbe Befehl dient der Flottenerneuerung: einen alten Bus gegen einen neuen tauschen, ohne
+die Linie erst leerzuräumen und neu zu bestücken. Deshalb ist er nicht auf Werkstattfälle
+beschränkt.
+
+Ein Fahrzeug im Werk **altert nicht** — es fährt ja nicht.
+
 **Nicht modelliert**: dass eine Störung zwei Fahrzeuge zugleich trifft, dass sie sich über Tage
-zieht, oder dass ein Fahrzeug während der Hauptuntersuchung ausfällt. Das letzte ist eine
-bewusste Großzügigkeit: ein Fahrzeug mitten im Fahrplan herauszunehmen würde die Linie
-stilllegen, und das wäre keine Entscheidung mehr, sondern eine Falle.
+zieht, oder dass ein Fahrzeug unplanmäßig ausfällt und sofort in die Werkstatt muss. Die
+Werkstatt betritt man bisher nur freiwillig.
 
 ---
 

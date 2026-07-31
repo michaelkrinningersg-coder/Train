@@ -18,6 +18,7 @@ import {
   interestRateFor,
   resaleValue,
   serviceCost,
+  serviceDays,
   vehicleSpec,
 } from '@game/economy'
 import { applyRailCommand, type CommandContext } from './railCommands.js'
@@ -143,18 +144,58 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
       const cost = serviceCost(vehicle, cls.purchasePrice)
       if (state.cash < cost) return fail('Nicht genug Kapital.')
 
-      // Das Fahrzeug bleibt im Umlauf: eine Hauptuntersuchung dauert im Spiel
-      // keinen Betriebstag. Das ist grosszuegig - real steht der Zug wochenlang
-      // in der Werkstatt -, aber ein Fahrzeug mitten im Fahrplan herauszunehmen
-      // wuerde die Linie stillegen, und das waere keine Entscheidung mehr,
-      // sondern eine Falle.
-      const serviced = { ...vehicle, condition: SERVICE_RESTORES_TO }
+      // Das Fahrzeug geht ins Werk und faehrt so lange nicht. Es bleibt seiner
+      // Linie zugeteilt - abziehen und spaeter wieder zuteilen brauchte es
+      // nicht. Die Linie faehrt einfach duenneren Takt, es sei denn, der
+      // Spieler haelt ein Ersatzfahrzeug bereit. Genau das ist die
+      // Entscheidung: Reserve vorhalten kostet Unterhalt, keine Reserve kostet
+      // Fahrgaeste.
+      const serviced = {
+        ...vehicle,
+        condition: SERVICE_RESTORES_TO,
+        inWorkshopUntil: state.day + serviceDays(vehicle),
+      }
       const next = { ...state, fleet: withMap(state.fleet, vehicle.id, serviced) }
       return {
         ok: true,
         cost,
         state: book(next, { category: 'vehicle_upkeep', amount: -cost, note: 'Hauptuntersuchung' }),
       }
+    }
+
+    case 'replace_vehicle': {
+      const pattern = state.patterns.get(command.patternId)
+      if (!pattern) return fail('Unbekannter Fahrplan.')
+      if (!pattern.vehicleIds.includes(command.outgoing)) {
+        return fail('Das Fahrzeug fährt nicht auf dieser Linie.')
+      }
+
+      const outgoing = state.fleet.get(command.outgoing)
+      const incoming = state.fleet.get(command.incoming)
+      if (!outgoing || !incoming) return fail('Unbekanntes Fahrzeug.')
+      if (outgoing.id === incoming.id) return fail('Das ist dasselbe Fahrzeug.')
+      if (outgoing.mode !== incoming.mode) {
+        return fail('Ein Zug lässt sich nicht durch einen Bus ersetzen.')
+      }
+
+      const busy = [...state.patterns.values()].some(
+        (p) => p.id !== pattern.id && p.vehicleIds.includes(incoming.id),
+      )
+      if (busy) return fail('Das Ersatzfahrzeug fährt bereits auf einer anderen Linie.')
+      if (pattern.vehicleIds.includes(incoming.id)) {
+        return fail('Das Ersatzfahrzeug fährt bereits auf dieser Linie.')
+      }
+
+      // An derselben Stelle einsetzen: bei Bahnlinien bestimmt das erste
+      // Fahrzeug die Zugklasse und damit Fahrzeit und Sitzplaetze der ganzen
+      // Linie. Wer den Spitzenreiter tauscht, soll das absichtlich tun und
+      // nicht, weil der Ersatz hinten angehaengt wurde.
+      const vehicleIds = pattern.vehicleIds.map((id) => (id === command.outgoing ? command.incoming : id))
+      const next: GameState = {
+        ...state,
+        patterns: withMap(state.patterns, pattern.id, { ...pattern, vehicleIds }),
+      }
+      return { ok: true, cost: 0, state: next }
     }
 
     case 'sell_vehicle': {

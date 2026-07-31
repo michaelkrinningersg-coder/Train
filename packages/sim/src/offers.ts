@@ -2,6 +2,7 @@ import {
   BUS_DWELL_SEC,
   dayBit,
   fareFor,
+  isAvailable,
   type CityId,
   type FarePolicy,
   type GameState,
@@ -208,7 +209,11 @@ function prepareBus(state: GameState, line: Line, crowding: readonly number[]): 
 
   const fleet = fleetSummary(state, pattern.vehicleIds)
   if (fleet.count === 0) {
-    warnings.push('Der Linie ist kein Fahrzeug zugeteilt.')
+    warnings.push(
+      pattern.vehicleIds.length > 0
+        ? 'Alle Fahrzeuge dieser Linie stehen im Werk — ohne Ersatzfahrzeug fährt sie nicht.'
+        : 'Der Linie ist kein Fahrzeug zugeteilt.',
+    )
     return idle()
   }
 
@@ -216,8 +221,10 @@ function prepareBus(state: GameState, line: Line, crowding: readonly number[]): 
   const headway = effectiveHeadwayMin(desired, metrics.roundTripSec, fleet.count)
   if (headway > desired + 0.5) {
     const needed = vehiclesNeeded(desired, metrics.roundTripSec)
+    const inWorkshop = pattern.vehicleIds.length - fleet.count
     warnings.push(
-      `Für einen ${desired}-Minuten-Takt fehlen ${needed - fleet.count} Fahrzeuge; gefahren wird ein ${Math.round(headway)}-Minuten-Takt.`,
+      `Für einen ${desired}-Minuten-Takt fehlen ${needed - fleet.count} Fahrzeuge; gefahren wird ein ${Math.round(headway)}-Minuten-Takt.` +
+        (inWorkshop > 0 ? ` (${inWorkshop} im Werk — ein Ersatzfahrzeug hilft sofort.)` : ''),
     )
   }
 
@@ -299,21 +306,32 @@ function prepareRail(state: GameState, line: Line, crowding: readonly number[]):
     return idle()
   }
 
-  const trains = pattern.vehicleIds.length
+  const available = pattern.vehicleIds.filter((id) => {
+    const vehicle = state.fleet.get(id)
+    return vehicle !== undefined && isAvailable(vehicle, state.day)
+  })
+  const trains = available.length
   const desired = pattern.headway.everyMinutes
   const headway = effectiveRailHeadway(desired, plan.roundTripSeconds, trains)
   const needed = trainsNeeded(desired, plan.roundTripSeconds)
   if (headway > desired + 0.5) {
+    const inWorkshop = pattern.vehicleIds.length - trains
     warnings.push(
-      `Für einen ${desired}-Minuten-Takt fehlen ${needed - trains} Züge; gefahren wird ein ${Math.round(headway)}-Minuten-Takt.`,
+      `Für einen ${desired}-Minuten-Takt fehlen ${needed - trains} Züge; gefahren wird ein ${Math.round(headway)}-Minuten-Takt.` +
+        (inWorkshop > 0 ? ` (${inWorkshop} im Werk — ein Ersatzzug hilft sofort.)` : ''),
     )
   }
 
   if ((pattern.days & dayBit(state.day)) === 0) return idle(desired, needed)
 
-  const runs = buildRuns(state, line, pattern, headway, crowding)
+  // Nur die tatsaechlich verfuegbaren Zuege in den Umlauf.
+  const runs = buildRuns(state, line, { ...pattern, vehicleIds: available }, headway, crowding)
   if (runs.length === 0) {
-    warnings.push('Das Zeitfenster lässt keine Fahrt zu.')
+    warnings.push(
+      pattern.vehicleIds.length > 0 && trains === 0
+        ? 'Alle Züge dieser Linie stehen im Werk — ohne Ersatzzug fährt sie nicht.'
+        : 'Das Zeitfenster lässt keine Fahrt zu.',
+    )
     return idle(headway, needed)
   }
 

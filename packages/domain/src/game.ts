@@ -185,6 +185,12 @@ export type Command =
   | { readonly kind: 'place_station'; readonly cityId: CityId; readonly position: LngLat; readonly platforms: number }
   | { readonly kind: 'upgrade_station'; readonly stationId: StationId; readonly platforms: number }
   | { readonly kind: 'service_vehicle'; readonly vehicleId: VehicleId }
+  | {
+      readonly kind: 'replace_vehicle'
+      readonly patternId: PatternId
+      readonly outgoing: VehicleId
+      readonly incoming: VehicleId
+    }
   | { readonly kind: 'renew_track'; readonly trackId: TrackId }
   | { readonly kind: 'buy_vehicle'; readonly classId: string; readonly units: number }
   | { readonly kind: 'sell_vehicle'; readonly vehicleId: VehicleId }

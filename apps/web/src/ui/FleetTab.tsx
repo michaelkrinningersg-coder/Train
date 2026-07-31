@@ -1,6 +1,6 @@
-import { availableBuses, availableTrains, busClass, toDate, trainClass } from '@game/domain'
+import { availableBuses, availableTrains, busClass, formatDate, toDate, trainClass } from '@game/domain'
 import { useState } from 'react'
-import { SERVICE_RESTORES_TO, formatMoney, resaleValue, serviceCost } from '@game/economy'
+import { SERVICE_RESTORES_TO, formatMoney, resaleValue, serviceCost, serviceDays } from '@game/economy'
 import { useGame } from '../game/store.js'
 
 export function FleetTab(): React.JSX.Element | null {
@@ -133,6 +133,9 @@ export function FleetTab(): React.JSX.Element | null {
                   <td>{cls?.displayName ?? v.classId}</td>
                   <td className={`num ${v.condition < 0.4 ? 'neg' : v.condition < 0.7 ? '' : 'pos'}`}>
                     {Math.round(v.condition * 100)} %
+                    {v.inWorkshopUntil !== undefined && state.day < v.inWorkshopUntil && (
+                      <div className="muted small">im Werk bis {formatDate(v.inWorkshopUntil)}</div>
+                    )}
                   </td>
                   <td>
                     {line ? (
@@ -150,7 +153,7 @@ export function FleetTab(): React.JSX.Element | null {
                       disabled={!worn || state.cash < service}
                       title={
                         worn
-                          ? `Zustand auf ${Math.round(SERVICE_RESTORES_TO * 100)} % · ${formatMoney(service)}. Ein abgenutztes Fahrzeug fällt häufiger aus und kostet mehr Unterhalt.`
+                          ? `Zustand auf ${Math.round(SERVICE_RESTORES_TO * 100)} % · ${formatMoney(service)} · ${serviceDays(v)} Tage im Werk. Solange fährt es nicht — ohne Ersatzfahrzeug fährt die Linie dünneren Takt.`
                           : 'Das Fahrzeug ist in gutem Zustand.'
                       }
                       onClick={() => dispatch({ kind: 'service_vehicle', vehicleId: v.id })}

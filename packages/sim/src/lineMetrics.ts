@@ -1,4 +1,4 @@
-import { BUS_DWELL_SEC, BUS_TIME_FACTOR, busClass, dwellWithCrowding } from '@game/domain'
+import { BUS_DWELL_SEC, BUS_TIME_FACTOR, busClass, dwellWithCrowding, isAvailable } from '@game/domain'
 import type { CityId, GameState, Line, ServicePattern, StationId, VehicleId } from '@game/domain'
 import { CAR_SPEED_KMH, ROAD_DETOUR } from '@game/demand'
 import { distanceKm } from '@game/geo'
@@ -92,6 +92,8 @@ export function fleetSummary(state: GameState, vehicleIds: readonly VehicleId[])
   const classes = vehicleIds
     .map((id) => state.fleet.get(id))
     .filter((v): v is NonNullable<typeof v> => Boolean(v))
+    // Ein Fahrzeug im Werk bleibt der Linie zugeteilt, faehrt aber nicht mit.
+    .filter((v) => isAvailable(v, state.day))
     .map((v) => busClass(v.classId))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
 
