@@ -1,0 +1,978 @@
+{
+  "region": "bavaria",
+  "label": "Bayern",
+  "generatedFrom": "GeoNames (CC BY 4.0), https://www.geonames.org/",
+  "minPopulation": 20000,
+  "view": {
+    "centre": [
+      11.4,
+      48.9
+    ],
+    "zoom": 6.6
+  },
+  "bbox": {
+    "minLng": 9.15214,
+    "minLat": 47.49209,
+    "maxLng": 13.43122,
+    "maxLat": 50.31297
+  },
+  "cities": [
+    {
+      "id": "gn:2867714",
+      "name": "München",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.57549,
+        48.13743
+      ],
+      "population": 1530955,
+      "radiusKm": 27.11,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Germering",
+          "population": 6424
+        },
+        {
+          "name": "Dachau",
+          "population": 4159
+        },
+        {
+          "name": "Unterschleißheim",
+          "population": 3756
+        },
+        {
+          "name": "Olching",
+          "population": 1583
+        },
+        {
+          "name": "Vaterstetten",
+          "population": 3311
+        },
+        {
+          "name": "Unterhaching",
+          "population": 6717
+        }
+      ]
+    },
+    {
+      "id": "gn:2861650",
+      "name": "Nürnberg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.07752,
+        49.45421
+      ],
+      "population": 587509,
+      "radiusKm": 16.79,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Fürth",
+          "population": 48935
+        },
+        {
+          "name": "Erlangen",
+          "population": 13263
+        },
+        {
+          "name": "Schwabach",
+          "population": 6473
+        },
+        {
+          "name": "Lauf an der Pegnitz",
+          "population": 3295
+        }
+      ]
+    },
+    {
+      "id": "gn:2954172",
+      "name": "Augsburg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.89851,
+        48.37154
+      ],
+      "population": 338395,
+      "radiusKm": 12.74,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Friedberg",
+          "population": 11380
+        },
+        {
+          "name": "Königsbrunn",
+          "population": 7206
+        },
+        {
+          "name": "Neusäß",
+          "population": 9578
+        },
+        {
+          "name": "Aichach",
+          "population": 1182
+        },
+        {
+          "name": "Gersthofen",
+          "population": 7944
+        }
+      ]
+    },
+    {
+      "id": "gn:2849483",
+      "name": "Regensburg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.10161,
+        49.01513
+      ],
+      "population": 151389,
+      "radiusKm": 8.52,
+      "facilities": []
+    },
+    {
+      "id": "gn:2805615",
+      "name": "Würzburg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        9.95121,
+        49.79391
+      ],
+      "population": 136716,
+      "radiusKm": 8.1,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Kitzingen",
+          "population": 2985
+        }
+      ]
+    },
+    {
+      "id": "gn:2895992",
+      "name": "Ingolstadt",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.42372,
+        48.76508
+      ],
+      "population": 123327,
+      "radiusKm": 7.69,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Neuburg an der Donau",
+          "population": 2669
+        }
+      ]
+    },
+    {
+      "id": "gn:2929567",
+      "name": "Erlangen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.00783,
+        49.59099
+      ],
+      "population": 101679,
+      "radiusKm": 6.99,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Forchheim",
+          "population": 4942
+        },
+        {
+          "name": "Herzogenaurach",
+          "population": 7325
+        }
+      ]
+    },
+    {
+      "id": "gn:2923544",
+      "name": "Fürth",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.98856,
+        49.47593
+      ],
+      "population": 94581,
+      "radiusKm": 6.74,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Zirndorf",
+          "population": 11480
+        }
+      ]
+    },
+    {
+      "id": "gn:2951825",
+      "name": "Bayreuth",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.57893,
+        49.94782
+      ],
+      "population": 74730,
+      "radiusKm": 5.99,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Kulmbach",
+          "population": 1790
+        }
+      ]
+    },
+    {
+      "id": "gn:2881485",
+      "name": "Landshut",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.16179,
+        48.52961
+      ],
+      "population": 71863,
+      "radiusKm": 5.87,
+      "facilities": []
+    },
+    {
+      "id": "gn:2952984",
+      "name": "Bamberg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.90067,
+        49.89873
+      ],
+      "population": 70047,
+      "radiusKm": 5.8,
+      "facilities": []
+    },
+    {
+      "id": "gn:2955272",
+      "name": "Aschaffenburg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        9.15214,
+        49.97704
+      ],
+      "population": 68551,
+      "radiusKm": 5.74,
+      "facilities": []
+    },
+    {
+      "id": "gn:2891621",
+      "name": "Kempten",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.31389,
+        47.72674
+      ],
+      "population": 61399,
+      "radiusKm": 5.43,
+      "facilities": []
+    },
+    {
+      "id": "gn:2844988",
+      "name": "Rosenheim",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.12247,
+        47.85637
+      ],
+      "population": 60167,
+      "radiusKm": 5.37,
+      "facilities": []
+    },
+    {
+      "id": "gn:2863941",
+      "name": "Neu-Ulm",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.01112,
+        48.39279
+      ],
+      "population": 58889,
+      "radiusKm": 5.32,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Senden",
+          "population": 7500
+        }
+      ]
+    },
+    {
+      "id": "gn:2834498",
+      "name": "Schweinfurt",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.22175,
+        50.04937
+      ],
+      "population": 55206,
+      "radiusKm": 5.15,
+      "facilities": [],
+      "absorbed": [
+        {
+          "name": "Bad Kissingen",
+          "population": 1194
+        }
+      ]
+    },
+    {
+      "id": "gn:2855328",
+      "name": "Passau",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        13.43122,
+        48.5665
+      ],
+      "population": 50560,
+      "radiusKm": 4.93,
+      "facilities": []
+    },
+    {
+      "id": "gn:2902768",
+      "name": "Hof",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.91261,
+        50.31297
+      ],
+      "population": 49239,
+      "radiusKm": 4.86,
+      "facilities": []
+    },
+    {
+      "id": "gn:2956656",
+      "name": "Amberg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.86267,
+        49.44287
+      ],
+      "population": 44737,
+      "radiusKm": 4.63,
+      "facilities": []
+    },
+    {
+      "id": "gn:2826099",
+      "name": "Straubing",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.57385,
+        48.88126
+      ],
+      "population": 44580,
+      "radiusKm": 4.63,
+      "facilities": []
+    },
+    {
+      "id": "gn:2871992",
+      "name": "Memmingen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.18527,
+        47.98372
+      ],
+      "population": 44192,
+      "radiusKm": 4.61,
+      "facilities": []
+    },
+    {
+      "id": "gn:2925034",
+      "name": "Freising",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.74876,
+        48.40351
+      ],
+      "population": 42570,
+      "radiusKm": 4.52,
+      "facilities": []
+    },
+    {
+      "id": "gn:2813040",
+      "name": "Weiden",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.15613,
+        49.67682
+      ],
+      "population": 42550,
+      "radiusKm": 4.52,
+      "facilities": []
+    },
+    {
+      "id": "gn:2892080",
+      "name": "Kaufbeuren",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.62192,
+        47.88238
+      ],
+      "population": 42505,
+      "radiusKm": 4.52,
+      "facilities": []
+    },
+    {
+      "id": "gn:2939951",
+      "name": "Coburg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.96384,
+        50.25937
+      ],
+      "population": 41901,
+      "radiusKm": 4.48,
+      "facilities": []
+    },
+    {
+      "id": "gn:2864549",
+      "name": "Neumarkt in der Oberpfalz",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.46278,
+        49.28028
+      ],
+      "population": 39557,
+      "radiusKm": 4.36,
+      "facilities": []
+    },
+    {
+      "id": "gn:2939623",
+      "name": "Dachau",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.43402,
+        48.26
+      ],
+      "population": 35581,
+      "radiusKm": 4.13,
+      "facilities": []
+    },
+    {
+      "id": "gn:2921039",
+      "name": "Germering",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.3765,
+        48.13392
+      ],
+      "population": 34492,
+      "radiusKm": 4.07,
+      "facilities": []
+    },
+    {
+      "id": "gn:2923625",
+      "name": "Fürstenfeldbruck",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.2547,
+        48.17904
+      ],
+      "population": 33533,
+      "radiusKm": 4.01,
+      "facilities": []
+    },
+    {
+      "id": "gn:2929715",
+      "name": "Erding",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.90686,
+        48.30603
+      ],
+      "population": 33519,
+      "radiusKm": 4.01,
+      "facilities": []
+    },
+    {
+      "id": "gn:2835537",
+      "name": "Schwabach",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.02346,
+        49.33047
+      ],
+      "population": 32081,
+      "radiusKm": 3.92,
+      "facilities": []
+    },
+    {
+      "id": "gn:2955936",
+      "name": "Ansbach",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.5931,
+        49.30481
+      ],
+      "population": 31839,
+      "radiusKm": 3.91,
+      "facilities": []
+    },
+    {
+      "id": "gn:2938540",
+      "name": "Deggendorf",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.96068,
+        48.84085
+      ],
+      "population": 31081,
+      "radiusKm": 3.86,
+      "facilities": []
+    },
+    {
+      "id": "gn:2835297",
+      "name": "Schwandorf in Bayern",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.1098,
+        49.32534
+      ],
+      "population": 28235,
+      "radiusKm": 3.68,
+      "facilities": []
+    },
+    {
+      "id": "gn:2881509",
+      "name": "Landsberg am Lech",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.88282,
+        48.04819
+      ],
+      "population": 27017,
+      "radiusKm": 3.6,
+      "facilities": []
+    },
+    {
+      "id": "gn:2922530",
+      "name": "Garmisch-Partenkirchen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.09576,
+        47.49209
+      ],
+      "population": 26022,
+      "radiusKm": 3.53,
+      "facilities": []
+    },
+    {
+      "id": "gn:2882588",
+      "name": "Kulmbach",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.45032,
+        50.10068
+      ],
+      "population": 25775,
+      "radiusKm": 3.52,
+      "facilities": []
+    },
+    {
+      "id": "gn:2866070",
+      "name": "Neuburg an der Donau",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.18709,
+        48.73218
+      ],
+      "population": 25701,
+      "radiusKm": 3.51,
+      "facilities": []
+    },
+    {
+      "id": "gn:2925910",
+      "name": "Forchheim",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.05877,
+        49.71754
+      ],
+      "population": 25500,
+      "radiusKm": 3.5,
+      "facilities": []
+    },
+    {
+      "id": "gn:2844265",
+      "name": "Roth",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.09111,
+        49.24762
+      ],
+      "population": 25083,
+      "radiusKm": 3.47,
+      "facilities": []
+    },
+    {
+      "id": "gn:2818766",
+      "name": "Unterschleißheim",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.57684,
+        48.28038
+      ],
+      "population": 24726,
+      "radiusKm": 3.45,
+      "facilities": []
+    },
+    {
+      "id": "gn:2814874",
+      "name": "Waldkraiburg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.39893,
+        48.20854
+      ],
+      "population": 24676,
+      "radiusKm": 3.44,
+      "facilities": []
+    },
+    {
+      "id": "gn:2877550",
+      "name": "Lindau",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        9.68431,
+        47.54612
+      ],
+      "population": 24518,
+      "radiusKm": 3.43,
+      "facilities": []
+    },
+    {
+      "id": "gn:2829457",
+      "name": "Starnberg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.34416,
+        48.00193
+      ],
+      "population": 23940,
+      "radiusKm": 3.39,
+      "facilities": []
+    },
+    {
+      "id": "gn:2812515",
+      "name": "Weilheim",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.15484,
+        47.84147
+      ],
+      "population": 23378,
+      "radiusKm": 3.35,
+      "facilities": []
+    },
+    {
+      "id": "gn:2921139",
+      "name": "Geretsried",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.48054,
+        47.85775
+      ],
+      "population": 23364,
+      "radiusKm": 3.35,
+      "facilities": []
+    },
+    {
+      "id": "gn:2854386",
+      "name": "Pfaffenhofen an der Ilm",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.505,
+        48.53053
+      ],
+      "population": 23192,
+      "radiusKm": 3.34,
+      "facilities": []
+    },
+    {
+      "id": "gn:2880144",
+      "name": "Lauf an der Pegnitz",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.28247,
+        49.51386
+      ],
+      "population": 23108,
+      "radiusKm": 3.33,
+      "facilities": []
+    },
+    {
+      "id": "gn:2857472",
+      "name": "Olching",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.33333,
+        48.2
+      ],
+      "population": 22395,
+      "radiusKm": 3.28,
+      "facilities": []
+    },
+    {
+      "id": "gn:2878074",
+      "name": "Lichtenfels",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.05928,
+        50.14567
+      ],
+      "population": 21336,
+      "radiusKm": 3.2,
+      "facilities": []
+    },
+    {
+      "id": "gn:2831088",
+      "name": "Sonthofen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.28262,
+        47.51821
+      ],
+      "population": 21285,
+      "radiusKm": 3.2,
+      "facilities": []
+    },
+    {
+      "id": "gn:2821517",
+      "name": "Traunreut",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        12.59231,
+        47.96269
+      ],
+      "population": 21244,
+      "radiusKm": 3.19,
+      "facilities": []
+    },
+    {
+      "id": "gn:2885908",
+      "name": "Königsbrunn",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.89178,
+        48.27506
+      ],
+      "population": 20673,
+      "radiusKm": 3.15,
+      "facilities": []
+    },
+    {
+      "id": "gn:2861914",
+      "name": "Nördlingen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.48868,
+        48.85122
+      ],
+      "population": 20352,
+      "radiusKm": 3.13,
+      "facilities": []
+    },
+    {
+      "id": "gn:2953424",
+      "name": "Bad Kissingen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.07784,
+        50.20228
+      ],
+      "population": 20134,
+      "radiusKm": 3.11,
+      "facilities": []
+    },
+    {
+      "id": "gn:2958975",
+      "name": "Aichach",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.13413,
+        48.45755
+      ],
+      "population": 19860,
+      "radiusKm": 3.09,
+      "facilities": []
+    },
+    {
+      "id": "gn:2924803",
+      "name": "Friedberg",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.98461,
+        48.35693
+      ],
+      "population": 18573,
+      "radiusKm": 2.99,
+      "facilities": []
+    },
+    {
+      "id": "gn:2890158",
+      "name": "Kitzingen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.15072,
+        49.73973
+      ],
+      "population": 18402,
+      "radiusKm": 2.97,
+      "facilities": []
+    },
+    {
+      "id": "gn:2817818",
+      "name": "Vaterstetten",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.76825,
+        48.10537
+      ],
+      "population": 17696,
+      "radiusKm": 2.91,
+      "facilities": []
+    },
+    {
+      "id": "gn:2905457",
+      "name": "Herzogenaurach",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.88565,
+        49.56798
+      ],
+      "population": 16912,
+      "radiusKm": 2.85,
+      "facilities": []
+    },
+    {
+      "id": "gn:2833080",
+      "name": "Senden",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.04442,
+        48.32441
+      ],
+      "population": 14775,
+      "radiusKm": 2.66,
+      "facilities": []
+    },
+    {
+      "id": "gn:2804034",
+      "name": "Zirndorf",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.95414,
+        49.4424
+      ],
+      "population": 14254,
+      "radiusKm": 2.62,
+      "facilities": []
+    },
+    {
+      "id": "gn:2819465",
+      "name": "Unterhaching",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        11.61564,
+        48.06598
+      ],
+      "population": 14135,
+      "radiusKm": 2.6,
+      "facilities": []
+    },
+    {
+      "id": "gn:2864252",
+      "name": "Neusäß",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.83333,
+        48.39249
+      ],
+      "population": 13326,
+      "radiusKm": 2.53,
+      "facilities": []
+    },
+    {
+      "id": "gn:2920891",
+      "name": "Gersthofen",
+      "country": "DE",
+      "admin1": "02",
+      "centre": [
+        10.87273,
+        48.42432
+      ],
+      "population": 12310,
+      "radiusKm": 2.43,
+      "facilities": []
+    }
+  ]
+}

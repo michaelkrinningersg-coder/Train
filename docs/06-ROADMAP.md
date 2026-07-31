@@ -5,17 +5,32 @@ baut Infrastruktur auf Vorrat.
 
 ---
 
-## Phase 0 — Fundament (1–2 Wochen)
+## Phase 0 — Fundament ✅ abgeschlossen
 
 **Ziel**: Monorepo steht, Karte lädt, Städte sind sichtbar.
 
-- pnpm-Workspace, TypeScript strict, Vitest, Lint, CI
-- `packages/domain` mit den Typen aus [02-DATENMODELL](02-DATENMODELL.md)
-- `apps/web` mit MapLibre + deck.gl, Bayern-PMTiles (klein, schnell)
-- Pipeline `01-cities` für Bayern, Städte als Kreise mit Einwohnerzahl auf der Karte
-- Docker Compose mit Postgres/PostGIS
+- [x] pnpm-Workspace, TypeScript strict, Vitest
+- [x] `packages/domain` mit den Typen aus [02-DATENMODELL](02-DATENMODELL.md)
+- [x] `packages/geo` mit Distanz-, Längen- und Bounding-Box-Rechnung
+- [x] `apps/web` mit MapLibre + deck.gl
+- [x] Pipeline `01-cities`: GeoNames → Bayern, mit Agglomerations-Clustering
+      und Endonymen (München statt „Munich")
+- [x] Pipeline `03-basemap`: lokaler Kachelcache, macht die Entwicklung offline-fähig
+- [x] Docker Compose mit Postgres/PostGIS
 
-**Abnahme**: Ich sehe eine Karte von Bayern mit ~80 Städten, kann klicken und Einwohnerzahlen sehen.
+**Abnahme erreicht**: Karte von Bayern mit **65 Städten**, Hover-Tooltip, Klick öffnet
+ein Detailpanel mit Einwohnerzahl, Stadtradius und einer Vorschau der erzeugten Reisen
+je Segment.
+
+> Zur Zahl: die Roadmap hatte ~80 Städte geschätzt. GeoNames führt in Bayern 65 Orte
+> ab 20 000 Einwohnern — die Schätzung war zu hoch, nicht der Datensatz zu klein.
+> Die Schwelle ist über `REGIONS` in `data/pipeline/src/regions.ts` einstellbar.
+
+**Was aus Phase 0 offen blieb** (bewusst, kein Blocker):
+
+- Kein Lint-Setup und keine CI — kommt mit dem ersten echten Team-Workflow.
+- Basiskarte hängt noch an den MapLibre-Demokacheln (Zoom ≤ 6, nur Ländergrenzen).
+  Der Austausch gegen eigene PMTiles ist ein Einzeiler und steht in Phase 5.
 
 ---
 

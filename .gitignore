@@ -1,0 +1,19 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# Datenpipeline: Rohdaten sind gross und reproduzierbar, sie gehoeren nicht ins Repo.
+data/raw/
+data/pipeline/.cache/
+*.osm.pbf
+*.pmtiles
+
+# Erzeugte Seed-Artefakte werden bewusst NICHT ignoriert (siehe data/seed/README.md),
+# solange sie klein sind. Grosse Matrizen dagegen schon:
+data/seed/*.parquet
+
+# Kachelcache aus pnpm data:basemap - reproduzierbar, gehoert nicht ins Repo.
+data/seed/basemap/

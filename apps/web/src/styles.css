@@ -1,0 +1,308 @@
+/*
+ * Das Spiel ist bewusst nur dunkel gestaltet - die Karte ist die Buehne.
+ * Farbwerte stammen aus der validierten Referenzpalette (dunkle Flaeche).
+ */
+:root {
+  --surface: #1a1a19;
+  --plane: #0d0d0d;
+  --border: #383835;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --city: #3987e5;
+
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--plane);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Kopfzeile ───────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 18px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.topbar__brand {
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.topbar__region {
+  color: var(--city);
+  font-weight: 600;
+}
+
+.topbar__stat {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.topbar__stat b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.topbar__phase {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ── Karte ───────────────────────────────────────────────────────────────── */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 11px;
+}
+
+.notice {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+
+.notice--error {
+  color: var(--text-primary);
+}
+
+.notice pre {
+  padding: 8px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+/* ── Legende ─────────────────────────────────────────────────────────────── */
+.legend {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legend__title {
+  color: var(--text-muted);
+}
+
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend__swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legend__swatch > span {
+  display: block;
+  border-radius: 50%;
+  background: var(--city);
+  /* 2px Flaechenring, wie auf der Karte. */
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.legend__ring {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--city) 55%, transparent);
+  background: color-mix(in srgb, var(--city) 12%, transparent);
+}
+
+/* ── Detailpanel ─────────────────────────────────────────────────────────── */
+.panel {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: 320px;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.panel h3 {
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.panel p {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+
+.panel__close {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.panel__close:hover {
+  color: var(--text-primary);
+}
+
+.facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.facts dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chips li {
+  padding: 3px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.segments {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.segments th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--text-secondary);
+  padding: 3px 0;
+}
+
+.segments td {
+  padding: 3px 0 3px 10px;
+}
+
+.segments .bar {
+  width: 74px;
+}
+
+.segments .bar span {
+  display: block;
+  height: 6px;
+  min-width: 2px;
+  /* 4px gerundete Datenenden, an der Grundlinie verankert. */
+  border-radius: 0 4px 4px 0;
+  background: var(--city);
+}
