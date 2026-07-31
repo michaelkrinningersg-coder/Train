@@ -21,7 +21,8 @@ import {
 } from '@game/domain'
 import type { ElevationGrid } from '@game/geo'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
-import { advanceDay, applyCommand, createGame, makeSave, readSave, STARTING_CASH } from '@game/sim'
+import { applyCommand, createGame, makeSave, readSave, STARTING_CASH } from '@game/sim'
+import { createSimClient } from './simClient.js'
 import { AUTOSAVE_SLOT, writeSlot } from './storage.js'
 import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
 import { create } from 'zustand'
@@ -44,6 +45,45 @@ export const AUTOSAVE_EVERY_DAYS = 30
 
 /** Millisekunden je Spieltag je Geschwindigkeitsstufe. */
 export const SPEED_INTERVAL_MS: Record<Speed, number> = { 0: 0, 1: 900, 2: 180 }
+
+/**
+ * Der Rechenthread und das bisschen Buchhaltung drumherum.
+ *
+ * Absichtlich **neben** dem Store und nicht darin: das sind keine Daten, die
+ * eine Oberflaeche anzeigen wuerde, und jede Aenderung daran wuerde sonst ein
+ * Neuzeichnen ausloesen.
+ *
+ * `pending` ist der Kern der Sache. Waehrend ein Tag gerechnet wird, kann der
+ * Spieler weiterbauen — er soll die Wirkung seines Klicks sofort sehen und
+ * nicht neunzig Millisekunden warten. Der Zustand, den der Rechenthread
+ * zurueckgibt, kennt diese Befehle aber nicht: er ist aus dem Zustand *vor*
+ * dem Klick entstanden. Deshalb werden sie mitgeschrieben und auf das Ergebnis
+ * noch einmal angewandt. Ein Befehl ist eine reine Funktion; ihn einen Tag
+ * spaeter zu wiederholen ergibt genau denselben Bau, nur mit dem Bauende einen
+ * Tag spaeter.
+ *
+ * `generation` verwirft Antworten, die zu einem abgebrochenen oder geladenen
+ * Spiel gehoeren.
+ */
+const sim = createSimClient()
+let inFlight = false
+let pending: Command[] = []
+let generation = 0
+
+/**
+ * Neues Spiel an den Rechenthread uebergeben.
+ *
+ * Der Zaehler entwertet alles, was vom vorigen Spiel noch unterwegs ist. Ohne
+ * ihn koennte die Antwort auf einen Tag, der vor dem Laden abgeschickt wurde,
+ * den geladenen Spielstand ueberschreiben - und zwar genau einmal, kurz nach
+ * dem Laden, was niemand reproduzieren wuerde.
+ */
+function handOver(cities: readonly City[]): void {
+  generation++
+  inFlight = false
+  pending = []
+  void sim.init(cities)
+}
 
 interface GameStore {
   readonly ready: boolean
@@ -190,9 +230,15 @@ export const useGame = create<GameStore>((set, get) => ({
       lastAutosaveDay: 0,
       tab: 'mission',
     })
+    handOver(enriched)
   },
 
-  restart: () => set({ ready: false, state: null, demand: null, speed: 0, outcomeSeen: false }),
+  restart: () => {
+    generation++
+    inFlight = false
+    pending = []
+    set({ ready: false, state: null, demand: null, speed: 0, outcomeSeen: false })
+  },
 
   dismissOutcome: () => set({ outcomeSeen: true }),
 
@@ -218,6 +264,7 @@ export const useGame = create<GameStore>((set, get) => ({
         outcomeSeen: false,
         message: null,
       })
+      handOver([...state.cities.values()])
       return true
     } catch (error) {
       set({ message: (error as Error).message })
@@ -235,25 +282,54 @@ export const useGame = create<GameStore>((set, get) => ({
       return false
     }
     set({ state: result.state, message: null })
+    // Der laufende Betriebstag kennt diesen Befehl nicht - er wird auf sein
+    // Ergebnis noch einmal angewandt. Siehe `pending` oben.
+    if (inFlight) pending.push(command)
     return true
   },
 
   step: (days = 1) => {
-    const { state, demand } = get()
-    if (!state || !demand) return
-    let next = state
-    for (let i = 0; i < days; i++) next = advanceDay(next, demand)
-    set({ state: next })
+    const { state } = get()
+    if (!state) return
+    // Laeuft noch ein Tag, wird dieser Takt uebersprungen. Auflaufen zu lassen
+    // waere schlimmer: die Uhr liefe der Rechnung davon und das Spiel wuerde
+    // nach dem Pausieren noch minutenlang weiterrechnen.
+    if (inFlight) return
 
-    // Autosave alle AUTOSAVE_EVERY_DAYS Spieltage. Bewusst nach dem Setzen des
-    // Zustands und ohne `await`: ein langsamer Schreibvorgang darf die Spieluhr
-    // nicht anhalten, und schlaegt er fehl, ist der naechste in dreissig Tagen.
-    if (next.day - get().lastAutosaveDay >= AUTOSAVE_EVERY_DAYS) {
-      set({ lastAutosaveDay: next.day })
-      void writeSlot(AUTOSAVE_SLOT, makeSave(next, 'Automatisch', new Date().toISOString())).catch(() => {
-        set({ message: 'Automatisches Speichern fehlgeschlagen — Spielstand notfalls exportieren.' })
+    inFlight = true
+    pending = []
+    const mine = generation
+
+    void sim
+      .advance(state, days)
+      .then((computed) => {
+        if (mine !== generation) return
+        // Was der Spieler waehrend der Rechnung gebaut hat, kennt dieser
+        // Zustand noch nicht - also noch einmal darauf anwenden.
+        let next = computed
+        for (const command of pending) {
+          const result = applyCommand(next, command, { elevation: get().elevation ?? undefined })
+          if (result.ok) next = result.state
+        }
+        set({ state: next })
+
+        // Autosave alle AUTOSAVE_EVERY_DAYS Spieltage. Bewusst ohne `await`:
+        // ein langsamer Schreibvorgang darf die Spieluhr nicht anhalten, und
+        // schlaegt er fehl, ist der naechste in dreissig Tagen.
+        if (next.day - get().lastAutosaveDay >= AUTOSAVE_EVERY_DAYS) {
+          set({ lastAutosaveDay: next.day })
+          void writeSlot(AUTOSAVE_SLOT, makeSave(next, 'Automatisch', new Date().toISOString())).catch(() => {
+            set({ message: 'Automatisches Speichern fehlgeschlagen — Spielstand notfalls exportieren.' })
+          })
+        }
       })
-    }
+      .catch((error: unknown) => {
+        if (mine === generation) set({ message: `Die Simulation ist gescheitert: ${String(error)}`, speed: 0 })
+      })
+      .finally(() => {
+        if (mine === generation) inFlight = false
+        pending = []
+      })
   },
 
   setElevation: (elevation) => set({ elevation }),

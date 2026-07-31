@@ -471,6 +471,59 @@ nachvollziehbar. Gefragt wird nur: kommt man an.
 
 ---
 
+## Phase 5c — Rechenthread (erledigt)
+
+**Ziel**: Die Simulation aus dem Hauptthread nehmen. Gemessen kostete ein
+Betriebstag 36 ms bei acht Linien und 89 ms bei sechzehn, bei 180 ms Taktung der
+schnellsten Geschwindigkeit — der Hauptthread rechnete also bis zur Hälfte der
+Zeit, während die Karte stand.
+
+**Was entstanden ist:**
+
+- `sim.worker.ts` — die Betriebssimulation im Web Worker. `@game/sim` war dafür
+  vorbereitet: kein DOM, keine Ein- und Ausgabe, kein `Math.random()`.
+- `simClient.ts` — der Draht dorthin, mit **Rückfallweg** in den Hauptthread
+  (`VITE_SIM_INLINE=1` erzwingt ihn, damit sich der Nutzen messen statt
+  behaupten lässt).
+- **Der Worker hält keinen Zustand.** Er bekommt einen und gibt einen zurück,
+  dieselbe reine Funktion wie vorher, nur woanders. Zwei Zustände, die
+  auseinanderlaufen können, wären der teuerste Fehler an dieser Stelle.
+- **Befehle während der Rechnung** werden mitgeschrieben und auf das Ergebnis
+  noch einmal angewandt. Der Spieler soll die Wirkung seines Klicks sofort
+  sehen, nicht neunzig Millisekunden später — und der Zustand, den der Worker
+  zurückgibt, kennt den Klick nicht.
+
+**Zwei Nebenbefunde, die mehr brachten als der Worker selbst:**
+
+- **Die Historie schleppte vierhundert vollständige Tagesergebnisse mit.**
+  Gelesen wird daraus nur der Tagesgewinn. Eine Kopie des Zustands kostete
+  damit 51 ms, ohne sie 18 — das ist der Unterschied zwischen einer Simulation,
+  die sich verschieben lässt, und einer, bei der das Verschieben teurer wäre
+  als das Rechnen.
+- **Die Kartenschichten bauten bei jedem Spieltag alle 694 Städte neu.**
+  `[...state.cities.values()]` ergibt ein frisches Array, und daran erkennt
+  deck.gl „alles neu hochladen", samt Schriftsatz für 180 Beschriftungen. Städte
+  und Netz sind jetzt getrennte Schichtgruppen mit eigenen Abhängigkeiten.
+
+**Gemessen am Produktionsbau**, zehn Sekunden Spiel bei höchster
+Geschwindigkeit, Netz aus acht Linien:
+
+| | |
+|---|---|
+| JavaScript im Hauptthread | **0,6 %** der Laufzeit |
+| Rundlauf zum Rechenthread, inkl. beider Kopien | 9,8 ms je Tag |
+| Zustand setzen | 0,1 ms je Tag |
+
+Von der Simulation ist im Profil des Hauptthreads **nichts** mehr zu finden.
+
+**Was die Messung nicht sagt:** Die verbleibenden langen Aufgaben in dieser
+Umgebung sind Softwarerasterung — der Prüfrechner hat keine Grafikkarte
+(SwiftShader), und 694 halbtransparente Einzugskreise in Software zu füllen
+kostet Zeit, die auf einer Maschine mit GPU nicht anfällt. Über das Zeichnen
+sagt hier also keine Zahl etwas aus; über die Simulation schon.
+
+---
+
 ## Phase 5 — Europa (2–3 Wochen)
 
 - Pipeline auf Mitteleuropa, dann Europa hochziehen

@@ -138,6 +138,15 @@ export function loadLinks(state: GameState): LoadLink[] {
   return out.sort((x, y) => x.load - y.load)
 }
 
+/** Was die Städteschichten brauchen — bewusst ohne den Spielzustand. */
+export interface CityLayerContext {
+  readonly cities: readonly City[]
+  readonly zoom: number
+  readonly selectedCityId: CityId | null
+  readonly tone: Tone
+  readonly onPickCity: (city: City | null) => void
+}
+
 export interface LayerContext {
   readonly state: GameState
   readonly demand: DemandMatrix
@@ -164,12 +173,90 @@ function loadWidth(load: number): number {
   return 3 + 7 * Math.min(1, load) + (load > 1 ? 4 * Math.min(1, load - 1) : 0)
 }
 
-export function buildLayers(ctx: LayerContext): Layer[] {
-  const { state, cities, zoom, selectedCityId, selectedLineId, draft, showDemand } = ctx
+/**
+ * Die Städteschichten — Einzugsgebiet, Punkte, Haltestellenringe, Namen.
+ *
+ * Getrennt von allem anderen, und das ist keine Ordnungsliebe. Sie hängen an
+ * Städten, Zoom und Auswahl, nicht am Spieltag; gebaut wurden sie bis hierher
+ * trotzdem bei jeder Zustandsänderung neu, also 694 Punkte und 180
+ * Beschriftungen bei jedem simulierten Tag. deck.gl erkennt an der Identität
+ * des `data`-Arrays, ob es die Attribute neu hochladen muss — ein frisches
+ * Array bedeutet: alles neu, samt Schriftsatz für die Namen.
+ *
+ * Gemessen war das der teuerste Posten im Hauptthread, teurer als die
+ * Simulation selbst. Der Rückgabewert ist zweigeteilt, weil das Einzugsgebiet
+ * unter das Netz gehört und die Namen darüber.
+ */
+export function buildCityLayers(ctx: CityLayerContext): { readonly below: Layer[]; readonly above: Layer[] } {
+  const { cities, zoom, selectedCityId } = ctx
   const c: MarkPalette = MARKS[ctx.tone]
   const labelled = declutter(cities, zoom)
   const characterSet = new Set<string>()
-  for (const c of labelled) for (const ch of c.name) characterSet.add(ch)
+  for (const city of labelled) for (const ch of city.name) characterSet.add(ch)
+
+  return {
+    below: [
+      // Einzugsgebiet in echten Metern.
+      new ScatterplotLayer<City>({
+        id: 'city-catchment',
+        data: cities as City[],
+        getPosition: (d) => [d.centre[0], d.centre[1]],
+        getRadius: (d) => d.radiusKm * 1000,
+        radiusUnits: 'meters',
+        filled: true,
+        stroked: false,
+        getFillColor: rgba(c.city, ctx.tone === 'light' ? 26 : 16),
+        pickable: false,
+      }),
+    ],
+    above: [
+      new ScatterplotLayer<City>({
+        id: 'city-dot',
+        data: cities as City[],
+        getPosition: (d) => [d.centre[0], d.centre[1]],
+        getRadius: (d) => dotRadius(d.population),
+        radiusUnits: 'pixels',
+        filled: true,
+        stroked: true,
+        lineWidthUnits: 'pixels',
+        getLineWidth: (d) => (d.id === selectedCityId ? 2.5 : 2),
+        getFillColor: rgba(c.city),
+        getLineColor: (d) => (d.id === selectedCityId ? rgba(c.selected) : rgba(c.casing, 220)),
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: ctx.tone === 'light' ? [0, 0, 0, 60] : [255, 255, 255, 70],
+        onClick: ({ object }) => {
+          ctx.onPickCity(object ?? null)
+          return true
+        },
+        updateTriggers: { getLineColor: selectedCityId, getLineWidth: selectedCityId },
+      }),
+      new TextLayer<City>({
+        id: 'city-label',
+        data: labelled,
+        characterSet: [...characterSet],
+        getPosition: (d) => [d.centre[0], d.centre[1]],
+        getText: (d) => d.name,
+        getSize: 11,
+        sizeUnits: 'pixels',
+        getColor: rgba(c.label),
+        getPixelOffset: (d) => [0, -(dotRadius(d.population) + 13)],
+        fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+        outlineWidth: 3,
+        outlineColor: rgba(c.labelHalo, 235),
+        fontSettings: { sdf: true },
+        pickable: false,
+      }),
+    ],
+  }
+}
+
+/** Alles, was am Spielzustand hängt: Netz, Entwürfe, Auslastung, Nachfrage. */
+export function buildLayers(ctx: LayerContext): Layer[] {
+  const { state, cities, zoom, selectedLineId, draft, showDemand } = ctx
+  const c: MarkPalette = MARKS[ctx.tone]
+  void cities
+  void zoom
 
   const stations = [...state.network.stations.values()]
   const stationCities = stations
@@ -223,21 +310,6 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       }),
     )
   }
-
-  layers.push(
-    // Einzugsgebiet in echten Metern.
-    new ScatterplotLayer<City>({
-      id: 'city-catchment',
-      data: cities as City[],
-      getPosition: (d) => [d.centre[0], d.centre[1]],
-      getRadius: (d) => d.radiusKm * 1000,
-      radiusUnits: 'meters',
-      filled: true,
-      stroked: false,
-      getFillColor: rgba(c.city, ctx.tone === 'light' ? 26 : 16),
-      pickable: false,
-    }),
-  )
 
   if (tracks.length > 0) {
     layers.push(
@@ -409,27 +481,6 @@ export function buildLayers(ctx: LayerContext): Layer[] {
   }
 
   layers.push(
-    new ScatterplotLayer<City>({
-      id: 'city-dot',
-      data: cities as City[],
-      getPosition: (d) => [d.centre[0], d.centre[1]],
-      getRadius: (d) => dotRadius(d.population),
-      radiusUnits: 'pixels',
-      filled: true,
-      stroked: true,
-      lineWidthUnits: 'pixels',
-      getLineWidth: (d) => (d.id === selectedCityId ? 2.5 : 2),
-      getFillColor: rgba(c.city),
-      getLineColor: (d) => (d.id === selectedCityId ? rgba(c.selected) : rgba(c.casing, 220)),
-      pickable: true,
-      autoHighlight: true,
-      highlightColor: ctx.tone === 'light' ? [0, 0, 0, 60] : [255, 255, 255, 70],
-      onClick: ({ object }) => {
-        ctx.onPickCity(object ?? null)
-        return true
-      },
-      updateTriggers: { getLineColor: selectedCityId, getLineWidth: selectedCityId },
-    }),
     // Haltestellenring: sitzt auf dem Stadtpunkt und macht sofort sichtbar,
     // welche Staedte bereits erschlossen sind.
     new ScatterplotLayer<City>({
@@ -458,22 +509,6 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       getLineWidth: 2,
       getFillColor: rgba(c.track),
       getLineColor: rgba(c.casing),
-      pickable: false,
-    }),
-    new TextLayer<City>({
-      id: 'city-label',
-      data: labelled,
-      characterSet: [...characterSet],
-      getPosition: (d) => [d.centre[0], d.centre[1]],
-      getText: (d) => d.name,
-      getSize: 11,
-      sizeUnits: 'pixels',
-      getColor: rgba(c.label),
-      getPixelOffset: (d) => [0, -(dotRadius(d.population) + 13)],
-      fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-      outlineWidth: 3,
-      outlineColor: rgba(c.labelHalo, 235),
-      fontSettings: { sdf: true },
       pickable: false,
     }),
   )

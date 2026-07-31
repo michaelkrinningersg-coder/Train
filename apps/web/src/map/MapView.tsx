@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { THEME } from '../theme.js'
-import { buildLayers, type LoadLink } from './layers.js'
+import { buildCityLayers, buildLayers, type LoadLink } from './layers.js'
 import { basemapById, hidePlaceLabels, loadStyle, PLAIN_STYLE } from './mapStyle.js'
 
 // Nur unsere eigene Quelle. Die Herkunft der Basiskarte liefert der jeweilige
@@ -176,9 +176,50 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
     }
   }, [basemap])
 
-  const layers = useMemo(() => {
+  // Die Staedteliste ist ueber ein ganzes Spiel dieselbe. Sie bei jedem
+  // Spieltag neu aufzubauen hiess fuer deck.gl: alle 694 Punkte und 180
+  // Beschriftungen neu hochladen, samt Schriftsatz.
+  // Absichtlich nur an `state.cities` haengend und nicht am ganzen Zustand -
+  // genau das ist der Punkt.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cities = useMemo(() => (state ? [...state.cities.values()] : []), [state?.cities])
+
+  // Staedte, Zoom, Auswahl - haengt nicht am Spieltag und wird deshalb nur neu
+  // gebaut, wenn sich eines davon aendert.
+  const cityLayers = useMemo(
+    () =>
+      buildCityLayers({
+        cities,
+        zoom,
+        selectedCityId,
+        tone: basemap.tone,
+        onPickCity: (city) => {
+          const store = useGame.getState()
+          if (!city) {
+            store.selectCity(null)
+            return
+          }
+          // Im Zeichenmodus ist ein Klick auf eine erschlossene Stadt das
+          // Hinzufuegen zur Linie, nicht das Oeffnen der Stadtdetails. Der
+          // Modus kommt aus der Referenz und nicht aus der Abhaengigkeitsliste,
+          // damit ein Moduswechsel die Staedteschichten nicht neu baut.
+          if (actions.current.mapMode === 'draw-line') {
+            const rail = store.draftMode === 'rail'
+            const stop = [...(store.state?.network.stations.values() ?? [])].find(
+              (s) => s.cityId === city.id && (rail ? s.mode !== 'bus' : s.mode !== 'rail'),
+            )
+            if (stop) store.toggleDraftStop(stop.id)
+            else store.notify(`${city.name} hat ${rail ? 'noch keinen Bahnhof' : 'noch keine Haltestelle'}.`)
+            return
+          }
+          store.selectCity(city.id)
+        },
+      }),
+    [cities, zoom, selectedCityId, basemap.tone],
+  )
+
+  const networkLayers = useMemo(() => {
     if (!state || !demand) return []
-    const cities = [...state.cities.values()]
 
     return buildLayers({
       state,
@@ -196,27 +237,14 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       hoverPoint: mapMode === 'draw-track' ? hoverPoint : null,
       onPickTrack: (id) => useGame.getState().selectTrack(id),
       onPickLine: (id) => useGame.getState().selectLine(id),
-      onPickCity: (city) => {
-        const store = useGame.getState()
-        if (!city) {
-          store.selectCity(null)
-          return
-        }
-        // Im Zeichenmodus ist ein Klick auf eine erschlossene Stadt das
-        // Hinzufuegen zur Linie, nicht das Oeffnen der Stadtdetails.
-        if (actions.current.mapMode === 'draw-line') {
-          const rail = store.draftMode === 'rail'
-          const stop = [...store.state!.network.stations.values()].find(
-            (s) => s.cityId === city.id && (rail ? s.mode !== 'bus' : s.mode !== 'rail'),
-          )
-          if (stop) store.toggleDraftStop(stop.id)
-          else store.notify(`${city.name} hat ${rail ? 'noch keinen Bahnhof' : 'noch keine Haltestelle'}.`)
-          return
-        }
-        store.selectCity(city.id)
-      },
+      onPickCity: () => undefined,
     })
-  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand, showLoad, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
+  }, [state, demand, cities, zoom, selectedCityId, selectedLineId, draft, showDemand, showLoad, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
+
+  const layers = useMemo(
+    () => [...cityLayers.below, ...networkLayers, ...cityLayers.above],
+    [cityLayers, networkLayers],
+  )
 
   useEffect(() => {
     overlayRef.current?.setProps({ layers })
