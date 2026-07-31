@@ -198,7 +198,10 @@ function progressOf(state: GameState, goal: Goal): GoalProgress {
  */
 export function scenarioStatus(state: GameState, scenario: Scenario): ScenarioStatus {
   const goals = scenario.goals.map((goal) => progressOf(state, goal))
-  const daysLeft = scenario.deadlineDays > 0 ? scenario.deadlineDays - state.day : null
+  // Die Frist laeuft ab dem Beginn *dieses* Auftrags, nicht ab Spielbeginn -
+  // im Feldzug faengt der zweite Auftrag mitten in der Spielzeit an.
+  const ends = state.scenarioStartedOnDay + scenario.deadlineDays
+  const daysLeft = scenario.deadlineDays > 0 ? ends - state.day : null
   const complete = goals.length > 0 && goals.every((g) => g.done)
 
   if (complete) {
@@ -228,7 +231,7 @@ export function scenarioStatus(state: GameState, scenario: Scenario): ScenarioSt
       goals,
       outcome: 'lost',
       daysLeft,
-      reason: `Die Frist ist am ${formatDate(scenario.deadlineDays)} abgelaufen — ${open} von ${goals.length} Zielen offen.`,
+      reason: `Die Frist ist am ${formatDate(ends)} abgelaufen — ${open} von ${goals.length} Zielen offen.`,
     }
   }
 

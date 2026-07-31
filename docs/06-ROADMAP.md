@@ -524,6 +524,48 @@ sagt hier also keine Zahl etwas aus; über die Simulation schon.
 
 ---
 
+## Phase 5d — Feldzug und Startaufstellung (erledigt)
+
+**Ziel**: Aus vier Aufgaben eine Vorgeschichte machen. Jeder Auftrag begann bei
+null; was man im ersten gebaut hatte, war im zweiten weg.
+
+**Was entstanden ist:**
+
+- **Feldzug** „Vom ersten Bus zur Fernachse": dieselben drei Aufträge, aber
+  **nichts wird weggeräumt**. Netz, Fuhrpark, Linien und Kasse gehen mit — samt
+  Fahrzeugen, die inzwischen zwei Jahre älter sind, und Schulden, die man
+  aufgenommen hat. Dazu ein **Zuschuss** je Auftrag, der das Erwirtschaftete
+  ergänzt statt es zu ersetzen.
+- **Startaufstellung** je Auftrag: Haltestellen, Bahnhöfe, Strecken und fertige
+  Linien, ausgedrückt über dieselben Befehle wie im Spiel — ein Auftrag kann
+  also nichts aufstellen, was ein Spieler nicht auch bauen könnte. Städte stehen
+  mit Namen darin; was der Datensatz nicht kennt, wird übersprungen.
+- `scenarioStartedOnDay` im Zustand: die Frist läuft ab dem Beginn *dieses*
+  Auftrags. Ohne diesen Bezug wäre der zweite Auftrag mit vier Jahren Frist nach
+  zwei Jahren Spielzeit sofort verloren. Spielstandformat 4.
+
+**Warum eine Aufstellung überhaupt:** Nicht jeder Handgriff ist eine
+Entscheidung. Acht Bahnhöfe zwischen Hamburg und München zu setzen ist Arbeit,
+aber keine Wahl — wo die Trasse langgeht, mit welcher Höchstgeschwindigkeit und
+ob ein- oder zweigleisig, das ist der Auftrag. Im Ruhrgebiet ist es deutlicher:
+dort vier Städte in einem Klumpen aus zweihundert Punkten zu treffen, war im
+Testlauf schlicht Fummelarbeit.
+
+Die Aufstellung ist **kostenlos** — angewandt, dann Kasse auf das Startkapital.
+Sonst hinge das Startvermögen am Gelände unter den Bahnhöfen, und eine Änderung
+an den Baukosten machte einen Auftrag still unspielbar.
+
+**Ein bewusster Unterschied:** Im Feldzug greift die Aufstellung **nicht**. Wer
+den Ruhrauftrag einzeln spielt, bekommt die vier Haltestellen geschenkt; wer
+ihn im Feldzug erreicht, bringt sein eigenes Netz mit und baut dort selbst. Ein
+Betrieb, der seit zwei Jahren fährt, bekommt keine Starthilfe mehr.
+
+**Was offen bleibt:** kein zweiter Feldzug, keine Verzweigung, keine
+Bestenliste. Und ein verlorener Auftrag beendet den Feldzug — es gibt kein
+Wiederholen eines Schritts mit dem Netz von vorher.
+
+---
+
 ## Phase 5 — Europa (2–3 Wochen)
 
 - Pipeline auf Mitteleuropa, dann Europa hochziehen

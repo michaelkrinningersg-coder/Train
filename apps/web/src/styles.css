@@ -1297,3 +1297,18 @@ button.primary.on {
   margin-right: 10px;
   font-size: 11px;
 }
+
+.start__section {
+  margin: 28px 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Der Feldzug steht oben und darf breiter sein - er ist der empfohlene Weg. */
+.mission--campaign {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--city) 45%, transparent);
+}

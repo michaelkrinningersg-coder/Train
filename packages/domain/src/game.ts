@@ -141,6 +141,14 @@ export interface GameState {
    * seinen Auftrag von selbst mit, ohne ein einziges Feld fuer den Fortschritt.
    */
   readonly scenarioId: string
+  /**
+   * Spieltag, an dem der laufende Auftrag begonnen hat.
+   *
+   * Im Feldzug folgt ein Auftrag auf den anderen, ohne dass die Uhr
+   * zurueckgesetzt wird - die Frist muss sich also auf den Beginn *dieses*
+   * Auftrags beziehen und nicht auf den Spielbeginn.
+   */
+  readonly scenarioStartedOnDay: number
   /** Ganze Tage seit Spielbeginn, siehe calendar.ts. */
   readonly day: number
   readonly cash: Money
@@ -215,6 +223,12 @@ export type Command =
   | { readonly kind: 'set_pattern'; readonly pattern: Omit<ServicePattern, 'id'> }
   | { readonly kind: 'set_fare'; readonly lineId: LineId; readonly fare: Line['fare'] }
   | { readonly kind: 'set_connection_hold'; readonly lineId: LineId; readonly seconds: number }
+  | {
+      /** Naechster Auftrag im Feldzug - Netz, Fuhrpark und Kasse bleiben stehen. */
+      readonly kind: 'begin_scenario'
+      readonly scenarioId: string
+      readonly grant: Money
+    }
   | { readonly kind: 'take_loan'; readonly amount: Money; readonly termYears: number }
   | { readonly kind: 'repay_loan'; readonly loanId: string; readonly amount: Money }
   | { readonly kind: 'place_bus_stop'; readonly cityId: CityId }

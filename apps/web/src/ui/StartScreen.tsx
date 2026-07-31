@@ -1,4 +1,4 @@
-import { SCENARIOS, formatDate, type City, type Goal } from '@game/domain'
+import { CAMPAIGNS, SCENARIOS, formatDate, type City, type Goal } from '@game/domain'
 import { useGame } from '../game/store.js'
 
 /**
@@ -34,6 +34,33 @@ export function StartScreen({ cities }: { readonly cities: readonly City[] }): R
           </p>
         </header>
 
+        <h2 className="start__section">Feldzug</h2>
+        <div className="start__grid">
+          {CAMPAIGNS.map((campaign) => {
+            const steps = campaign.steps.map((id) => SCENARIOS.find((s) => s.id === id)).filter(Boolean)
+            const first = steps[0]
+            if (!first) return null
+            return (
+              <button key={campaign.id} type="button" className="mission mission--campaign" onClick={() => start(cities, first.id)}>
+                <h2>{campaign.title}</h2>
+                <p className="mission__summary">{campaign.summary}</p>
+                <ol className="mission__goals">
+                  {steps.map((s) => (
+                    <li key={s!.id}>
+                      {s!.title} <span className="muted">— {s!.summary}</span>
+                    </li>
+                  ))}
+                </ol>
+                <footer className="mission__foot">
+                  <span>{(first.startingCash / 100).toLocaleString('de-DE')} € Startkapital</span>
+                  <span>{steps.length} Aufträge nacheinander</span>
+                </footer>
+              </button>
+            )
+          })}
+        </div>
+
+        <h2 className="start__section">Einzelne Aufträge</h2>
         <div className="start__grid">
           {SCENARIOS.map((scenario) => (
             <button key={scenario.id} type="button" className="mission" onClick={() => start(cities, scenario.id)}>

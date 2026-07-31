@@ -320,6 +320,15 @@ Beim Start wählt man einen **Auftrag**. Vier gibt es:
 | **Die Nord-Süd-Achse** | Hamburg–München mit der Bahn, pünktlich und rentabel | 6 Jahre |
 | **Freies Spiel** | Ganz Deutschland, keine Frist | — |
 
+Die drei mit Frist lassen sich auch als **Feldzug** hintereinander spielen. Der Unterschied ist
+nicht die Reihenfolge, sondern dass nichts weggeräumt wird: Netz, Fuhrpark und Kasse gehen mit,
+samt gealterter Fahrzeuge und aufgenommener Kredite. Dazu gibt es je Auftrag einen Zuschuss.
+
+Manche Aufträge bringen eine **Startaufstellung** mit — im Ruhrgebiet vier Haltestellen, auf
+der Nord-Süd-Achse acht Bahnhöfe. Nicht jeder Handgriff ist eine Entscheidung: wo die Trasse
+langgeht, ist der Auftrag; acht Bahnhöfe zu setzen ist nur Arbeit. Im Feldzug entfällt die
+Aufstellung — ein Betrieb, der seit zwei Jahren fährt, bekommt keine Starthilfe mehr.
+
 Der erste ist ein Einstieg, der sich nicht so nennt: er stellt genau die vier Handgriffe als
 Ziele, die man einmal gemacht haben muss, und schreibt daneben, wo die Knöpfe dafür sind. Ein
 Tutorial, das man wegklicken kann, wäre entweder überflüssig oder ungelesen.

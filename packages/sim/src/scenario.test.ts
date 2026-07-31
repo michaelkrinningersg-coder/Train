@@ -1,7 +1,9 @@
 import {
   DAYS_ALL,
   DEFAULT_BUS_FARE,
+  CAMPAIGNS,
   SCENARIOS,
+  campaignStep,
   cityId,
   cityRadiusKm,
   scenarioById,
@@ -15,6 +17,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { advanceDays } from './advance.js'
 import { applyCommand } from './commands.js'
 import { INSOLVENCY_CASH, reachableCities, scenarioStatus } from './scenario.js'
+import { applyScenarioSetup, missingSetupCities } from './setup.js'
 import { makeSave, readSave } from './save.js'
 import { createGame } from './state.js'
 
@@ -242,5 +245,116 @@ describe('Die ausgelieferten Aufträge', () => {
         expect(germany, `${scenario.id}: ${goal.to}`).toContain(goal.to)
       }
     }
+  })
+})
+
+describe('Startaufstellung', () => {
+  const withSetup = (setup: Scenario['setup']): Scenario => ({ ...TEST_SCENARIO, setup: setup! })
+
+  it('stellt Haltestellen und eine fahrende Linie hin', () => {
+    const scenario = withSetup({
+      busStops: ['Anfang', 'Mitte'],
+      lines: [
+        {
+          name: 'Startlinie',
+          mode: 'bus',
+          stops: ['Anfang', 'Mitte'],
+          headwayMinutes: 30,
+          vehicleClassId: 'intercity',
+          vehicles: 3,
+        },
+      ],
+    })
+    const state = applyScenarioSetup(fresh(), scenario)
+
+    expect(state.network.stations.size).toBe(2)
+    expect(state.lines.size).toBe(1)
+    expect(state.patterns.size).toBe(1)
+    expect(state.fleet.size).toBe(3)
+
+    // Und sie faehrt wirklich - eine Aufstellung ohne zugeteilte Fahrzeuge
+    // waere eine Attrappe.
+    const after = advanceDays(state, demand, 3)
+    expect(after.lastDay!.passengers).toBeGreaterThan(0)
+  })
+
+  it('ist geschenkt und nicht gekauft', () => {
+    const scenario = withSetup({ busStops: ['Anfang', 'Mitte', 'Ende'] })
+    const state = applyScenarioSetup(fresh(), scenario)
+
+    // Drei Haltestellen kosten Geld - der Kontostand steht trotzdem auf dem
+    // Startkapital. Sonst haenge das Startvermoegen am Gelaende.
+    expect(state.cash).toBe(scenario.startingCash)
+    expect(state.ledger).toHaveLength(0)
+  })
+
+  it('überspringt Städte, die es im Datensatz nicht gibt', () => {
+    const scenario = withSetup({ busStops: ['Anfang', 'Nirgendwo', 'Mitte'] })
+    const state = applyScenarioSetup(fresh(), scenario)
+    expect(state.network.stations.size).toBe(2)
+    expect(missingSetupCities(state.cities, scenario.setup)).toEqual(['Nirgendwo'])
+  })
+
+  it('nennt in den ausgelieferten Aufträgen nur bekannte Städte', () => {
+    const germany = JSON.parse(readFileSync('../../data/seed/cities.germany.json', 'utf8')) as { cities: City[] }
+    const known = new Map(germany.cities.map((c) => [c.id, c]))
+    for (const scenario of SCENARIOS) {
+      expect(missingSetupCities(known, scenario.setup), scenario.id).toEqual([])
+    }
+  })
+})
+
+describe('Feldzug', () => {
+  const CAMPAIGN = CAMPAIGNS[0]!
+
+  it('ordnet jeden Auftrag seinem Platz in der Kette zu', () => {
+    CAMPAIGN.steps.forEach((id, index) => {
+      const step = campaignStep(id)
+      expect(step?.campaign.id).toBe(CAMPAIGN.id)
+      expect(step?.index).toBe(index)
+    })
+    expect(campaignStep('gibt-es-nicht')).toBeUndefined()
+  })
+
+  it('nimmt Netz, Fuhrpark und Kasse in den nächsten Auftrag mit', () => {
+    const built = advanceDays(withLine(fresh(), ['Anfang', 'Mitte']), demand, 10)
+    const result = applyCommand(built, { kind: 'begin_scenario', scenarioId: 'ruhr', grant: 1_000_000_00 })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const next = result.state
+    expect(next.scenarioId).toBe('ruhr')
+    expect(next.network.stations.size).toBe(built.network.stations.size)
+    expect(next.lines.size).toBe(built.lines.size)
+    expect(next.fleet.size).toBe(built.fleet.size)
+    // Erwirtschaftetes bleibt, der Zuschuss kommt dazu.
+    expect(next.cash).toBe(built.cash + 1_000_000_00)
+  })
+
+  it('setzt die Frist auf den Beginn des neuen Auftrags, nicht auf den Spielbeginn', () => {
+    const built = advanceDays(fresh(), demand, 300)
+    const result = applyCommand(built, { kind: 'begin_scenario', scenarioId: 'test', grant: 0 })
+    if (!result.ok) throw new Error(result.reason)
+
+    // Ohne diesen Bezug waere der zweite Auftrag mit hundert Tagen Frist nach
+    // dreihundert Spieltagen sofort verloren.
+    expect(result.state.scenarioStartedOnDay).toBe(300)
+    expect(scenarioStatus(result.state, TEST_SCENARIO).daysLeft).toBe(100)
+    expect(scenarioStatus(result.state, TEST_SCENARIO).outcome).toBe('running')
+  })
+
+  it('trägt den Auftragsbeginn durch Speichern und Laden', () => {
+    const built = advanceDays(fresh(), demand, 50)
+    const result = applyCommand(built, { kind: 'begin_scenario', scenarioId: 'test', grant: 0 })
+    if (!result.ok) throw new Error(result.reason)
+
+    const loaded = readSave(makeSave(result.state, 'Feldzug', '1990-02-20T00:00:00.000Z'))
+    expect(loaded.scenarioStartedOnDay).toBe(50)
+  })
+
+  it('hebt einen Spielstand ohne Auftragsbeginn auf Tag null', () => {
+    const save = makeSave(fresh(), 'Alt', '1990-01-01T00:00:00.000Z')
+    const { scenarioStartedOnDay: _gone, ...older } = save.state
+    expect(readSave({ ...save, version: 3, state: older }).scenarioStartedOnDay).toBe(0)
   })
 })

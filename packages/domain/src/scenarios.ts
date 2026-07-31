@@ -42,6 +42,36 @@ export type Goal =
   | { readonly kind: 'satisfaction'; readonly value: number }
   | { readonly kind: 'punctuality'; readonly value: number }
 
+/**
+ * Startaufstellung eines Auftrags.
+ *
+ * Städte stehen mit **Namen** darin und nicht mit Kennungen: ein Auftrag ist
+ * ein Text, den ein Mensch schreibt, und `gn:2867714` schreibt niemand
+ * absichtlich. Aufgelöst wird beim Start gegen den geladenen Datensatz; was
+ * dort fehlt, wird übersprungen statt den Start zu verhindern.
+ *
+ * Die Aufstellung ist **kostenlos**: sie wird angewandt und danach der
+ * Kontostand auf das Startkapital gesetzt. Sonst müsste jeder Auftrag mit
+ * Baukosten rechnen, die sich mit dem Gelände ändern.
+ */
+export interface ScenarioSetup {
+  readonly busStops?: readonly string[]
+  readonly railStations?: readonly string[]
+  /** Strecken zwischen je zwei Bahnhöfen, in dieser Reihenfolge. */
+  readonly railLinks?: readonly (readonly [string, string])[]
+  readonly lines?: readonly ScenarioLine[]
+}
+
+export interface ScenarioLine {
+  readonly name: string
+  readonly mode: 'bus' | 'rail'
+  /** Städtenamen in Fahrtreihenfolge. */
+  readonly stops: readonly string[]
+  readonly headwayMinutes: number
+  readonly vehicleClassId: string
+  readonly vehicles: number
+}
+
 export interface Scenario {
   readonly id: string
   readonly title: string
@@ -58,6 +88,33 @@ export interface Scenario {
   readonly goals: readonly Goal[]
   /** Hinweise für den Einstieg, in der Reihenfolge, in der sie nützlich sind. */
   readonly hints?: readonly string[]
+  /** Was schon steht, wenn der Auftrag einzeln begonnen wird. */
+  readonly setup?: ScenarioSetup
+  /**
+   * Zuschuss beim Übergang aus einem vorigen Auftrag.
+   *
+   * Im Feldzug bleiben Netz und Kasse erhalten — `startingCash` wäre dort
+   * falsch, weil es das Erwirtschaftete ersetzen statt ergänzen würde. Der
+   * Zuschuss ist das, was der Auftraggeber für die neue Aufgabe dazugibt.
+   */
+  readonly grant?: Money
+}
+
+/**
+ * Ein Feldzug: mehrere Aufträge nacheinander, auf demselben Netz.
+ *
+ * Der Unterschied zu vier einzelnen Aufträgen ist nicht die Reihenfolge,
+ * sondern dass **nichts weggeräumt wird**. Was im ersten Auftrag entstanden
+ * ist, steht im zweiten noch da — mitsamt den Fahrzeugen, die inzwischen
+ * gealtert sind, und den Schulden, die man aufgenommen hat. Erst dadurch wird
+ * aus einer Aufgabe eine Vorgeschichte.
+ */
+export interface Campaign {
+  readonly id: string
+  readonly title: string
+  readonly summary: string
+  /** Auftragskennungen in der Reihenfolge, in der sie zu spielen sind. */
+  readonly steps: readonly string[]
 }
 
 const YEAR = 365
@@ -116,6 +173,10 @@ export const SCENARIOS: readonly Scenario[] = [
       'Bei kurzen Entfernungen entscheidet der Takt, nicht die Geschwindigkeit.',
       'Die Zufriedenheit fällt in Tagen und erholt sich in Monaten — lieber gleich genug Kapazität.',
     ],
+    // Die vier Kernstaedte stehen schon. Sie im Ruhrklumpen von Hand zu treffen
+    // ist Fummelarbeit und keine Entscheidung.
+    setup: { busStops: ['Duisburg', 'Essen', 'Bochum', 'Dortmund'] },
+    grant: 6_000_000_00,
   },
 
   {
@@ -142,6 +203,15 @@ export const SCENARIOS: readonly Scenario[] = [
       'Der Streckenunterhalt läuft, ob ein Zug fährt oder nicht.',
       'Zubringerbusse bringen Relationen, die die Achse allein nicht erreicht.',
     ],
+    // Die Bahnhoefe stehen, die Strecke nicht. Acht Bahnhoefe von Hand zu
+    // setzen ist Arbeit ohne Entscheidung; wo die Trasse langgeht, mit welcher
+    // Hoechstgeschwindigkeit und ob ein- oder zweigleisig, ist der Auftrag.
+    setup: {
+      railStations: [
+        'Hamburg', 'Hannover', 'Kassel', 'Frankfurt am Main', 'Mannheim', 'Stuttgart', 'Augsburg', 'München',
+      ],
+    },
+    grant: 300_000_000_00,
   },
 
   {
@@ -161,7 +231,35 @@ export const SCENARIOS: readonly Scenario[] = [
   },
 ]
 
+/**
+ * Die Feldzüge.
+ *
+ * Einer bisher, und er ist die Reihenfolge der drei Aufträge mit Frist. Das
+ * klingt nach wenig und ist trotzdem etwas anderes: der Ruhrauftrag beginnt mit
+ * dem Netz, den Fahrzeugen und den Schulden des ersten — und mit Fahrzeugen,
+ * die inzwischen zwei Jahre älter sind.
+ */
+export const CAMPAIGNS: readonly Campaign[] = [
+  {
+    id: 'aufbau',
+    title: 'Vom ersten Bus zur Fernachse',
+    summary: 'Drei Aufträge auf einem Netz. Was Sie bauen, bleibt stehen.',
+    steps: ['first-line', 'ruhr', 'north-south'],
+  },
+]
+
 export const scenarioById = (id: string): Scenario | undefined => SCENARIOS.find((s) => s.id === id)
+
+export const campaignById = (id: string): Campaign | undefined => CAMPAIGNS.find((c) => c.id === id)
+
+/** Der Feldzug, zu dem ein Auftrag gehört — und an welcher Stelle er dort steht. */
+export function campaignStep(scenarioId: string): { campaign: Campaign; index: number } | undefined {
+  for (const campaign of CAMPAIGNS) {
+    const index = campaign.steps.indexOf(scenarioId)
+    if (index >= 0) return { campaign, index }
+  }
+  return undefined
+}
 
 /** Was gespielt wird, wenn niemand etwas ausgewählt hat. */
 export const DEFAULT_SCENARIO_ID = 'first-line'

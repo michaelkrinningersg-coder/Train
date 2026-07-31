@@ -262,6 +262,24 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
       }
     }
 
+    case 'begin_scenario': {
+      // Netz, Fuhrpark, Linien und Kasse bleiben unangetastet - genau darin
+      // besteht der Unterschied zwischen einem Feldzug und vier Auftraegen.
+      const next: GameState = {
+        ...state,
+        scenarioId: command.scenarioId,
+        scenarioStartedOnDay: state.day,
+      }
+      return {
+        ok: true,
+        cost: 0,
+        state:
+          command.grant > 0
+            ? book(next, { category: 'loan', amount: command.grant, note: 'Zuschuss für den neuen Auftrag' })
+            : next,
+      }
+    }
+
     case 'set_pattern': {
       const line = state.lines.get(command.pattern.lineId)
       if (!line) return fail('Unbekannte Linie.')

@@ -1,4 +1,4 @@
-import { scenarioById, formatDate } from '@game/domain'
+import { campaignStep, scenarioById, formatDate } from '@game/domain'
 import { scenarioStatus } from '@game/sim'
 import { useMemo } from 'react'
 import { useGame } from '../game/store.js'
@@ -24,8 +24,15 @@ export function MissionTab(): React.JSX.Element | null {
   const status = useMemo(() => (state && scenario ? scenarioStatus(state, scenario) : null), [state, scenario])
   if (!state || !scenario || !status) return null
 
+  const step = campaignStep(scenario.id)
+
   return (
     <div className="mission-tab">
+      {step && (
+        <p className="muted small">
+          {step.campaign.title} · Auftrag {step.index + 1} von {step.campaign.steps.length}
+        </p>
+      )}
       <h2>{scenario.title}</h2>
       <p className="small">{scenario.briefing}</p>
 
@@ -95,12 +102,15 @@ export function MissionOutcome(): React.JSX.Element | null {
   const seen = useGame((s) => s.outcomeSeen)
   const dismiss = useGame((s) => s.dismissOutcome)
   const restart = useGame((s) => s.restart)
+  const nextScenario = useGame((s) => s.nextScenario)
 
   const scenario = state ? scenarioById(state.scenarioId) : undefined
   const status = useMemo(() => (state && scenario ? scenarioStatus(state, scenario) : null), [state, scenario])
   if (!state || !scenario || !status || seen || status.outcome === 'running') return null
 
   const won = status.outcome === 'won'
+  const step = campaignStep(scenario.id)
+  const next = step ? scenarioById(step.campaign.steps[step.index + 1] ?? '') : undefined
   return (
     <div className="modal" role="dialog" aria-modal="true">
       <div className="modal__box">
@@ -126,13 +136,25 @@ export function MissionOutcome(): React.JSX.Element | null {
           </div>
         </dl>
         <div className="modal__actions">
-          <button type="button" className="primary" onClick={restart}>
-            Anderen Auftrag wählen
-          </button>
+          {won && next ? (
+            <button type="button" className="primary" onClick={nextScenario}>
+              Weiter: {next.title}
+            </button>
+          ) : (
+            <button type="button" className="primary" onClick={restart}>
+              Anderen Auftrag wählen
+            </button>
+          )}
           <button type="button" onClick={dismiss}>
             {won ? 'Weiterspielen' : 'Trotzdem weitermachen'}
           </button>
         </div>
+        {won && next && (
+          <p className="muted small">
+            Netz, Fuhrpark und Kasse bleiben stehen
+            {next.grant ? `, dazu ${(next.grant / 100).toLocaleString('de-DE')} € Zuschuss` : ''}.
+          </p>
+        )}
       </div>
     </div>
   )

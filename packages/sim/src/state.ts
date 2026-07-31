@@ -21,6 +21,7 @@ export function createGame(options: NewGameOptions): GameState {
   return {
     seed: options.seed ?? 1,
     scenarioId: options.scenarioId ?? DEFAULT_SCENARIO_ID,
+    scenarioStartedOnDay: 0,
     day: 0,
     cash: options.startingCash ?? STARTING_CASH,
     loans: [],

@@ -17,11 +17,12 @@ import {
   type NodeId,
   type StationId,
   type TrackId,
+  campaignStep,
   scenarioById,
 } from '@game/domain'
 import type { ElevationGrid } from '@game/geo'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
-import { applyCommand, createGame, makeSave, readSave, STARTING_CASH } from '@game/sim'
+import { applyCommand, applyScenarioSetup, createGame, makeSave, readSave, STARTING_CASH } from '@game/sim'
 import { createSimClient } from './simClient.js'
 import { AUTOSAVE_SLOT, writeSlot } from './storage.js'
 import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
@@ -123,6 +124,8 @@ interface GameStore {
   start: (cities: readonly City[], scenarioId?: string) => void
   /** Zurueck zur Auftragsauswahl. */
   restart: () => void
+  /** Naechster Auftrag im Feldzug - das Netz bleibt stehen. */
+  nextScenario: () => void
   /** Ergebnis der Auftragsauswertung wurde zur Kenntnis genommen. */
   dismissOutcome: () => void
   readonly outcomeSeen: boolean
@@ -214,16 +217,19 @@ export const useGame = create<GameStore>((set, get) => ({
     // Potenzialen - beides wird einmal beim Start gerechnet und danach nie wieder.
     const enriched = withPotentials(cities)
     set({
-      state: createGame({
-        cities: enriched,
-        ...(scenarioId ? { scenarioId } : {}),
+      state: applyScenarioSetup(
+        createGame({
+          cities: enriched,
+          ...(scenarioId ? { scenarioId } : {}),
         // Der Auftrag bestimmt das Startkapital; die Umgebungsvariable sticht
         // ihn nur in der Entwicklung.
         startingCash:
           Number.isFinite(cashOverride) && cashOverride > 0
             ? cashOverride
             : (scenarioById(scenarioId ?? '')?.startingCash ?? STARTING_CASH),
-      }),
+        }),
+        scenarioById(scenarioId ?? ''),
+      ),
       demand: buildDemandMatrix(enriched, { minTripsPerDay: 1 }),
       ready: true,
       outcomeSeen: false,
@@ -241,6 +247,20 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   dismissOutcome: () => set({ outcomeSeen: true }),
+
+  nextScenario: () => {
+    const state = get().state
+    if (!state) return
+    const step = campaignStep(state.scenarioId)
+    const nextId = step?.campaign.steps[step.index + 1]
+    if (!nextId) return
+    const ok = get().dispatch({
+      kind: 'begin_scenario',
+      scenarioId: nextId,
+      grant: scenarioById(nextId)?.grant ?? 0,
+    })
+    if (ok) set({ outcomeSeen: false, tab: 'mission', speed: 0 })
+  },
 
   load: (raw) => {
     try {

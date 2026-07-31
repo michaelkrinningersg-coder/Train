@@ -46,7 +46,7 @@ import { withPotentials } from '@game/demand'
  * verhalten haben — niemand wartet auf niemanden, und gespielt wurde ohne
  * Auftrag.
  */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 /** Was ein `Map`-Wert selbst mitbringt, muss nicht als Schlüssel danebenstehen. */
 type ById<T> = readonly T[]
@@ -54,6 +54,7 @@ type ById<T> = readonly T[]
 export interface SerialisedState {
   readonly seed: number
   readonly scenarioId: string
+  readonly scenarioStartedOnDay: number
   readonly day: number
   readonly cash: number
   readonly loans: readonly Loan[]
@@ -85,6 +86,7 @@ export function serialiseState(state: GameState): SerialisedState {
   return {
     seed: state.seed,
     scenarioId: state.scenarioId,
+    scenarioStartedOnDay: state.scenarioStartedOnDay,
     day: state.day,
     cash: state.cash,
     loans: state.loans,
@@ -127,6 +129,7 @@ export function deserialiseState(data: SerialisedState): GameState {
   return {
     seed: data.seed,
     scenarioId: data.scenarioId,
+    scenarioStartedOnDay: data.scenarioStartedOnDay,
     day: data.day,
     cash: data.cash,
     loans: data.loans,
@@ -193,6 +196,10 @@ function migrate(state: SerialisedState, from: number): SerialisedState {
         current = liftV2toV3(current)
         version = 3
         break
+      case 3:
+        current = liftV3toV4(current)
+        version = 4
+        break
       default:
         version = SAVE_VERSION
     }
@@ -223,6 +230,13 @@ function liftV1toV2(state: SerialisedState): SerialisedState {
  */
 function liftV2toV3(state: SerialisedState): SerialisedState {
   return { ...state, scenarioId: (state as Partial<SerialisedState>).scenarioId ?? 'free' }
+}
+
+/**
+ * Format 3 kannte keinen Feldzug — dort begann jeder Auftrag am Spielbeginn.
+ */
+function liftV3toV4(state: SerialisedState): SerialisedState {
+  return { ...state, scenarioStartedOnDay: (state as Partial<SerialisedState>).scenarioStartedOnDay ?? 0 }
 }
 
 export function makeSave(state: GameState, label: string, savedAt: string): SaveGame {
