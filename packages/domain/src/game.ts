@@ -133,6 +133,14 @@ export interface DayResult {
 
 export interface GameState {
   readonly seed: number
+  /**
+   * Welcher Auftrag gespielt wird.
+   *
+   * Er steht im Spielzustand und nicht daneben, weil der Fortschritt
+   * ausschliesslich aus dem Zustand abgelesen wird - ein Spielstand traegt damit
+   * seinen Auftrag von selbst mit, ohne ein einziges Feld fuer den Fortschritt.
+   */
+  readonly scenarioId: string
   /** Ganze Tage seit Spielbeginn, siehe calendar.ts. */
   readonly day: number
   readonly cash: Money

@@ -1,4 +1,4 @@
-import { cityId as brandCity } from '@game/domain'
+import { cityId as brandCity, DEFAULT_SCENARIO_ID } from '@game/domain'
 import type { City, GameState, LineId, Money, PatternId, StationId, VehicleId } from '@game/domain'
 
 /**
@@ -13,12 +13,14 @@ export interface NewGameOptions {
   readonly cities: readonly City[]
   readonly seed?: number
   readonly startingCash?: Money
+  readonly scenarioId?: string
 }
 
 export function createGame(options: NewGameOptions): GameState {
   const cities = new Map(options.cities.map((c) => [c.id, c]))
   return {
     seed: options.seed ?? 1,
+    scenarioId: options.scenarioId ?? DEFAULT_SCENARIO_ID,
     day: 0,
     cash: options.startingCash ?? STARTING_CASH,
     loans: [],

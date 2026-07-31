@@ -425,6 +425,52 @@ nichts (89 ms vorher, 92 ms nachher) und wurde zurückgenommen.
 
 ---
 
+## Phase 5b — Aufträge (erledigt)
+
+**Ziel**: Einen Grund zu spielen. Bis hierher konnte man bauen, und es rechnete — was fehlte,
+war die Frage, auf die das eine Antwort ist. Ein Verkehrsbetrieb ohne Auftrag ist eine
+Simulation; erst eine Vorgabe mit Frist macht daraus eine Entscheidung, denn eine Entscheidung
+braucht etwas, das man verlieren kann.
+
+**Was entstanden ist:**
+
+- **Vier Aufträge** als reine Daten (`domain/scenarios.ts`): „Die erste Linie" (Einstieg),
+  „Pendlerland Ruhr", „Die Nord-Süd-Achse", „Freies Spiel".
+- **Acht Zielarten**, alle aus dem Spielzustand ablesbar: Fahrgäste, Tagesgewinn, Kasse,
+  Linien, Haltestellen, zwei Städte verbinden, Zufriedenheit, Pünktlichkeit.
+- **Auswahlbildschirm** beim Start statt des stillen Sprungs mitten nach Deutschland.
+- **Auftragsreiter** mit Fortschritt, Frist und — beim Einstieg — den Handgriffen in der
+  Reihenfolge, in der sie nützlich sind. Dazu ein Stand in der Kopfzeile.
+- **Abschlussmeldung** bei Erfüllung, Fristablauf oder Zahlungsunfähigkeit, mit
+  „Weiterspielen" für alle, die es trotzdem wollen.
+- **Spielstandformat 3**: der Auftrag steht im Zustand, ältere Stände landen im freien Spiel.
+
+**Zwei Entscheidungen, die die Form prägen:**
+
+- **Ziele sind Fragen an den Zustand, keine mitgeschriebenen Zähler.** Damit übersteht der
+  Fortschritt Speichern und Laden von selbst, und ein geladener Stand kann nicht in eine Lage
+  geraten, die es im Spiel nicht gibt. Der Preis: Ziele können sich nur auf Zustände beziehen,
+  nicht auf Ereignisse — „fahre einmal 10 000 Fahrgäste" geht so nicht, „fahre heute 10 000"
+  schon. Für ein Spiel, in dem man einen Betrieb aufbaut statt Kunststücke vorzuführen, ist
+  das die richtige Seite des Handels.
+- **Ziele statt Punktzahl.** Eine Punktzahl zwänge alles auf eine Achse und ebnete genau die
+  Abwägungen ein, die das Spiel ausmachen. Ein Auftrag sagt, *was* am Ende dastehen soll, und
+  lässt offen, wie man dorthin kommt.
+
+**Erreichbarkeit** (`connect`-Ziele) läuft bewusst **nicht** über die Reisekettensuche: die
+fragt, ob eine Verbindung attraktiv ist, und verwirft Wege, die im Nutzenmodell durchfallen.
+Ein Ziel, das sich still ändert, weil ein Umweg knapp zu teuer wird, wäre nicht
+nachvollziehbar. Gefragt wird nur: kommt man an.
+
+**Was offen bleibt:**
+
+- **Keine Auftragsketten.** Jeder Auftrag beginnt bei null; ein Feldzug über mehrere Aufträge
+  mit übernommenem Netz wäre der nächste Schritt.
+- **Keine Startaufstellung.** Ein Auftrag kann kein vorhandenes Netz mitbringen, nur Geld.
+- **Keine Bestenliste**, kein Vergleich zweier Lösungen desselben Auftrags.
+
+---
+
 ## Phase 5 — Europa (2–3 Wochen)
 
 - Pipeline auf Mitteleuropa, dann Europa hochziehen

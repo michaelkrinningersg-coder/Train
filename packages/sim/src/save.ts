@@ -41,17 +41,19 @@ import { withPotentials } from '@game/demand'
  */
 
 /**
- * Format 2 kennt die Anschlusssicherung je Linie. Ältere Stände haben das Feld
- * nicht; sie werden beim Laden so gelesen, wie sie sich verhalten haben —
- * niemand wartet auf niemanden.
+ * Format 2 kennt die Anschlusssicherung je Linie, Format 3 den Auftrag. Ältere
+ * Stände haben die Felder nicht; sie werden beim Laden so gelesen, wie sie sich
+ * verhalten haben — niemand wartet auf niemanden, und gespielt wurde ohne
+ * Auftrag.
  */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 /** Was ein `Map`-Wert selbst mitbringt, muss nicht als Schlüssel danebenstehen. */
 type ById<T> = readonly T[]
 
 export interface SerialisedState {
   readonly seed: number
+  readonly scenarioId: string
   readonly day: number
   readonly cash: number
   readonly loans: readonly Loan[]
@@ -82,6 +84,7 @@ export interface SaveGame {
 export function serialiseState(state: GameState): SerialisedState {
   return {
     seed: state.seed,
+    scenarioId: state.scenarioId,
     day: state.day,
     cash: state.cash,
     loans: state.loans,
@@ -123,6 +126,7 @@ export function deserialiseState(data: SerialisedState): GameState {
   const cities = withPotentials(data.cities)
   return {
     seed: data.seed,
+    scenarioId: data.scenarioId,
     day: data.day,
     cash: data.cash,
     loans: data.loans,
@@ -185,6 +189,10 @@ function migrate(state: SerialisedState, from: number): SerialisedState {
         current = liftV1toV2(current)
         version = 2
         break
+      case 2:
+        current = liftV2toV3(current)
+        version = 3
+        break
       default:
         version = SAVE_VERSION
     }
@@ -206,6 +214,15 @@ function liftV1toV2(state: SerialisedState): SerialisedState {
       connectionHoldSec: (line as Partial<Line>).connectionHoldSec ?? 0,
     })),
   }
+}
+
+/**
+ * Format 2 kannte keinen Auftrag — dort wurde ohne Frist und ohne Ziel gespielt.
+ * Genau das ist „Freies Spiel", also wird ein alter Stand dorthin gehoben und
+ * nicht in ein Szenario, dessen Frist er womöglich längst verpasst hätte.
+ */
+function liftV2toV3(state: SerialisedState): SerialisedState {
+  return { ...state, scenarioId: (state as Partial<SerialisedState>).scenarioId ?? 'free' }
 }
 
 export function makeSave(state: GameState, label: string, savedAt: string): SaveGame {

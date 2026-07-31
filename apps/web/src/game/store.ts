@@ -17,15 +17,16 @@ import {
   type NodeId,
   type StationId,
   type TrackId,
+  scenarioById,
 } from '@game/domain'
 import type { ElevationGrid } from '@game/geo'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
-import { advanceDay, applyCommand, createGame, makeSave, readSave } from '@game/sim'
+import { advanceDay, applyCommand, createGame, makeSave, readSave, STARTING_CASH } from '@game/sim'
 import { AUTOSAVE_SLOT, writeSlot } from './storage.js'
 import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
 import { create } from 'zustand'
 
-export type Tab = 'rail' | 'network' | 'fleet' | 'finance'
+export type Tab = 'mission' | 'rail' | 'network' | 'fleet' | 'finance'
 export type Speed = 0 | 1 | 2
 export type MapMode = 'idle' | 'draw-line' | 'place-station' | 'draw-track' | 'place-loop'
 
@@ -78,7 +79,13 @@ interface GameStore {
   /** Spielstandsverwaltung offen. */
   readonly showSaves: boolean
 
-  start: (cities: readonly City[]) => void
+  /** Startet einen Auftrag. Ohne Kennung den Standardauftrag. */
+  start: (cities: readonly City[], scenarioId?: string) => void
+  /** Zurueck zur Auftragsauswahl. */
+  restart: () => void
+  /** Ergebnis der Auftragsauswertung wurde zur Kenntnis genommen. */
+  dismissOutcome: () => void
+  readonly outcomeSeen: boolean
   dispatch: (command: Command) => boolean
   step: (days?: number) => void
 
@@ -126,7 +133,8 @@ export const useGame = create<GameStore>((set, get) => ({
   state: null,
   demand: null,
   speed: 0,
-  tab: 'network',
+  // Wer einen Auftrag gewaehlt hat, will zuerst lesen, was er bedeutet.
+  tab: 'mission',
   mapMode: 'idle',
   draft: [],
   selectedCityId: null,
@@ -145,8 +153,9 @@ export const useGame = create<GameStore>((set, get) => ({
   showTimetable: false,
   showSaves: false,
   lastAutosaveDay: 0,
+  outcomeSeen: false,
 
-  start: (cities) => {
+  start: (cities, scenarioId) => {
     // Entwicklungshilfe: mit VITE_STARTING_CASH laesst sich der Bahnbau testen,
     // ohne erst Jahre Busbetrieb durchzuspielen. Im Spiel selbst gilt der
     // Standardwert aus @game/sim.
@@ -157,13 +166,25 @@ export const useGame = create<GameStore>((set, get) => ({
     set({
       state: createGame({
         cities: enriched,
-        ...(Number.isFinite(cashOverride) && cashOverride > 0 ? { startingCash: cashOverride } : {}),
+        ...(scenarioId ? { scenarioId } : {}),
+        // Der Auftrag bestimmt das Startkapital; die Umgebungsvariable sticht
+        // ihn nur in der Entwicklung.
+        startingCash:
+          Number.isFinite(cashOverride) && cashOverride > 0
+            ? cashOverride
+            : (scenarioById(scenarioId ?? '')?.startingCash ?? STARTING_CASH),
       }),
       demand: buildDemandMatrix(enriched, { minTripsPerDay: 1 }),
       ready: true,
+      outcomeSeen: false,
       lastAutosaveDay: 0,
+      tab: 'mission',
     })
   },
+
+  restart: () => set({ ready: false, state: null, demand: null, speed: 0, outcomeSeen: false }),
+
+  dismissOutcome: () => set({ outcomeSeen: true }),
 
   load: (raw) => {
     try {
@@ -184,6 +205,7 @@ export const useGame = create<GameStore>((set, get) => ({
         trackDraft: null,
         showTimetable: false,
         lastAutosaveDay: state.day,
+        outcomeSeen: false,
         message: null,
       })
       return true

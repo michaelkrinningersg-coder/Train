@@ -2,6 +2,7 @@ import { formatDate } from '@game/domain'
 import { formatMoney } from '@game/economy'
 import { SPEED_INTERVAL_MS, useGame, type Speed } from '../game/store.js'
 import { BasemapPicker } from './BasemapPicker.js'
+import { MissionChip } from './MissionChip.js'
 
 const SPEEDS: { readonly value: Speed; readonly label: string; readonly title: string }[] = [
   { value: 0, label: '❚❚', title: 'Pause' },
@@ -48,6 +49,8 @@ export function TopBar(): React.JSX.Element | null {
       </span>
 
       <div className="topbar__spacer" />
+
+      <MissionChip />
 
       <BasemapPicker />
 

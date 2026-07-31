@@ -9,6 +9,8 @@ import { FleetTab } from './ui/FleetTab.js'
 import { Legend } from './ui/Legend.js'
 import { NetworkTab } from './ui/NetworkTab.js'
 import { RailTab } from './ui/RailTab.js'
+import { MissionOutcome, MissionTab } from './ui/MissionTab.js'
+import { StartScreen } from './ui/StartScreen.js'
 import { StationPlacement } from './ui/StationPlacement.js'
 import { Timetable } from './ui/Timetable.js'
 import { TopBar } from './ui/TopBar.js'
@@ -21,6 +23,7 @@ import { TopBar } from './ui/TopBar.js'
 const REGION = import.meta.env['VITE_REGION'] ?? 'germany'
 
 const TABS: { readonly id: Tab; readonly label: string }[] = [
+  { id: 'mission', label: 'Auftrag' },
   { id: 'rail', label: 'Schiene' },
   { id: 'network', label: 'Linien' },
   { id: 'fleet', label: 'Fuhrpark' },
@@ -30,7 +33,6 @@ const TABS: { readonly id: Tab; readonly label: string }[] = [
 export function App(): React.JSX.Element {
   const dataset = useCityDataset(REGION)
   const ready = useGame((s) => s.ready)
-  const start = useGame((s) => s.start)
   const tab = useGame((s) => s.tab)
   const setTab = useGame((s) => s.setTab)
   const speed = useGame((s) => s.speed)
@@ -46,9 +48,8 @@ export function App(): React.JSX.Element {
   const setShowSaves = useGame((s) => s.setShowSaves)
   const state = useGame((s) => s.state)
 
-  useEffect(() => {
-    if (dataset.status === 'ready' && !ready) start(dataset.data.cities)
-  }, [dataset, ready, start])
+  // Gestartet wird nicht mehr von selbst: der Spieler waehlt erst einen Auftrag.
+  // Vorher landete man ohne ein Wort mitten in Deutschland.
 
   // Höhenraster für die Baukosten. Fehlt es, rechnet das Spiel mit flachem
   // Gelände weiter statt zu scheitern.
@@ -84,6 +85,8 @@ export function App(): React.JSX.Element {
     )
   }
 
+  if (!ready) return <StartScreen cities={dataset.data.cities} />
+
   return (
     <div className="app">
       <TopBar />
@@ -114,12 +117,15 @@ export function App(): React.JSX.Element {
             ))}
           </nav>
           <div className="sidebar__body">
+            {tab === 'mission' && <MissionTab />}
             {tab === 'rail' && <RailTab />}
             {tab === 'network' && <NetworkTab />}
             {tab === 'fleet' && <FleetTab />}
             {tab === 'finance' && <FinanceTab />}
           </div>
         </aside>
+
+        <MissionOutcome />
 
         {showTimetable && selectedLineId && state?.lines.get(selectedLineId)?.mode === 'rail' && (
           <Timetable lineId={selectedLineId} />

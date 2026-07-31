@@ -309,6 +309,31 @@ nicht *wie voll ist meine Linie*, sondern *welcher Korridor ist voll und was lie
 | [docs/05-DATENPIPELINE.md](docs/05-DATENPIPELINE.md) | OSM/GeoNames/Routing-Aufbereitung |
 | [docs/06-ROADMAP.md](docs/06-ROADMAP.md) | Phasenplan bis zum spielbaren Prototyp |
 
+## Aufträge
+
+Beim Start wählt man einen **Auftrag**. Vier gibt es:
+
+| Auftrag | Worum es geht | Frist |
+|---|---|---|
+| **Die erste Linie** | Zwei Haltestellen, ein Bus, hundert Fahrgäste | 2 Jahre |
+| **Pendlerland Ruhr** | Zehn Großstädte auf achtzig Kilometern — Dichte statt Entfernung | 4 Jahre |
+| **Die Nord-Süd-Achse** | Hamburg–München mit der Bahn, pünktlich und rentabel | 6 Jahre |
+| **Freies Spiel** | Ganz Deutschland, keine Frist | — |
+
+Der erste ist ein Einstieg, der sich nicht so nennt: er stellt genau die vier Handgriffe als
+Ziele, die man einmal gemacht haben muss, und schreibt daneben, wo die Knöpfe dafür sind. Ein
+Tutorial, das man wegklicken kann, wäre entweder überflüssig oder ungelesen.
+
+Gewonnen ist ein Auftrag erst, wenn **alle** Ziele *zugleich* erfüllt sind. Ein Netz, das die
+Fahrgastzahl nur erreicht, indem es die Zufriedenheit ruiniert, hat den Auftrag nicht erfüllt,
+sondern Teile davon nacheinander. Verloren ist er, wenn die Frist abläuft oder der Betrieb
+zahlungsunfähig wird — ein Konto im Minus ist das noch nicht, das ist eine Entscheidung und
+kostet Überziehungszinsen.
+
+Jedes Ziel ist eine **Frage an den Spielzustand**, kein mitgeschriebener Zähler. Deshalb steht
+ein geladener Spielstand genau da, wo er stand, ohne dass der Spielstand ein einziges Feld für
+den Fortschritt enthielte.
+
 ## Region
 
 Gespielt wird **Deutschland**: 694 Städte ab 20 000 Einwohnern, echte Einwohnerzahlen aus
@@ -339,7 +364,7 @@ spätere Änderung schwerer zu lesen.
 
 ## Status
 
-**Phase 4c abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
+**Phase 5a abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
 Strecken über echtes Gelände trassieren und ausbauen, Züge kaufen, Bahnlinien takten und im
 Bildfahrplan Konflikte durch Überholstellen oder Ausbau auflösen. Fahrgäste steigen zwischen
 eigenen Linien um, und Überfüllung kostet Stammkunden und Fahrplanstabilität.
@@ -349,5 +374,7 @@ Wikidata, und Fahrzeuge wie Strecken wollen instand gehalten werden. Anschlüsse
 Entscheidung: warten und die eigene Verspätung weitertragen, oder pünktlich losfahren und
 Umsteiger stehen lassen.
 
-Als Nächstes: Saisonganglinien — oder Phase 5, Europa. Der Phasenplan steht in
+Gespielt wird ganz Deutschland, und es gibt vier Aufträge mit Zielen und Frist.
+
+Als Nächstes: die Simulation in einen Web Worker — oder Europa. Der Phasenplan steht in
 [docs/06-ROADMAP.md](docs/06-ROADMAP.md).

@@ -1024,3 +1024,199 @@ button.primary.on {
   border-radius: 3px;
   vertical-align: middle;
 }
+
+/* ── Auftragsauswahl ─────────────────────────────────────────────────────── */
+.start {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--plane);
+}
+
+.start__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+.start__head h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.start__head p {
+  margin: 0 0 32px;
+  font-size: 14px;
+}
+
+.start__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+/* Die ganze Karte ist die Schaltflaeche - ein extra "Starten" waere ein Klick,
+   der nichts entscheidet. */
+.mission {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mission:hover {
+  border-color: var(--city);
+  background: color-mix(in srgb, var(--city) 8%, var(--surface));
+}
+
+.mission h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.mission__summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.mission__brief {
+  margin: 0;
+}
+
+.mission__goals {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.mission__foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Auftragsreiter ──────────────────────────────────────────────────────── */
+.mission-tab h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.goals {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goals__item {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.goals__mark {
+  color: var(--text-muted);
+}
+
+.goals__item--done .goals__mark {
+  color: var(--good);
+}
+
+.goals__item--done .goals__label {
+  color: var(--text-muted);
+}
+
+.goals__bar {
+  grid-column: 1 / -1;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--hairline);
+}
+
+.goals__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--city);
+}
+
+.goals__item--done .goals__bar > span {
+  background: var(--good);
+}
+
+.hints {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ── Abschlussmeldung ────────────────────────────────────────────────────── */
+.modal {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.modal__box {
+  width: 420px;
+  padding: 24px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.modal__box h2 {
+  margin: 0 0 2px;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.modal__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.modal__actions button {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.modal__actions .primary {
+  background: color-mix(in srgb, var(--city) 24%, transparent);
+  border-color: color-mix(in srgb, var(--city) 55%, transparent);
+  color: var(--text-primary);
+}
