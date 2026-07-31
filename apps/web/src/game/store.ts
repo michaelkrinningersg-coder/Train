@@ -2,6 +2,7 @@ import {
   DAYS_ALL,
   DEFAULT_BUS_FARE,
   DEFAULT_RAIL_FARE,
+  DEFAULT_CONNECTION_HOLD_SEC,
   DEFAULT_RUNTIME_RESERVE,
   DEFAULT_RUNTIME_RESERVE_RAIL,
   DEFAULT_SERVICE_WINDOW,
@@ -358,6 +359,7 @@ export const useGame = create<GameStore>((set, get) => ({
         path: rail ? { kind: 'rail', tracks: [] } : { kind: 'road' },
         fare: rail ? DEFAULT_RAIL_FARE : DEFAULT_BUS_FARE,
         runtimeReserve: rail ? DEFAULT_RUNTIME_RESERVE_RAIL : DEFAULT_RUNTIME_RESERVE,
+        connectionHoldSec: DEFAULT_CONNECTION_HOLD_SEC,
       },
     })
     if (!created) return

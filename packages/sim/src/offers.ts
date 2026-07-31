@@ -87,6 +87,10 @@ export interface LineOffer {
   readonly firstDepartureSec: number
   /** Fahrzeit vom ersten zum letzten Halt, inklusive Aufenthalten. */
   readonly oneWaySec: number
+  /** Höchstwartezeit dieser Linie auf einen verspäteten Zubringer. */
+  readonly holdSec: number
+  /** Davon tatsächlich gewartet — wird erst von `applyConnectionHolding` gesetzt. */
+  readonly heldSec: number
 }
 
 export type Direction = 'forward' | 'backward'
@@ -281,6 +285,8 @@ function prepareBus(state: GameState, line: Line, crowding: readonly number[]): 
       punctuality: 1,
       firstDepartureSec: pattern.headway.firstDeparture,
       oneWaySec: stops[stops.length - 1]?.arrivalSec ?? 0,
+      holdSec: line.connectionHoldSec,
+      heldSec: 0,
     },
     detail: { metrics, fleet, departures },
   }
@@ -408,6 +414,8 @@ function prepareRail(state: GameState, line: Line, crowding: readonly number[]):
       punctuality,
       firstDepartureSec: zero,
       oneWaySec: stops[stops.length - 1]?.arrivalSec ?? 0,
+      holdSec: line.connectionHoldSec,
+      heldSec: 0,
     },
     detail: { plan, train: plan.train, runs: delayed, conflicts, disruptions, trainsNeeded: needed, seats },
   }

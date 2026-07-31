@@ -245,6 +245,22 @@ export function applyCommand(state: GameState, command: Command, ctx: CommandCon
       }
     }
 
+    case 'set_connection_hold': {
+      const line = state.lines.get(command.lineId)
+      if (!line) return fail('Unbekannte Linie.')
+      if (!Number.isFinite(command.seconds) || command.seconds < 0) {
+        return fail('Eine Wartezeit kann nicht negativ sein.')
+      }
+      return {
+        ok: true,
+        cost: 0,
+        state: {
+          ...state,
+          lines: withMap(state.lines, line.id, { ...line, connectionHoldSec: Math.round(command.seconds) }),
+        },
+      }
+    }
+
     case 'set_pattern': {
       const line = state.lines.get(command.pattern.lineId)
       if (!line) return fail('Unbekannte Linie.')

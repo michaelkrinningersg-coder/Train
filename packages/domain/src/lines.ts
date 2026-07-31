@@ -27,7 +27,23 @@ export interface Line {
   readonly fare: FarePolicy
   /** Fahrzeitreserve als Faktor, 1,07 = 7 Prozent. Siehe docs/04 Abschnitt 1. */
   readonly runtimeReserve: number
+  /**
+   * Anschlusssicherung: wie lange diese Linie an einem Umsteigepunkt hoechstens
+   * auf einen verspaeteten Zubringer wartet.
+   *
+   * 0 heisst „faehrt immer nach Plan" — dann verpassen die Umsteiger ihren
+   * Anschluss, wenn der Zubringer zu spaet kommt. Wartet die Linie, kommen sie
+   * mit, aber alle anderen an Bord fahren die Wartezeit als Verspaetung mit.
+   * Genau das ist die Abwaegung, und sie gehoert dem Spieler.
+   */
+  readonly connectionHoldSec: number
 }
+
+/** Eine neue Linie faehrt nach Plan und wartet auf niemanden. */
+export const DEFAULT_CONNECTION_HOLD_SEC = 0
+
+/** Zur Auswahl stehende Wartezeiten in Sekunden. */
+export const CONNECTION_HOLD_CHOICES = [0, 180, 300, 600] as const
 
 /** Bitmaske Mo=1, Di=2, Mi=4, Do=8, Fr=16, Sa=32, So=64. */
 export type DayMask = number

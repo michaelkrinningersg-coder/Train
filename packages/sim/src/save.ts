@@ -40,7 +40,12 @@ import { withPotentials } from '@game/demand'
  * weitergibt, gibt damit auch weiter, wie sie zu lesen ist.
  */
 
-export const SAVE_VERSION = 1
+/**
+ * Format 2 kennt die Anschlusssicherung je Linie. Ältere Stände haben das Feld
+ * nicht; sie werden beim Laden so gelesen, wie sie sich verhalten haben —
+ * niemand wartet auf niemanden.
+ */
+export const SAVE_VERSION = 2
 
 /** Was ein `Map`-Wert selbst mitbringt, muss nicht als Schlüssel danebenstehen. */
 type ById<T> = readonly T[]
@@ -144,9 +149,11 @@ export class SaveError extends Error {}
 /**
  * Liest einen Spielstand und hebt ihn nötigenfalls auf die aktuelle Version.
  *
- * Beim ersten Format gibt es nichts zu heben. Die Stelle steht trotzdem schon
- * hier, weil sie sonst genau dann fehlt, wenn man sie braucht — nämlich wenn
- * jemand einen Spielstand von vorgestern lädt.
+ * Der Grundsatz jeder Migration: sie stellt das Verhalten wieder her, das der
+ * alte Stand hatte, nicht das, was heute die schönere Voreinstellung wäre. Wer
+ * ein Netz mit knappen Anschlüssen gebaut hat, bekommt es beim Laden nicht
+ * stillschweigend mit Anschlusssicherung zurück — sein Fahrplan wäre ein
+ * anderer, ohne dass er etwas getan hätte.
  */
 export function readSave(raw: unknown): GameState {
   if (typeof raw !== 'object' || raw === null) throw new SaveError('Das ist kein Spielstand.')
@@ -174,12 +181,31 @@ function migrate(state: SerialisedState, from: number): SerialisedState {
   let version = from
   while (version < SAVE_VERSION) {
     switch (version) {
-      // Hier kommen kuenftige Schritte hin: `current = liftV1toV2(current)`.
+      case 1:
+        current = liftV1toV2(current)
+        version = 2
+        break
       default:
         version = SAVE_VERSION
     }
   }
   return current
+}
+
+/**
+ * Format 1 kannte keine Anschlusssicherung — dort wartete keine Linie.
+ *
+ * Der Typ sagt, dass `connectionHoldSec` da ist; die Daten von gestern wissen
+ * davon nichts. Genau deshalb steht hier ein `Partial` und kein `!`.
+ */
+function liftV1toV2(state: SerialisedState): SerialisedState {
+  return {
+    ...state,
+    lines: state.lines.map((line) => ({
+      ...line,
+      connectionHoldSec: (line as Partial<Line>).connectionHoldSec ?? 0,
+    })),
+  }
 }
 
 export function makeSave(state: GameState, label: string, savedAt: string): SaveGame {

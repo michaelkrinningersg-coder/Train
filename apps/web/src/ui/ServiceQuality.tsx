@@ -30,6 +30,8 @@ export function QualityFacts({ result }: { readonly result: LineDayResult }): Re
   const satisfaction = result.satisfaction ?? 1
   const transfers = result.transferPassengers ?? 0
   const transferShare = result.totalPassengers > 0 ? transfers / result.totalPassengers : 0
+  const missed = result.missedConnections ?? 0
+  const held = result.holdDelaySec ?? 0
 
   return (
     <>
@@ -44,6 +46,18 @@ export function QualityFacts({ result }: { readonly result: LineDayResult }): Re
           {transferShare > 0.005 && <span className="muted"> · {Math.round(transferShare * 100)} %</span>}
         </dd>
       </div>
+      {missed >= 1 && (
+        <div title="Fahrgäste, deren Zubringer zu spät kam und die deshalb erst die nächste Fahrt dieser Linie bekommen haben.">
+          <dt>Anschluss verpasst</dt>
+          <dd className="num neg">{Math.round(missed).toLocaleString('de-DE')}</dd>
+        </div>
+      )}
+      {held > 0 && (
+        <div title="Verspätung, die allein daraus entsteht, dass diese Linie auf Zubringer gewartet hat.">
+          <dt>davon Anschlusswarten</dt>
+          <dd className="num">{(held / 60).toFixed(1)} min</dd>
+        </div>
+      )}
     </>
   )
 }
@@ -51,6 +65,18 @@ export function QualityFacts({ result }: { readonly result: LineDayResult }): Re
 /** Hinweis unter den Kennzahlen, wenn die Zufriedenheit erkennbar leidet. */
 export function QualityNote({ result }: { readonly result: LineDayResult }): React.JSX.Element | null {
   const satisfaction = result.satisfaction ?? 1
-  if (satisfaction >= 0.9) return null
-  return <p className="warn small">⚠ {satisfactionHint(satisfaction)}</p>
+  const missed = result.missedConnections ?? 0
+  const missedShare = result.totalPassengers > 0 ? missed / result.totalPassengers : 0
+
+  return (
+    <>
+      {satisfaction < 0.9 && <p className="warn small">⚠ {satisfactionHint(satisfaction)}</p>}
+      {missedShare > 0.03 && (
+        <p className="warn small">
+          ⚠ {Math.round(missedShare * 100)} % der Fahrgäste erreichen ihren Anschluss an diese Linie nicht. Entweder
+          mehr Puffer legen oder die Linie warten lassen.
+        </p>
+      )}
+    </>
+  )
 }

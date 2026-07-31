@@ -39,6 +39,8 @@ export interface DemandAssignment {
   readonly punctualityByOd: ReadonlyMap<string, number>
   /** Fahrgäste je Linie, die auf einer Kette mit Umstieg sitzen. */
   readonly transferRidersByLine: ReadonlyMap<LineId, number>
+  /** Fahrgäste je Linie, die den Anschluss *an* diese Linie verpassen. */
+  readonly missedByLine: ReadonlyMap<LineId, number>
 }
 
 export function assignDemand(
@@ -48,6 +50,7 @@ export function assignDemand(
 ): DemandAssignment {
   const byLine = new Map<LineId, AssignedFlows>()
   const transferRidersByLine = new Map<LineId, number>()
+  const missedByLine = new Map<LineId, number>()
   const punctualitySum = new Map<string, { weighted: number; riders: number }>()
   const { weekday, month } = toDate(state.day)
 
@@ -103,7 +106,7 @@ export function assignDemand(
           const perHour = new Float64Array(HOURS)
           for (let h = 0; h < HOURS; h++) perHour[h] = riders * hourShare(segment, h)
 
-          for (const leg of itinerary.legs) {
+          itinerary.legs.forEach((leg, position) => {
             const flow: AssignmentFlow = {
               fromIndex: leg.fromIndex,
               toIndex: leg.toIndex,
@@ -121,7 +124,12 @@ export function assignDemand(
             if (itinerary.transfers > 0) {
               transferRidersByLine.set(leg.lineId, (transferRidersByLine.get(leg.lineId) ?? 0) + riders)
             }
-          }
+
+            // Verpasste Anschluesse zaehlen bei der Linie, die weggefahren ist -
+            // dort entscheidet der Spieler ueber die Wartebereitschaft.
+            const missed = riders * (itinerary.legMisses[position] ?? 0)
+            if (missed > 0) missedByLine.set(leg.lineId, (missedByLine.get(leg.lineId) ?? 0) + missed)
+          })
         }
 
         const entry = punctualitySum.get(od)
@@ -140,5 +148,5 @@ export function assignDemand(
     punctualityByOd.set(od, riders > 0 ? weighted / riders : 1)
   }
 
-  return { byLine, punctualityByOd, transferRidersByLine }
+  return { byLine, punctualityByOd, transferRidersByLine, missedByLine }
 }

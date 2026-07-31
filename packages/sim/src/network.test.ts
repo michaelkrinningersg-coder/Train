@@ -22,9 +22,11 @@ import { advanceDays } from './advance.js'
 import { applyCommand } from './commands.js'
 import {
   MIN_INTERCHANGE_SEC,
+  applyConnectionHolding,
   connectionQuality,
   lineConnections,
 } from './connections.js'
+import { expectedHoldSec, missProbability } from './holding.js'
 import { simulateDay } from './day.js'
 import { assignDemand } from './demandAssignment.js'
 import {
@@ -160,6 +162,7 @@ function network(options: BuildOptions = {}): GameState {
         path: mode === 'rail' ? { kind: 'rail', tracks: [] } : { kind: 'road' },
         fare: mode === 'rail' ? DEFAULT_RAIL_FARE : DEFAULT_BUS_FARE,
         runtimeReserve: DEFAULT_RUNTIME_RESERVE_RAIL,
+        connectionHoldSec: 0,
       },
     })
   }
@@ -505,7 +508,7 @@ describe('Anschlüsse', () => {
     const list = lineConnections(state, offers, lineNamed(state, 'Zubringer').id)
     // Der Zubringer endet in der Umsteigestadt - dort kommt man nur in
     // Hinrichtung an, deshalb ist `outboundSec` hier immer gesetzt.
-    return list.find((c) => c.stationName === HUB)!.toOtherSec!
+    return list.find((c) => c.stationName === HUB)!.toOther!.waitSec
   }
 
   it('macht die Umsteigezeit von der Abfahrtsminute abhängig', () => {
@@ -578,5 +581,161 @@ describe('Anschlüsse', () => {
     expect(chain.waitTimeSec).toBeCloseTo(chain.legWaits.reduce((s, w) => s + w, 0), 6)
     expect(chain.legWaits[1]!).toBeGreaterThanOrEqual(MIN_INTERCHANGE_SEC)
     expect(chain.legWaits[2]!).toBeGreaterThanOrEqual(MIN_INTERCHANGE_SEC)
+  })
+})
+
+// ── Anschlusssicherung ──────────────────────────────────────────────────────
+
+describe('Anschlusssicherung', () => {
+  /**
+   * Setzt einer Linie eine Verspaetung ins Angebot.
+   *
+   * Der Umweg ueber ein von Hand gesetztes Angebot ist Absicht: die Verspaetung
+   * einer Linie haengt an Stoerungswuerfeln und Belegungskonflikten, und ein
+   * Test, der erst ein unpuenktliches Netz bauen muss, prueft am Ende die
+   * Stoerungen und nicht die Anschlusssicherung.
+   */
+  const delayed = (offers: readonly LineOffer[], lineId: LineId, sec: number): LineOffer[] =>
+    offers.map((o) => (o.lineId === lineId ? { ...o, averageDelaySec: sec, punctuality: 0.7 } : o))
+
+  /** Setzt die Wartebereitschaft einer Linie. */
+  function hold(state: GameState, lineName: string, seconds: number): GameState {
+    const result = applyCommand(state, {
+      kind: 'set_connection_hold',
+      lineId: lineNamed(state, lineName).id,
+      seconds,
+    })
+    if (!result.ok) throw new Error(result.reason)
+    return result.state
+  }
+
+  it('rechnet die erwartete Haltezeit geschlossen aus', () => {
+    // Ohne Verspaetung des Zubringers gibt es nichts zu halten.
+    expect(expectedHoldSec(0, 300, 600)).toBe(0)
+    // Ohne Wartebereitschaft auch nicht.
+    expect(expectedHoldSec(300, 0, 0)).toBe(0)
+
+    // Mehr Puffer heisst weniger Warten, mehr Wartebereitschaft mehr.
+    expect(expectedHoldSec(300, 600, 300)).toBeLessThan(expectedHoldSec(300, 0, 300))
+    expect(expectedHoldSec(300, 120, 600)).toBeGreaterThan(expectedHoldSec(300, 120, 180))
+
+    // Und nie mehr als die zugesagte Hoechstwartezeit.
+    expect(expectedHoldSec(3000, 0, 300)).toBeLessThanOrEqual(300)
+  })
+
+  it('senkt mit jeder Minute Wartebereitschaft die verpassten Anschlüsse', () => {
+    const chances = [0, 180, 300, 600].map((c) => missProbability(300, 120, c))
+    for (let i = 1; i < chances.length; i++) expect(chances[i]!).toBeLessThan(chances[i - 1]!)
+
+    // Ein Puffer wirkt genauso - nur ohne die eigene Linie zu verspaeten.
+    expect(missProbability(300, 900, 0)).toBeLessThan(missProbability(300, 60, 0))
+    // Ein puenktlicher Zubringer laesst niemanden stehen.
+    expect(missProbability(0, 0, 0)).toBe(0)
+  })
+
+  it('lässt eine Linie ohne Wartebereitschaft unberührt', () => {
+    const state = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const trunk = lineNamed(state, 'Hauptlinie').id
+    const offers = delayed(offersOf(state), trunk, 8 * 60)
+
+    const { offers: after, holds } = applyConnectionHolding(state, offers)
+    const feeder = lineNamed(state, 'Zubringer').id
+
+    expect(holds.get(feeder)!.seconds).toBe(0)
+    expect(after.find((o) => o.lineId === feeder)!.averageDelaySec).toBe(0)
+    expect(after.find((o) => o.lineId === feeder)!.punctuality).toBe(1)
+  })
+
+  it('holt sich beim Warten die Verspätung des Zubringers ins eigene Angebot', () => {
+    const base = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const trunk = lineNamed(base, 'Hauptlinie').id
+    const state = hold(base, 'Zubringer', 600)
+    const feeder = lineNamed(state, 'Zubringer').id
+
+    const offers = delayed(offersOf(state), trunk, 8 * 60)
+    const { offers: after, holds } = applyConnectionHolding(state, offers)
+
+    expect(holds.get(feeder)!.seconds).toBeGreaterThan(0)
+    expect(holds.get(feeder)!.events.some((e) => e.fromLineId === trunk)).toBe(true)
+
+    const own = after.find((o) => o.lineId === feeder)!
+    // Die Wartezeit trifft die ganze Linie, nicht nur die Umsteiger.
+    expect(own.averageDelaySec).toBeCloseTo(holds.get(feeder)!.seconds, 6)
+    expect(own.punctuality).toBeLessThan(1)
+    expect(own.heldSec).toBeGreaterThan(0)
+  })
+
+  it('macht einen knappen Anschluss hinter einem unpünktlichen Zubringer teurer als einen gepufferten', () => {
+    // Dieselbe Linie, dieselbe Fahrzeit - nur die Phasenlage unterscheidet sich.
+    // Vorher war das ein reiner Zeitunterschied; jetzt kommt das Risiko dazu.
+    const state = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    const trunk = lineNamed(state, 'Hauptlinie').id
+    const offers = delayed(offersOf(state), trunk, 10 * 60)
+
+    const trunkOffer = offers.find((o) => o.lineId === trunk)!
+    const feederIndex = offers.findIndex((o) => o.lineId !== trunk)
+    const feederOffer = offers[feederIndex]!
+
+    // Zwei Fassungen desselben Zubringers: einer faehrt kurz nach der Ankunft
+    // des Zuges, einer eine Viertelstunde spaeter.
+    const shifted = (minutes: number): LineOffer[] =>
+      offers.map((o) =>
+        o.lineId === feederOffer.lineId ? { ...o, firstDepartureSec: o.firstDepartureSec + minutes * 60 } : o,
+      )
+
+    const missOf = (list: readonly LineOffer[]): number => {
+      const connection = lineConnections(state, list, trunkOffer.lineId).find((c) => c.stationName === HUB)!
+      return connection.toOther!.missShare
+    }
+
+    const waits = [0, 5, 10, 15, 20, 25, 30].map((m) => ({ m, miss: missOf(shifted(m)) }))
+    const best = waits.reduce((a, b) => (a.miss <= b.miss ? a : b))
+    const worst = waits.reduce((a, b) => (a.miss >= b.miss ? a : b))
+
+    // Der knappste Anschluss verliert die meisten Umsteiger.
+    expect(worst.miss).toBeGreaterThan(best.miss)
+  })
+
+  it('rechnet einen verpassten Anschluss als vollen Takt Wartezeit in die Reisekette', () => {
+    const state = network({ feeder: true, trunkAsRail: false, busHeadway: 60 })
+    // Verspaetet ist der *Zubringer* - er bringt den Umsteiger zu spaet an den
+    // Anschluss. Die Verspaetung der Anschlusslinie selbst spielt hier keine
+    // Rolle; sie faehrt ja auch dann noch, wenn sie spaet dran ist.
+    const feeder = lineNamed(state, 'Zubringer').id
+
+    const chainWait = (offers: readonly LineOffer[]): number =>
+      buildItineraries(state, offers)
+        .get(odKey(id(FEEDER), id(TARGET)))!
+        .find((c) => c.transfers === 1)!.waitTimeSec
+
+    const punctual = offersOf(state)
+    const late = delayed(punctual, feeder, 12 * 60)
+
+    // Dieselben Fahrplaene, dieselbe Phasenlage - nur ist der Anschlusszug
+    // jetzt unpuenktlich. Wer ihn verpasst, wartet einen ganzen Takt.
+    expect(chainWait(late)).toBeGreaterThan(chainWait(punctual))
+  })
+
+  it('bewertet einen riskanten Anschluss trotz kurzer Zeit nicht als guten', () => {
+    expect(connectionQuality(4 * 60, 0)).toBe('good')
+    expect(connectionQuality(4 * 60, 0.4)).toBe('risky')
+  })
+
+  it('wartet je Halt nur einmal, auch bei zwei verspäteten Zubringern', () => {
+    // Zwei parallele Linien am selben Halt sind kein doppelter Aufenthalt -
+    // der Zug wartet einmal, bis der letzte da ist.
+    const base = network({ feeder: true, trunkAsRail: false, busHeadway: 60, duplicateTrunk: true })
+    const state = hold(base, 'Zubringer', 600)
+    const feeder = lineNamed(state, 'Zubringer').id
+
+    const offers = offersOf(state)
+    const one = delayed(offers, lineNamed(state, 'Hauptlinie').id, 8 * 60)
+    const two = delayed(one, lineNamed(state, 'Parallellinie').id, 8 * 60)
+
+    const holdOf = (list: readonly LineOffer[]): number =>
+      applyConnectionHolding(state, list).holds.get(feeder)!.seconds
+
+    expect(holdOf(two)).toBeCloseTo(holdOf(one), 6)
+    expect(applyConnectionHolding(state, two).holds.get(feeder)!.events).toHaveLength(1)
   })
 })

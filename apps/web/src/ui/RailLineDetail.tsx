@@ -2,6 +2,7 @@ import { availableTrains, formatDate, toDate, trainClass, type LineId, type Vehi
 import { formatMoney } from '@game/economy'
 import { planLine, trainsNeeded } from '@game/sim'
 import { patternOf, useGame } from '../game/store.js'
+import { ConnectionHold } from './ConnectionHold.js'
 import { Connections } from './Connections.js'
 import { DepartureOffset } from './DepartureOffset.js'
 import { QualityFacts, QualityNote } from './ServiceQuality.js'
@@ -159,6 +160,7 @@ export function RailLineDetail({ lineId }: { readonly lineId: LineId }): React.J
         </ul>
       )}
 
+      <ConnectionHold lineId={lineId} />
       <Connections lineId={lineId} />
 
       <h3>Gestern</h3>

@@ -110,6 +110,7 @@ function railSetup(options: {
       path: { kind: 'rail', tracks: [] },
       fare: DEFAULT_RAIL_FARE,
       runtimeReserve: DEFAULT_RUNTIME_RESERVE_RAIL,
+      connectionHoldSec: 0,
     },
   })
   if (!created.ok) throw new Error(created.reason)

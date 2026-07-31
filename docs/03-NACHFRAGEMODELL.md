@@ -322,18 +322,58 @@ Hälfte der Phasenlagen treffen — und innerhalb davon wählen, welche Richtung
 Beide Richtungen zugleich kurz zu bekommen geht nur, wenn Fahrzeit und Takt zueinander passen.
 Das ist genau die Rechnung hinter einem Integralen Taktfahrplan.
 
+### Anschlusssicherung: warten oder pünktlich weiterfahren
+
+Die Phasenlage entscheidet, wie *lange* man umsteigt. Sie entscheidet noch nicht, ob man den
+Anschluss überhaupt erreicht — dafür braucht es die Verspätung des Zubringers. Ohne die wäre
+ein Anschluss mit null Minuten Puffer genauso zuverlässig wie einer mit zehn, und ein
+Fahrplan ließe sich beliebig eng legen.
+
+Deshalb bekommt jede Linie eine **Höchstwartezeit**: null, drei, fünf oder zehn Minuten.
+
+Gerechnet wird nicht mit einzelnen Zügen — das Modell kennt Takte und mittlere Verspätungen,
+keine Einzelfahrten. Die Frage „kommt der Zubringer heute rechtzeitig?" hat deshalb keine
+Ja-Nein-Antwort, sondern eine Wahrscheinlichkeit. Angenommen ist eine **Exponentialverteilung**
+mit der beobachteten mittleren Verspätung `m`: die meisten Fahrten fast pünktlich, wenige sehr
+spät. Das ist die übliche erste Näherung und die einzige Verteilung, die aus einem einzigen
+Mittelwert folgt, ohne weitere Annahmen hineinzuschmuggeln.
+
+Mit `s` als Puffer (der geplanten Wartezeit am Bahnsteig) und `c` als Höchstwartezeit:
+
+| Größe | Formel |
+|---|---|
+| erwartete Haltezeit der Anschlusslinie | `m · e^(−s/m) · (1 − e^(−c/m))` |
+| Anteil verpasster Anschlüsse | `e^(−(s+c)/m)` |
+| Anteil der Fahrten, die überhaupt warten | `e^(−s/m)` |
+
+Beides geschlossen — kein Würfeln, kein Iterieren, kein Fixpunkt.
+
+**Was der Spieler davon merkt.** Wer nicht wartet, hält seine Linie pünktlich und lässt
+Umsteiger stehen; wer wartet, holt sie ab und verspätet dafür *alle* an Bord, nicht nur die
+Umsteiger. Der verpasste Anschluss kostet den Reisenden einen vollen Takt zusätzliche
+Wartezeit — er geht als solcher in die Nutzenrechnung der Reisekette ein und außerdem in ihre
+Pünktlichkeit, und über die in die Zufriedenheit der Relation. Ein knapper Anschluss hinter
+einem unpünktlichen Zubringer ist ab 15 % verpasster Umsteiger im Anschlusspanel als
+*riskant* markiert, unabhängig davon, wie kurz er auf dem Papier ist.
+
+**Eine Runde, kein Fixpunkt.** Die durch Warten entstandene Verspätung löst keine zweite Runde
+Anschlusssicherungen aus. Sonst müsste über das ganze Netz iteriert werden, und zwei Linien,
+die gegenseitig aufeinander warten, würden dabei nicht konvergieren, sondern sich
+hochschaukeln. Die Verspätung aus dem Betrieb wird weitergereicht; die aus dem Warten bleibt
+bei der wartenden Linie.
+
+**Gewartet wird auf jeden möglichen Zubringer**, nicht nur auf einen mit tatsächlichen
+Umsteigern. Wie viele Fahrgäste an einem einzelnen Anschluss hängen, weiß das Modell erst nach
+der Nachfrageverteilung — also nach dem Fahrplan. Praktisch ist der Unterschied klein: nur
+verspätete Linien lösen überhaupt einen Halt aus, und eine Buslinie mit null Verspätung gar
+keinen.
+
 **Noch nicht umgesetzt** und bewusst aufgeschoben:
 
 - Die Aufteilung auf konkurrierende Zugläufe im Zeitfenster ±30 min proportional zum Nutzen.
   Aktuell zählt die Summe der Sitzplätze einer Stunde. Bei einem Taktfahrplan mit gleichen
   Zügen ist das dasselbe Ergebnis; interessant wird es erst, wenn Eil- und Nahverkehrszüge
   auf derselben Linie fahren.
-- **Anschlusssicherung.** Die Anschlusslinie fährt immer nach Plan; sie wartet nie auf einen
-  verspäteten Zubringer. Real ist das eine Abwägung — Anschluss halten und die eigene
-  Verspätung weitertragen, oder pünktlich losfahren und die Umsteiger stehen lassen. Solange
-  es die nicht gibt, ist ein Anschluss mit null Puffer im Modell genauso sicher wie einer mit
-  zehn Minuten, und deshalb wird ein knapper Anschluss auch nicht als riskant markiert:
-  das behauptete eine Gefahr, die hier nicht existiert.
 - Die Reihenfolge am Bahnsteig: alle Gruppen eines Abschnitts werden gleich behandelt.
 - Ein Umsteiger, der auf einem späteren Teilstück keinen Platz mehr bekommt, gilt als *anteilig*
   bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten Zuordnungsdurchgang;

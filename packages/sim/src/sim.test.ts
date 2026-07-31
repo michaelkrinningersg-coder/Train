@@ -62,6 +62,7 @@ function addLine(state: GameState, stopNames: string[], headwayMin = 60): GameSt
       path: { kind: 'road' },
       fare: DEFAULT_BUS_FARE,
       runtimeReserve: DEFAULT_RUNTIME_RESERVE,
+      connectionHoldSec: 0,
     } satisfies Omit<Line, 'id'>,
   })
   if (!created.ok) throw new Error(created.reason)
@@ -131,6 +132,7 @@ describe('Befehle', () => {
         path: { kind: 'road' },
         fare: DEFAULT_BUS_FARE,
         runtimeReserve: DEFAULT_RUNTIME_RESERVE,
+        connectionHoldSec: 0,
       },
     })
     expect(second.ok).toBe(true)

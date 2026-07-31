@@ -122,6 +122,7 @@ function corridor(names: string[], buses: number, classId = 'intercity', headway
       path: { kind: 'road' },
       fare: { perKm: { first: 25, second: 15 }, baseFare: 250, priceIndex: 1 },
       runtimeReserve: 1.07,
+      connectionHoldSec: 0,
     },
   })
   if (!created.ok) throw new Error(created.reason)
@@ -316,6 +317,7 @@ function railCorridor(options: {
       path: { kind: 'rail', tracks: [] },
       fare: DEFAULT_RAIL_FARE,
       runtimeReserve: DEFAULT_RUNTIME_RESERVE_RAIL,
+      connectionHoldSec: 0,
     },
   })
   if (!created.ok) throw new Error(created.reason)
@@ -449,6 +451,7 @@ function busLine(
       path: { kind: 'road' },
       fare: { perKm: { first: 25, second: 15 }, baseFare: 250, priceIndex: 1 },
       runtimeReserve: 1.07,
+      connectionHoldSec: 0,
     },
   })
   const line = [...next.lines.values()].find((l) => l.name === name)!

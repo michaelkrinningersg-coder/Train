@@ -251,6 +251,24 @@ die Linie erst leerzuräumen.
 Bei Bahnlinien zählt dabei die **Reihenfolge**: das erste verfügbare Fahrzeug bestimmt die
 Zugklasse und damit Fahrzeit und Sitzplätze der ganzen Linie.
 
+## Anschlüsse: warten oder pünktlich weiterfahren
+
+Ein Umstieg dauert so lange, wie die Fahrpläne zueinander liegen — die Abfahrtsminute im
+Linienpanel ist der Hebel dafür. Was aber, wenn der Zubringer zu spät kommt?
+
+Jede Linie hat dafür eine **Höchstwartezeit**: nie, drei, fünf oder zehn Minuten. Es gibt
+keine Einstellung, die beides gewinnt:
+
+| | kostet | bringt |
+|---|---|---|
+| **nie warten** | Umsteiger verpassen den Anschluss und warten einen vollen Takt | Linie bleibt pünktlich |
+| **warten** | *alle* an Bord fahren die Wartezeit als Verspätung mit | die Umsteiger kommen mit |
+| **mehr Puffer legen** | jeder Umsteiger wartet planmäßig länger | beides sinkt zugleich |
+
+In der Anschlussliste steht neben jeder Umsteigezeit, wie viel Prozent der Umsteiger sie
+verpassen. Ab 15 % ist der Anschluss rot — auch wenn er auf dem Papier nur drei Minuten
+dauert. Ein Anschluss, den ein Teil der Fahrgäste nicht erreicht, ist keiner.
+
 ## Dokumentation
 
 | Dokument | Inhalt |
@@ -265,13 +283,15 @@ Zugklasse und damit Fahrzeit und Sitzplätze der ganzen Linie.
 
 ## Status
 
-**Phase 4b abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
+**Phase 4c abgeschlossen** — spielbar: Busnetz aufbauen und betreiben, Bahnhöfe platzieren,
 Strecken über echtes Gelände trassieren und ausbauen, Züge kaufen, Bahnlinien takten und im
 Bildfahrplan Konflikte durch Überholstellen oder Ausbau auflösen. Fahrgäste steigen zwischen
 eigenen Linien um, und Überfüllung kostet Stammkunden und Fahrplanstabilität.
 
 Spielstände lassen sich speichern und exportieren, Städte haben echte Einrichtungen aus
-Wikidata, und Fahrzeuge wie Strecken wollen instand gehalten werden.
+Wikidata, und Fahrzeuge wie Strecken wollen instand gehalten werden. Anschlüsse sind eine
+Entscheidung: warten und die eigene Verspätung weitertragen, oder pünktlich losfahren und
+Umsteiger stehen lassen.
 
-Als Nächstes: Auslastungs-Heatmap, Saisonganglinien — oder Phase 5, Europa. Der Phasenplan
-steht in [docs/06-ROADMAP.md](docs/06-ROADMAP.md).
+Als Nächstes: Saisonganglinien — oder Phase 5, Europa. Der Phasenplan steht in
+[docs/06-ROADMAP.md](docs/06-ROADMAP.md).

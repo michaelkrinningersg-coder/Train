@@ -247,13 +247,12 @@ Rechnung hinter einem Integralen Taktfahrplan.
 
 **Was aus Phase 4a offen blieb:**
 
-- **Keine Anschlusssicherung.** Die Anschlusslinie fährt immer nach Plan und wartet nie auf
-  einen verspäteten Zubringer. Damit ist ein Anschluss mit null Puffer genauso sicher wie
-  einer mit zehn Minuten — die Abwägung „Anschluss halten oder pünktlich weiterfahren" fehlt
-  noch.
-- **Gestrandete Umsteiger.** Wer auf einem späteren Teilstück keinen Platz mehr bekommt, gilt
-  als anteilig bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten
-  Zuordnungsdurchgang.
+- ~~Keine Anschlusssicherung.~~ Erledigt in Phase 4c: jede Linie hat eine Höchstwartezeit,
+  und ein verpasster Anschluss kostet einen vollen Takt. Siehe docs/03 Abschnitt 6.
+- **Gestrandete Umsteiger.** Wer auf einem späteren Teilstück keinen *Platz* mehr bekommt,
+  gilt als anteilig bedient statt als gestrandet. (Wer den Anschluss wegen Verspätung
+  verpasst, wird seit Phase 4c richtig gezählt — es geht hier nur noch um Kapazität.) Die
+  Wahrheit bräuchte einen zweiten Zuordnungsdurchgang.
 - **Die Reihenfolge am Bahnsteig** fehlt weiterhin: bei Überfüllung werden alle gleich
   behandelt.
 - **Die Zufriedenheitsparameter sind gesetzt, nicht gemessen.** Es gibt keine Erhebung dazu,
@@ -302,8 +301,8 @@ damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
 
 **Was aus Phase 4b offen blieb:**
 
-- **Keine Migration im Ernstfall erprobt.** Die Stelle ist da und leer — das erste Format
-  hat nichts zu heben. Ob sie trägt, zeigt sich erst beim zweiten.
+- ~~Keine Migration im Ernstfall erprobt.~~ Format 2 (Anschlusssicherung) hat der Stelle in
+  Phase 4c ihre erste echte Aufgabe gegeben; ein Test lädt einen Stand aus Format 1.
 - **Kein unplanmäßiger Werkstattaufenthalt.** Eine Störung hält den Zug auf, schickt ihn aber
   nie in die Werkstatt. Die Werkstatt betritt man bisher nur freiwillig.
 - **Einrichtungen sind statisch.** Eine Universität wird nicht gegründet, ein Werk nicht
@@ -313,6 +312,42 @@ damit Pendler anzieht, die vorher nur der Stadtgröße folgten.
   Region gehört die Verteilung, die der Pipelinelauf ausgibt, noch einmal gelesen.
 - Segmente mit vollständiger Saisonganglinie, die Auslastungs-Heatmap und abgestimmte
   Zubringertarife stehen weiterhin aus.
+
+---
+
+## Phase 4c — Anschlusssicherung (erledigt)
+
+**Ziel**: Aus einem Anschluss eine Entscheidung machen. Bis hierher fuhr die Anschlusslinie
+immer nach Plan; ein Anschluss mit null Puffer war deshalb genauso zuverlässig wie einer mit
+zehn Minuten, und die Frage, die jeder Betrieb wirklich beantworten muss — halten oder
+pünktlich weiterfahren —, kam im Spiel nicht vor.
+
+**Was entstanden ist:**
+
+- **Höchstwartezeit je Linie** (nie / 3′ / 5′ / 10′) als eigener Befehl und als Regler direkt
+  über der Anschlussliste, wo auch die Abfahrtsminute steht. Die beiden gehören zusammen: die
+  eine legt den Puffer fest, die andere, was passiert, wenn er nicht reicht.
+- **Geschlossene Rechnung** statt Würfeln: Verspätung des Zubringers als Exponentialverteilung,
+  daraus erwartete Haltezeit und Anteil verpasster Anschlüsse. Formeln in docs/03 Abschnitt 6.
+- **Verpasste Anschlüsse kosten einen vollen Takt** — sie gehen in Reisezeit *und*
+  Pünktlichkeit der Reisekette ein und damit in die Zufriedenheit der Relation.
+- **Risiko im Anschlusspanel**: ab 15 % verpasster Umsteiger ist ein Anschluss als riskant
+  markiert, egal wie kurz er auf dem Papier ist.
+- **Spielstandformat 2** mit dem ersten echten Migrationsschritt.
+
+**Was der Spieler davon hat:** Ein Fahrplan ist nicht mehr beliebig eng zu legen. Wer knappe
+Anschlüsse baut, muss entweder Puffer legen (kostet alle Umsteiger Zeit) oder warten lassen
+(kostet alle an Bord Pünktlichkeit). Es gibt keine Einstellung, die beides gewinnt.
+
+**Was offen bleibt:**
+
+- **Die Anschlusssicherung wirkt in einer Runde.** Wer wartet, gibt seine Verspätung nicht an
+  eine dritte Linie weiter, die auf ihn wartet. Der Fixpunkt wäre nicht nur teuer, er
+  konvergiert bei gegenseitigem Warten gar nicht.
+- **Gewartet wird auf jeden Zubringer**, nicht nur auf einen mit tatsächlichen Umsteigern —
+  deren Zahl steht erst nach dem Fahrplan fest.
+- **Keine Ansage im Bildfahrplan.** Der gehaltene Anschluss steht als Verspätungsminute in den
+  Kennzahlen, ist aber im Zeit-Weg-Diagramm nicht als solcher zu erkennen.
 
 ---
 

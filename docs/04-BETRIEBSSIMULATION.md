@@ -282,6 +282,32 @@ Ein Fahrzeug im Werk **altert nicht** — es fährt ja nicht.
 zieht, oder dass ein Fahrzeug unplanmäßig ausfällt und sofort in die Werkstatt muss. Die
 Werkstatt betritt man bisher nur freiwillig.
 
+### Anschlusssicherung: die einzige Verspätung, die der Spieler bestellt
+
+Alles bisher Beschriebene an Verspätung entsteht, weil zwei Züge dieselbe Stelle brauchen oder
+weil etwas kaputtgeht. Es gibt eine Quelle mehr, und die ist gewollt: eine Linie, die auf
+einen verspäteten Zubringer **wartet**, holt sich dessen Verspätung ins eigene Angebot.
+
+Die Rechnung steht in `holding.ts` und ist geschlossen — Verspätung des Zubringers als
+Exponentialverteilung, daraus erwartete Haltezeit und Anteil verpasster Anschlüsse (Formeln in
+docs/03 Abschnitt 6). Angewandt wird sie in `applyConnectionHolding`, und zwar an genau einer
+Stelle im Tagesablauf: **zwischen** der Verspätungsauflösung und dem Bau der Reiseketten.
+Vorher ist die Verspätung des Zubringers noch nicht bekannt, nachher wäre die Reisekette schon
+mit den falschen Zeiten bewertet.
+
+Zwei Eigenschaften, die im Code sonst leicht überlesen werden:
+
+- **Je Halt wird einmal gewartet.** Zwei zugleich verspätete Zubringer sind kein doppelter
+  Aufenthalt — der Zug wartet, bis der letzte da ist. Deshalb das Maximum je Halt und die
+  Summe über die Halte, nicht die Summe über alle Zubringer.
+- **Die Pünktlichkeit sinkt getrennt von der Verspätung.** Wie viel gewartet wird, und wie
+  *oft* überhaupt gewartet wird, sind zwei verschiedene Zahlen; die erste geht in
+  `averageDelaySec`, die zweite als Faktor in `punctuality`. Eine Linie, die selten aber lange
+  wartet, ist etwas anderes als eine, die ständig zwei Minuten steht.
+
+Ein Bus mit null Verspätung löst nirgends einen Halt aus. Die Anschlusssicherung ist damit
+praktisch eine Mechanik der Bahn — dort, wo Störungen und Belegungskonflikte herkommen.
+
 ---
 
 ## 5a. Fahrgastzuordnung: der Zug wird unterwegs geleert und neu gefüllt

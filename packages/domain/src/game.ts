@@ -111,6 +111,15 @@ export interface LineDayResult {
   readonly stopFlowPerDeparture?: readonly number[]
   /** Zusaetzliche Haltezeit aus Andrang, ueber alle Halte summiert. */
   readonly crowdingDwellSec?: number
+
+  /** Mittlere Verspaetung dieser Linie, die allein aus gehaltenen Anschluessen stammt. */
+  readonly holdDelaySec?: number
+  /**
+   * Fahrgaeste, die den Anschluss an diese Linie verpassen und auf die naechste
+   * Fahrt warten muessen. Verloren sind sie nicht - sie kommen nur spaeter an,
+   * und die Relation merkt es sich in ihrer Zufriedenheit.
+   */
+  readonly missedConnections?: number
 }
 
 export interface DayResult {
@@ -197,6 +206,7 @@ export type Command =
   | { readonly kind: 'create_line'; readonly line: Omit<Line, 'id'> }
   | { readonly kind: 'set_pattern'; readonly pattern: Omit<ServicePattern, 'id'> }
   | { readonly kind: 'set_fare'; readonly lineId: LineId; readonly fare: Line['fare'] }
+  | { readonly kind: 'set_connection_hold'; readonly lineId: LineId; readonly seconds: number }
   | { readonly kind: 'take_loan'; readonly amount: Money; readonly termYears: number }
   | { readonly kind: 'repay_loan'; readonly loanId: string; readonly amount: Money }
   | { readonly kind: 'place_bus_stop'; readonly cityId: CityId }

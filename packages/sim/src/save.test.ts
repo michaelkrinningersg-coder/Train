@@ -66,6 +66,7 @@ function played(days = 40): GameState {
       path: { kind: 'road' },
       fare: DEFAULT_BUS_FARE,
       runtimeReserve: 1.07,
+      connectionHoldSec: 0,
     },
   })
   const line = [...state.lines.values()][0]!
@@ -166,6 +167,26 @@ describe('Spielstände', () => {
     // Megabyte, muss die Historie beim Speichern gekuerzt werden.
     const bytes = JSON.stringify(makeSave(played(365), 'Jahr', '1991-01-01T00:00:00.000Z')).length
     expect(bytes).toBeLessThan(4_000_000)
+  })
+
+  it('liest einen Spielstand aus Format 1 und lässt dort niemanden warten', () => {
+    // Der erste echte Migrationsschritt. Format 1 kannte keine
+    // Anschlusssicherung — ein alter Stand muss sich beim Laden genau so
+    // verhalten wie damals, nicht so, wie es heute die schoenere
+    // Voreinstellung waere.
+    const save = makeSave(played(3), 'Alt', '1990-01-04T00:00:00.000Z')
+    const legacy = {
+      ...save,
+      version: 1,
+      state: {
+        ...save.state,
+        lines: save.state.lines.map(({ connectionHoldSec: _gone, ...rest }) => rest),
+      },
+    }
+
+    const loaded = readSave(legacy)
+    expect(loaded.lines.size).toBeGreaterThan(0)
+    for (const line of loaded.lines.values()) expect(line.connectionHoldSec).toBe(0)
   })
 
   it('trägt Beschriftung und Zeitstempel mit', () => {

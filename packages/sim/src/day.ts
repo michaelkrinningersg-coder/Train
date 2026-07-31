@@ -1,6 +1,7 @@
 import type { GameState, LineDayResult, LineId } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import { finishBusDay, idleResult } from './busDay.js'
+import { applyConnectionHolding, type LineHold } from './connections.js'
 import { assignDemand, type AssignedFlows } from './demandAssignment.js'
 import { buildOptions, type ItineraryOption } from './itineraries.js'
 import { prepareLines, type PreparedLine } from './offers.js'
@@ -15,13 +16,17 @@ import { updateSatisfaction, type ServiceObservation } from './satisfaction.js'
  * 1. **Angebot** — jede Linie rechnet aus, was sie heute fährt. Für Bahnlinien
  *    heißt das Fahrplan bauen, Konflikte suchen und Verspätungen auflösen. Die
  *    Haltezeiten stammen aus den Fahrgastzahlen von gestern.
- * 2. **Reiseketten** — aus allen Angeboten zusammen werden die möglichen
- *    Verbindungen gebildet, direkt und mit einem Umstieg.
- * 3. **Wahl** — je Relation und Segment entscheidet ein Logit zwischen den
+ * 2. **Anschlusssicherung** — Linien, die auf Zubringer warten, holen sich
+ *    deren Verspätung ins eigene Angebot. Das muss zwischen 1 und 3 stehen:
+ *    vorher ist die Verspätung des Zubringers noch nicht bekannt, nachher wäre
+ *    die Reisekette schon mit falschen Zeiten bewertet.
+ * 3. **Reiseketten** — aus allen Angeboten zusammen werden die möglichen
+ *    Verbindungen gebildet, direkt und mit bis zu zwei Umstiegen.
+ * 4. **Wahl** — je Relation und Segment entscheidet ein Logit zwischen den
  *    Ketten, dem Auto, dem Bestandsverkehr und Zuhausebleiben. Die Zufriedenheit
  *    der Relation geht als Abschlag auf das eigene Angebot ein.
- * 4. **Kapazität** — jede Linie prüft abschnittsweise, wer mitkommt.
- * 5. **Nachwirkung** — daraus werden Zufriedenheit und Andrang des nächsten
+ * 5. **Kapazität** — jede Linie prüft abschnittsweise, wer mitkommt.
+ * 6. **Nachwirkung** — daraus werden Zufriedenheit und Andrang des nächsten
  *    Tages fortgeschrieben.
  *
  * Schritt 2 und 3 gab es vorher nicht; jede Linie zog ihren Anteil selbst aus
@@ -33,6 +38,8 @@ export interface DaySimulation {
   readonly lines: readonly LineDayResult[]
   readonly prepared: readonly PreparedLine[]
   readonly options: ReadonlyMap<string, readonly ItineraryOption[]>
+  /** Was jede Linie an Verspätung durch gehaltene Anschlüsse aufnimmt. */
+  readonly holds: ReadonlyMap<LineId, LineHold>
   /** Zufriedenheit nach diesem Tag — Eingabe für den nächsten. */
   readonly satisfaction: ReadonlyMap<string, number>
   /** Ein- und Aussteigende je Fahrt und Halt — Eingabe für die Haltezeiten morgen. */
@@ -42,10 +49,22 @@ export interface DaySimulation {
 const NO_FLOWS: AssignedFlows = { forward: [], backward: [] }
 
 export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulation {
-  const prepared = prepareLines(state)
-  const offers = prepared.flatMap((p) => (p.kind === 'idle' ? [] : [p.offer]))
+  const raw = prepareLines(state)
+  const { offers, holds } = applyConnectionHolding(
+    state,
+    raw.flatMap((p) => (p.kind === 'idle' ? [] : [p.offer])),
+  )
+
+  // Die gehaltenen Angebote zurueck an ihre Linien - alles Weitere rechnet mit
+  // der Verspaetung *nach* dem Warten, weil das die ist, die der Fahrgast
+  // erlebt und die der Betrieb bezahlt.
+  const byLineOffer = new Map(offers.map((o) => [o.lineId, o]))
+  const prepared = raw.map((p) =>
+    p.kind === 'idle' ? p : { ...p, offer: byLineOffer.get(p.offer.lineId) ?? p.offer },
+  )
+
   const options = buildOptions(state, offers)
-  const { byLine, punctualityByOd, transferRidersByLine } = assignDemand(state, demand, options)
+  const { byLine, punctualityByOd, transferRidersByLine, missedByLine } = assignDemand(state, demand, options)
 
   const lines: LineDayResult[] = []
   const crowding = new Map<LineId, readonly number[]>()
@@ -64,7 +83,11 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
         ? finishRailDay(state, line, flows, transfers)
         : finishBusDay(state, line, flows, transfers)
 
-    lines.push(result)
+    lines.push({
+      ...result,
+      holdDelaySec: holds.get(line.line.id)?.seconds ?? 0,
+      missedConnections: missedByLine.get(line.line.id) ?? 0,
+    })
     if (result.stopFlowPerDeparture) crowding.set(line.line.id, result.stopFlowPerDeparture)
 
     // Beobachtungen je Relation einsammeln. Bei einer Kette ueber zwei Linien
@@ -90,6 +113,7 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
     lines,
     prepared,
     options,
+    holds,
     satisfaction: updateSatisfaction(state.satisfaction, observed),
     crowding,
   }

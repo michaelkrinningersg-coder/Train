@@ -1,6 +1,7 @@
 import type { GameState, LineId } from '@game/domain'
 import { waitFromHeadway } from '@game/demand'
 import { distanceKm } from '@game/geo'
+import { expectedHoldSec, holdProbability, missProbability } from './holding.js'
 import { arrivalAt, departureAt, type Direction, type LineOffer } from './offers.js'
 
 /**
@@ -22,9 +23,9 @@ import { arrivalAt, departureAt, type Direction, type LineOffer } from './offers
  * der Spieler entscheiden kann, wo auf dieser Verteilung er landet. Genau das
  * macht aus einer Rechengröße eine Spielmechanik.
  *
- * Nicht modelliert: dass ein Anschluss auf einen verspäteten Zug wartet. Real
- * ist das eine Abwägung (Anschluss halten oder pünktlich weiterfahren); hier
- * fährt die Anschlusslinie immer nach Plan.
+ * Ob ein Anschluss auf einen verspäteten Zubringer wartet, entscheidet der
+ * Spieler je Linie — siehe `holding.ts`. Von dort kommt auch das Risiko, einen
+ * Anschluss ganz zu verpassen.
  */
 
 /** Mindestzeit für einen Umstieg, auch am selben Bahnsteig. */
@@ -102,19 +103,37 @@ export function connectionWaitSec(
   return total / samples
 }
 
-export type ConnectionQuality = 'good' | 'fair' | 'poor'
+export type ConnectionQuality = 'good' | 'fair' | 'poor' | 'risky'
 
 /**
- * Bewertung eines Anschlusses nach der gesamten Umsteigezeit.
- *
- * Bewusst keine Kategorie „zu knapp": das Modell lässt die Anschlusslinie immer
- * nach Plan fahren, also gibt es kein Verpassen. Einen Nullpuffer als riskant zu
- * markieren, würde eine Gefahr behaupten, die hier nicht existiert.
+ * Ab diesem Anteil verpasster Anschlüsse ist ein kurzer Umstieg keine gute
+ * Verbindung mehr, sondern eine knappe.
  */
-export function connectionQuality(waitSec: number): ConnectionQuality {
+export const RISKY_MISS_SHARE = 0.15
+
+/**
+ * Bewertung eines Anschlusses nach Umsteigezeit **und** Risiko.
+ *
+ * Ein Nullpuffer hinter einem verspäteten Zubringer ist keine gute Verbindung,
+ * auch wenn er auf dem Papier zwei Minuten dauert — man erreicht ihn nur nicht.
+ * Deshalb sticht das Risiko die Zeit.
+ */
+export function connectionQuality(waitSec: number, missShare = 0): ConnectionQuality {
+  if (missShare >= RISKY_MISS_SHARE) return 'risky'
   if (waitSec <= GOOD_CONNECTION_SEC) return 'good'
   if (waitSec <= POOR_CONNECTION_SEC) return 'fair'
   return 'poor'
+}
+
+/** Ein Umstieg in eine Richtung, mit Zeit und Risiko. */
+export interface ConnectionLeg {
+  readonly waitSec: number
+  /** Geplante Wartezeit am Bahnsteig — der Puffer für den Zubringer. */
+  readonly slackSec: number
+  /** Anteil der Umsteiger, die den Anschluss verpassen, 0..1. */
+  readonly missShare: number
+  /** Erwartete Haltezeit, wenn die Anschlusslinie wartet. */
+  readonly holdSec: number
 }
 
 export interface ConnectionInfo {
@@ -123,9 +142,9 @@ export interface ConnectionInfo {
   readonly otherLineId: LineId
   readonly otherLineName: string
   /** Wer mit dieser Linie ankommt und auf die andere umsteigt. */
-  readonly toOtherSec: number | null
+  readonly toOther: ConnectionLeg | null
   /** Und die Gegenrichtung der Reise: aus der anderen Linie in diese. */
-  readonly fromOtherSec: number | null
+  readonly fromOther: ConnectionLeg | null
 }
 
 /** In welche Richtungen kann man an diesem Halt einsteigen und weiterfahren? */
@@ -145,7 +164,7 @@ function arrivable(offer: LineOffer, index: number): Direction[] {
 }
 
 /** Bester Umstieg von einer Linie in die andere, über alle sinnvollen Richtungen. */
-function bestWait(
+export function bestWaitSec(
   from: LineOffer,
   fromIndex: number,
   to: LineOffer,
@@ -162,6 +181,25 @@ function bestWait(
     ),
   )
   return Math.min(...waits)
+}
+
+/** Derselbe Umstieg, um Puffer und Risiko ergänzt. */
+function bestLeg(
+  from: LineOffer,
+  fromIndex: number,
+  to: LineOffer,
+  toIndex: number,
+  walkSec: number,
+): ConnectionLeg | null {
+  const waitSec = bestWaitSec(from, fromIndex, to, toIndex, walkSec)
+  if (waitSec === null) return null
+  const slackSec = Math.max(0, waitSec - walkSec)
+  return {
+    waitSec,
+    slackSec,
+    missShare: missProbability(from.averageDelaySec, slackSec, to.holdSec),
+    holdSec: expectedHoldSec(from.averageDelaySec, slackSec, to.holdSec),
+  }
 }
 
 /**
@@ -195,20 +233,116 @@ export function lineConnections(
       if (otherIndex < 0) continue
 
       const walk = interchangeSeconds(state, stop.stationId, other.stops[otherIndex]!.stationId)
-      const toOtherSec = bestWait(own, stopIndex, other, otherIndex, walk)
-      const fromOtherSec = bestWait(other, otherIndex, own, stopIndex, walk)
-      if (toOtherSec === null && fromOtherSec === null) continue
+      const toOther = bestLeg(own, stopIndex, other, otherIndex, walk)
+      const fromOther = bestLeg(other, otherIndex, own, stopIndex, walk)
+      if (toOther === null && fromOther === null) continue
 
       result.push({
         stopIndex,
         stationName: state.network.stations.get(stop.stationId)?.name ?? '?',
         otherLineId: other.lineId,
         otherLineName: state.lines.get(other.lineId)?.name ?? '?',
-        toOtherSec,
-        fromOtherSec,
+        toOther,
+        fromOther,
       })
     }
   })
 
   return result
+}
+
+/** Ein gehaltener Anschluss, wie ihn das Linienpanel zeigt. */
+export interface HoldEvent {
+  readonly stopIndex: number
+  readonly fromLineId: LineId
+  /** Erwartete Haltezeit an diesem Halt. */
+  readonly seconds: number
+  /** Wie oft überhaupt gewartet wird. */
+  readonly chance: number
+}
+
+export interface LineHold {
+  /** Summe der erwarteten Haltezeiten über alle Halte der Linie. */
+  readonly seconds: number
+  /** Wahrscheinlichkeit, dass die Fahrt ohne jeden Halt durchkommt. */
+  readonly onTimeChance: number
+  readonly events: readonly HoldEvent[]
+}
+
+const NO_HOLD: LineHold = { seconds: 0, onTimeChance: 1, events: [] }
+
+/**
+ * Rechnet für jede Linie aus, wie viel Verspätung sie sich durch Warten einhandelt.
+ *
+ * Eingabe sind die Angebote **vor** der Anschlusssicherung — die Verspätung, die
+ * aus Betrieb und Störungen stammt. Ausgabe sind dieselben Angebote mit
+ * angehobener Verspätung und abgesenkter Pünktlichkeit. Die Rechnung dahinter
+ * steht in `holding.ts`.
+ */
+export function applyConnectionHolding(
+  state: GameState,
+  offers: readonly LineOffer[],
+): { readonly offers: LineOffer[]; readonly holds: ReadonlyMap<LineId, LineHold> } {
+  const holds = new Map<LineId, LineHold>()
+
+  for (const own of offers) {
+    if (own.holdSec <= 0) {
+      holds.set(own.lineId, NO_HOLD)
+      continue
+    }
+
+    const events: HoldEvent[] = []
+    let seconds = 0
+    let onTimeChance = 1
+
+    own.stops.forEach((stop, stopIndex) => {
+      // Je Halt zaehlt der schlimmste Zubringer. Zwei zugleich verspaetete Linien
+      // sind kein doppelter Halt - der Zug wartet einmal, bis der letzte da ist.
+      let worst: HoldEvent | null = null
+
+      for (const feeder of offers) {
+        if (feeder.lineId === own.lineId || feeder.averageDelaySec <= 0) continue
+        const feederIndex = feeder.stops.findIndex((s) => s.cityId === stop.cityId)
+        if (feederIndex < 0) continue
+
+        const walk = interchangeSeconds(state, feeder.stops[feederIndex]!.stationId, stop.stationId)
+        const wait = bestWaitSec(feeder, feederIndex, own, stopIndex, walk)
+        if (wait === null) continue
+
+        // Der Puffer ist die reine Wartezeit am Bahnsteig, ohne den Fussweg -
+        // der ist schon verbraucht, wenn der Fahrgast dort ankommt.
+        const slack = Math.max(0, wait - walk)
+        const seconds = expectedHoldSec(feeder.averageDelaySec, slack, own.holdSec)
+        if (seconds > 0 && (worst === null || seconds > worst.seconds)) {
+          worst = {
+            stopIndex,
+            fromLineId: feeder.lineId,
+            seconds,
+            chance: holdProbability(feeder.averageDelaySec, slack),
+          }
+        }
+      }
+
+      if (worst !== null) {
+        events.push(worst)
+        seconds += worst.seconds
+        onTimeChance *= 1 - worst.chance
+      }
+    })
+
+    holds.set(own.lineId, { seconds, onTimeChance, events })
+  }
+
+  const adjusted = offers.map((offer) => {
+    const hold = holds.get(offer.lineId)
+    if (!hold || hold.seconds <= 0) return offer
+    return {
+      ...offer,
+      averageDelaySec: offer.averageDelaySec + hold.seconds,
+      punctuality: offer.punctuality * hold.onTimeChance,
+      heldSec: hold.seconds,
+    }
+  })
+
+  return { offers: adjusted, holds }
 }

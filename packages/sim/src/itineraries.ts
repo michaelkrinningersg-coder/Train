@@ -8,6 +8,7 @@ import {
   type Alternative,
 } from '@game/demand'
 import { connectionWaitSec, interchangeSeconds } from './connections.js'
+import { missProbability } from './holding.js'
 import { legFare, rideSeconds, type Direction, type LineOffer } from './offers.js'
 
 /**
@@ -81,6 +82,11 @@ export interface Itinerary {
    * zwischen Aussteigen und Weiterfahrt tatsächlich vergeht.
    */
   readonly legWaits: readonly number[]
+  /**
+   * Anteil der Reisenden, die den Anschluss vor dieser Teilstrecke verpassen.
+   * Vor der ersten Teilstrecke immer 0 — dort gibt es nichts zu verpassen.
+   */
+  readonly legMisses: readonly number[]
   /** Prägendes Verkehrsmittel: das der längsten Teilstrecke. */
   readonly mode: 'bus' | 'rail'
   readonly travelTimeSec: number
@@ -126,6 +132,7 @@ function combine(
   od: string,
   legs: readonly ItineraryLeg[],
   legWaits: readonly number[],
+  legMisses: readonly number[],
 ): Itinerary {
   const byId = new Map(offers.map((o) => [o.lineId, o]))
   const parts = legs.map((leg) => ({ leg, offer: byId.get(leg.lineId)! }))
@@ -146,10 +153,16 @@ function combine(
   const first = parts[0]!
   const last = parts[parts.length - 1]!
 
+  // Ein verpasster Anschluss ist der haerteste Fall von Unpuenktlichkeit: man
+  // kommt nicht nur spaeter an, man kommt mit dieser Fahrt gar nicht an.
+  // Deshalb geht er in dieselbe Kennzahl ein wie die Verspaetung der Linien.
+  const reliability = legMisses.reduce((s, m) => s * (1 - m), 1)
+
   return {
     od,
     legs,
     legWaits,
+    legMisses,
     mode: longest.offer.mode,
     travelTimeSec,
     waitTimeSec,
@@ -157,7 +170,7 @@ function combine(
     comfort,
     transfers: legs.length - 1,
     reach: first.offer.stops[first.leg.fromIndex]!.catchment * last.offer.stops[last.leg.toIndex]!.catchment,
-    punctuality: parts.reduce((s, p) => s * p.offer.punctuality, 1),
+    punctuality: parts.reduce((s, p) => s * p.offer.punctuality, 1) * reliability,
   }
 }
 
@@ -350,7 +363,7 @@ export function buildItineraries(
       const od = odKey(origin, destination)
       result.set(
         od,
-        labels.map((label) => combine(offers, od, label.legs, label.legWaits)),
+        labels.map((label) => combine(offers, od, label.legs, label.legWaits, label.legMisses)),
       )
     }
   }
@@ -386,6 +399,8 @@ interface Label {
   readonly routeKey: string
   /** Wartezeit vor jeder Teilstrecke, erste = halber Takt, danach Anschlusszeit. */
   readonly legWaits: readonly number[]
+  /** Anteil verpasster Anschlüsse vor jeder Teilstrecke. */
+  readonly legMisses: readonly number[]
   /** Zwischensummen, damit die Bewertung ohne Neuaufbau der Kette auskommt. */
   readonly travelSec: number
   readonly waitSec: number
@@ -457,7 +472,7 @@ function searchFrom(
             // Die erste Teilstrecke: halber Takt, weil niemand weiss, wann er
             // losfahren will. Jede weitere: die echte Anschlusszeit aus der
             // Phasenlage der beiden Fahrplaene.
-            const wait = arrival
+            const planned = arrival
               ? connectionWaitSec(
                   { offer: lastOffer!, stopIndex: lastLeg!.toIndex, direction: directionOf(lastLeg!) },
                   { offer, stopIndex, direction: directionOf(leg) },
@@ -465,7 +480,17 @@ function searchFrom(
                 )
               : waitFromHeadway(offer.headwayMin)
 
+            // Wer den Anschluss verpasst, wartet einen ganzen Takt laenger.
+            // Genau darin unterscheidet sich ein knapper Anschluss von einem
+            // mit Puffer - vorher waren beide gleich gut.
+            const miss = arrival
+              ? missProbability(lastOffer!.averageDelaySec, Math.max(0, planned - interchange), offer.holdSec)
+              : 0
+            const headwaySec = Number.isFinite(offer.headwayMin) ? offer.headwayMin * 60 : 0
+            const wait = planned + miss * headwaySec
+
             const legWaits = arrival ? [...arrival.legWaits, wait] : [wait]
+            const legMisses = arrival ? [...arrival.legMisses, miss] : [0]
             const travelSec = (arrival?.travelSec ?? 0) + leg.timeSec
             const waitSec = (arrival?.waitSec ?? 0) + wait
             const fareCents = (arrival?.fareCents ?? 0) + leg.fareCents
@@ -474,6 +499,7 @@ function searchFrom(
               legs,
               routeKey,
               legWaits,
+              legMisses,
               travelSec,
               waitSec,
               fareCents,
