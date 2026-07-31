@@ -113,6 +113,22 @@ export interface Block {
   readonly toKm: number
 }
 
+/** Groesster baubarer Bahnhof. Darueber hinaus hilft ein zweiter Bahnhof mehr. */
+export const MAX_PLATFORMS = 12
+
+export interface StationConstruction {
+  readonly finishesOnDay: number
+  /**
+   * Bahnsteiggleise, die waehrend des Umbaus nutzbar bleiben.
+   *
+   * In der Regel eines weniger als vorher: wer einen Bahnsteig anbaut, sperrt
+   * dafuer einen bestehenden. Das ist der Grund, eine Erweiterung zu planen,
+   * *bevor* der Fahrplan eng wird - mitten im Engpass auszubauen macht ihn erst
+   * einmal schlimmer.
+   */
+  readonly platformsDuringWorks: number
+}
+
 export interface Station {
   readonly id: StationId
   readonly cityId: CityId
@@ -120,6 +136,7 @@ export interface Station {
   readonly name: string
   readonly position: LngLat
   readonly mode: 'rail' | 'bus' | 'combined'
+  /** Bahnsteiggleise im Endausbau. Waehrend eines Umbaus siehe `construction`. */
   readonly platforms: number
   /** 0..1 - Anteil der Stadtnachfrage, den dieser Bahnhof erschliesst. */
   readonly catchment: number
@@ -127,6 +144,15 @@ export interface Station {
   readonly distanceToCentreKm: number
   readonly buildCost: Money
   readonly upkeepPerDay: Money
+  readonly construction?: StationConstruction
+}
+
+/** Wie viele Bahnsteiggleise an diesem Tag tatsaechlich befahrbar sind. */
+export function platformsInService(station: Station, day: number): number {
+  if (station.construction && day < station.construction.finishesOnDay) {
+    return Math.max(1, station.construction.platformsDuringWorks)
+  }
+  return station.platforms
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   DEFAULT_RUNTIME_RESERVE_RAIL,
   cityId,
   cityRadiusKm,
+  platformsInService,
   trainClass,
   type City,
   type GameState,
@@ -51,6 +52,7 @@ function railSetup(options: {
   readonly trains?: number
   readonly headway?: number
   readonly trainClassId?: string
+  readonly platforms?: number
 }): GameState {
   const names = options.cities ?? ['Muenchen', 'Augsburg']
   const spec = options.spec ?? DOUBLE
@@ -58,7 +60,12 @@ function railSetup(options: {
 
   for (const name of names) {
     const c = CITIES.find((x) => x.name === name)!
-    const r = applyCommand(state, { kind: 'place_station', cityId: c.id, position: c.centre, platforms: 4 })
+    const r = applyCommand(state, {
+      kind: 'place_station',
+      cityId: c.id,
+      position: c.centre,
+      platforms: options.platforms ?? 4,
+    })
     if (!r.ok) throw new Error(r.reason)
     state = r.state
   }
@@ -376,5 +383,102 @@ describe('Wirtschaftlichkeit', () => {
     const a = advanceDays(state, demand, 5)
     const b = advanceDays(state, demand, 5)
     expect(a.cash).toBe(b.cash)
+  })
+})
+
+describe('Bahnhofsausbau', () => {
+  const stationOf = (state: GameState) => [...state.network.stations.values()][0]!
+
+  const expand = (state: GameState, platforms: number) =>
+    applyCommand(state, { kind: 'upgrade_station', stationId: stationOf(state).id, platforms })
+
+  it('baut Bahnsteiggleise an und bucht die Kosten', () => {
+    const before = railSetup({ spec: DOUBLE })
+    const result = expand(before, 6)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(stationOf(result.state).platforms).toBe(6)
+    expect(result.cost).toBeGreaterThan(0)
+    expect(result.state.cash).toBe(before.cash - result.cost)
+  })
+
+  it('erhoeht den Unterhalt entsprechend', () => {
+    const before = railSetup({ spec: DOUBLE })
+    const result = expand(before, 6)
+    if (!result.ok) throw new Error(result.reason)
+    expect(stationOf(result.state).upkeepPerDay).toBeGreaterThan(stationOf(before).upkeepPerDay)
+  })
+
+  it('sperrt waehrend des Umbaus ein bestehendes Gleis', () => {
+    const before = railSetup({ spec: DOUBLE })
+    const started = expand(before, 8)
+    if (!started.ok) throw new Error(started.reason)
+
+    const station = stationOf(started.state)
+    expect(station.platforms).toBe(8)
+    // Wer erst ausbaut, wenn es eng ist, macht es zunaechst enger.
+    expect(platformsInService(station, started.state.day)).toBeLessThan(platformsInService(stationOf(before), before.day))
+  })
+
+  it('gibt die Gleise nach der Bauzeit frei', () => {
+    const before = railSetup({ spec: DOUBLE })
+    const started = expand(before, 8)
+    if (!started.ok) throw new Error(started.reason)
+
+    const days = stationOf(started.state).construction!.finishesOnDay - started.state.day
+    const after = advanceDays(started.state, demand, days)
+
+    expect(stationOf(after).construction).toBeUndefined()
+    expect(platformsInService(stationOf(after), after.day)).toBe(8)
+  })
+
+  it('verweigert einen zweiten Umbau, solange der erste laeuft', () => {
+    const before = railSetup({ spec: DOUBLE })
+    const started = expand(before, 6)
+    if (!started.ok) throw new Error(started.reason)
+    expect(expand(started.state, 8).ok).toBe(false)
+  })
+
+  it('verweigert einen Rueckbau und einen Ausbau auf die bestehende Groesse', () => {
+    const state = railSetup({ spec: DOUBLE })
+    expect(expand(state, 1).ok).toBe(false)
+    expect(expand(state, stationOf(state).platforms).ok).toBe(false)
+  })
+
+  it('verweigert den Ausbau einer Bushaltestelle', () => {
+    const state = railSetup({ spec: DOUBLE })
+    const withStop = applyCommand(state, { kind: 'place_bus_stop', cityId: CITIES[2]!.id })
+    if (!withStop.ok) throw new Error(withStop.reason)
+
+    const stop = [...withStop.state.network.stations.values()].find((s) => s.mode === 'bus')!
+    expect(applyCommand(withStop.state, { kind: 'upgrade_station', stationId: stop.id, platforms: 4 }).ok).toBe(false)
+  })
+
+  it('rechnet vor, waehrend und nach dem Umbau mit der richtigen Gleiszahl', () => {
+    // Die Bahnsteigkapazitaet steckt in den Belegungen der Zuglaeufe - dort
+    // muss sich ein Umbau zeigen, sonst ist er reine Buchhaltung.
+    // Nur der umgebaute Bahnhof - der andere bleibt, wie er ist.
+    const platformCapacity = (state: GameState): number => {
+      const resource = `platform:${stationOf(state).id}`
+      const pattern = [...state.patterns.values()][0]!
+      const runs = buildRuns(state, lineOf(state), pattern, 60)
+      const capacities = runs.flatMap((r) =>
+        r.claims.filter((c) => c.resource === resource).map((c) => c.capacity),
+      )
+      return Math.min(...capacities)
+    }
+
+    const before = railSetup({ spec: DOUBLE, platforms: 4 })
+    expect(platformCapacity(before)).toBe(4)
+
+    const started = expand(before, 8)
+    if (!started.ok) throw new Error(started.reason)
+    // Waehrend der Bauarbeiten ist ein Gleis gesperrt.
+    expect(platformCapacity(started.state)).toBe(3)
+
+    const days = stationOf(started.state).construction!.finishesOnDay - started.state.day
+    const finished = advanceDays(started.state, demand, days)
+    expect(platformCapacity(finished)).toBe(8)
   })
 })

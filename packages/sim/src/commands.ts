@@ -29,6 +29,7 @@ function book(state: GameState, entry: Omit<LedgerEntry, 'day'>): GameState {
 export function applyCommand(state: GameState, command: Command, ctx: CommandContext = {}): CommandResult {
   switch (command.kind) {
     case 'place_station':
+    case 'upgrade_station':
     case 'build_track':
     case 'upgrade_track':
     case 'demolish_track':

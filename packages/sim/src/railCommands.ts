@@ -1,4 +1,5 @@
 import {
+  MAX_PLATFORMS,
   cityRadiusKm,
   nodeId as brandNode,
   stationCatchment,
@@ -16,6 +17,8 @@ import {
   capacityDuringWorks,
   railStationCost,
   railStationUpkeep,
+  stationExpansionCost,
+  stationExpansionDays,
   trackBuildCost,
   trackBuildDays,
   trackDemolitionValue,
@@ -90,7 +93,7 @@ export function applyRailCommand(state: GameState, command: Command, ctx: Comman
       const city = state.cities.get(command.cityId)
       if (!city) return fail('Unbekannte Stadt.')
 
-      const platforms = Math.max(1, Math.min(12, Math.round(command.platforms)))
+      const platforms = Math.max(1, Math.min(MAX_PLATFORMS, Math.round(command.platforms)))
       const distance = distanceKm(city.centre, command.position)
       const radius = cityRadiusKm(city.population)
 
@@ -193,6 +196,52 @@ export function applyRailCommand(state: GameState, command: Command, ctx: Comman
           category: 'construction',
           amount: -cost,
           note: `Strecke ${lengthKm.toFixed(0)} km`,
+        }),
+      }
+    }
+
+    case 'upgrade_station': {
+      const station = state.network.stations.get(command.stationId)
+      if (!station) return fail('Unbekannter Bahnhof.')
+      if (station.mode === 'bus') return fail('Eine Bushaltestelle hat keine Bahnsteiggleise.')
+      if (station.construction) return fail('An diesem Bahnhof läuft bereits ein Umbau.')
+
+      const target = Math.max(1, Math.min(MAX_PLATFORMS, Math.round(command.platforms)))
+      if (target <= station.platforms) {
+        return fail(`${station.name} hat bereits ${station.platforms} Bahnsteiggleise.`)
+      }
+
+      const city = state.cities.get(station.cityId)
+      if (!city) return fail('Unbekannte Stadt.')
+
+      const cost = stationExpansionCost(city.population, station.distanceToCentreKm, station.platforms, target)
+      if (state.cash < cost) return fail('Nicht genug Kapital.')
+
+      const days = stationExpansionDays(station.platforms, target)
+      const expanded: Station = {
+        ...station,
+        platforms: target,
+        upkeepPerDay: railStationUpkeep(target),
+        buildCost: station.buildCost + cost,
+        construction: {
+          finishesOnDay: state.day + days,
+          // Waehrend des Umbaus ist ein bestehendes Gleis gesperrt. Wer erst
+          // ausbaut, wenn es eng ist, macht es zunaechst enger.
+          platformsDuringWorks: Math.max(1, station.platforms - 1),
+        },
+      }
+
+      const next: GameState = {
+        ...state,
+        network: { ...state.network, stations: withMap(state.network.stations, station.id, expanded) },
+      }
+      return {
+        ok: true,
+        cost,
+        state: book(next, {
+          category: 'construction',
+          amount: -cost,
+          note: `${station.name}: Ausbau auf ${target} Bahnsteiggleise`,
         }),
       }
     }

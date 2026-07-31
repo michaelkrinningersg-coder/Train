@@ -193,9 +193,12 @@ Das ist der Punkt, an dem aus einem Wirtschaftsspiel *dieses* Spiel wird.
 
 - [x] **Zentrale Nachfrageverteilung**: das Angebot aller Linien wird einmal je Betriebstag
       zusammen bewertet, statt dass jede Linie ihren Anteil selbst aus der Matrix zieht
-- [x] **Reiseketten mit einem Umstieg**, umgestiegen wird in einer *Stadt* — damit ist der
-      Zubringerbus zum Bahnhof möglich, obwohl Bushaltestelle und Bahnhof getrennte Objekte
-      an verschiedenen Orten sind
+- [x] **Reiseketten mit bis zu zwei Umstiegen**, gefunden über eine rundenweise Suche in der
+      Bauart von RAPTOR. Umgestiegen wird in einer *Stadt* — damit ist der Zubringerbus zum
+      Bahnhof möglich, obwohl Bushaltestelle und Bahnhof getrennte Objekte an verschiedenen
+      Orten sind. Die Zahl der Umstiege ist ein Parameter, kein Strukturmerkmal.
+- [x] **Bahnhofsausbau**: Bahnsteiggleise lassen sich nachträglich anbauen, mit Bauzeit — und
+      währenddessen ist ein bestehendes Gleis gesperrt
 - [x] Austauschbare Verbindungen werden zu einer Alternative mit gemeinsamem Takt
       zusammengefasst (gegen das *red bus / blue bus*-Problem des Logit-Modells)
 - [x] **Zufriedenheit je Relation**: fällt bei Stehenbleiben und Unpünktlichkeit, erholt sich
@@ -220,13 +223,17 @@ und der Fehler zeigt sich erst Wochen später, was ihn erst gefährlich macht.
 Und das Umsteigen trägt: ein Zubringer Landsberg–Augsburg bringt der Bahnlinie
 München–Augsburg 80 Umsteiger am Tag, die es vorher schlicht nicht gab.
 
+Und das Umsteigen skaliert: in einem bayerischen Busnetz aus 11 Linien werden 22 Relationen
+direkt bedient, 56 mit einem Umstieg, **84 mit zwei**. Die Suche kostet dafür 1,3 ms; ein
+ganzer Betriebstag rechnet in 5 ms.
+
 **Was aus Phase 4a offen blieb:**
 
-- **Zwei und mehr Umstiege.** Die Aufzählung wächst kubisch; dafür bräuchte es eine echte
-  Verbindungssuche (RAPTOR). In einem Netz dieser Größe frisst die zweite Umsteigestrafe
-  den Gewinn ohnehin meist auf.
-- **Gestrandete Umsteiger.** Wer auf dem zweiten Teilstück keinen Platz mehr bekommt, gilt
-  als halb bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten
+- **Keine Anschlüsse.** Die Verbindungssuche kennt Takte, keine Abfahrtszeiten — ein
+  abgestimmter Anschluss ist darin genauso gut wie ein zufälliger. Das ist die größte offene
+  Vereinfachung und die Voraussetzung für einen Integralen Taktfahrplan als Spielmechanik.
+- **Gestrandete Umsteiger.** Wer auf einem späteren Teilstück keinen Platz mehr bekommt, gilt
+  als anteilig bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten
   Zuordnungsdurchgang.
 - **Die Reihenfolge am Bahnsteig** fehlt weiterhin: bei Überfüllung werden alle gleich
   behandelt.

@@ -483,17 +483,16 @@ for (const [vehicles, headway] of [[2, 120], [4, 60], [8, 30], [16, 15]] as cons
   )
 }
 
-console.log('\nUmsteigen — ein Zubringer aus einer Stadt ohne eigene Fernverbindung:')
-networkCase(
-  'nur München–Augsburg',
-  (s) => busLine(s, 'M–A', ['München', 'Augsburg'], 8, 30),
-  182,
-)
-networkCase(
-  '+ Zubringer Landsberg–Augsburg',
-  (s) => busLine(busLine(s, 'M–A', ['München', 'Augsburg'], 8, 30), 'L–A', ['Landsberg am Lech', 'Augsburg'], 3, 60),
-  182,
-)
+console.log('\nUmsteigen — jede weitere Linie erschließt Relationen, die es vorher nicht gab:')
+const trunk = (s: GameState): GameState => busLine(s, 'M–A', ['München', 'Augsburg'], 8, 30)
+const withFeeder = (s: GameState): GameState =>
+  busLine(trunk(s), 'L–A', ['Landsberg am Lech', 'Augsburg'], 3, 60)
+const withTail = (s: GameState): GameState =>
+  busLine(withFeeder(s), 'M–R', ['München', 'Rosenheim'], 3, 60)
+
+networkCase('nur München–Augsburg', trunk, 182)
+networkCase('+ Zubringer Landsberg–Augsburg', withFeeder, 182)
+networkCase('+ Anschluss München–Rosenheim', withTail, 182)
 
 console.log(
   '\nDie Zufriedenheit pendelt sich ungefähr dort ein, wo der Anteil der tatsächlich\n' +
@@ -501,7 +500,9 @@ console.log(
     'stehen gelassener Fahrgast länger nachträgt, als eine Durchschnittsrechnung\n' +
     'nahelegt. Sie fällt in Tagen und erholt sich in Monaten: ein überfahrener\n' +
     'Korridor lässt sich nicht mit einem einzigen zusätzlichen Bus reparieren.\n' +
-    'Der Zubringer zeigt den zweiten Effekt: Landsberg hat keine eigene Verbindung\n' +
-    'nach München, bekommt sie aber über den Umstieg in Augsburg — und beide Linien\n' +
-    'verdienen daran.',
+    'Der Umsteigeblock zeigt den zweiten Effekt: Landsberg hat keine eigene\n' +
+    'Verbindung nach München, bekommt sie aber über den Umstieg in Augsburg. Die\n' +
+    'dritte Linie bringt mehr als ihre eigene Relation — Landsberg erreicht über\n' +
+    'zwei Umstiege auch Rosenheim. Genau das ist der Unterschied zwischen einer\n' +
+    'Sammlung von Korridoren und einem Netz.',
 )

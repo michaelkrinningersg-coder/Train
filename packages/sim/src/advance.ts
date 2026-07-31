@@ -126,6 +126,13 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
       tracks.set(id, rest)
     }
   }
+  const stations = new Map(state.network.stations)
+  for (const [id, station] of stations) {
+    if (station.construction && nextDay >= station.construction.finishesOnDay) {
+      const { construction: _done, ...rest } = station
+      stations.set(id, rest)
+    }
+  }
 
   return {
     ...state,
@@ -133,7 +140,7 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     cash,
     loans,
     fleet,
-    network: { ...state.network, tracks },
+    network: { ...state.network, tracks, stations },
     satisfaction: day.satisfaction,
     crowding: day.crowding,
     ledger: trimLedger([...state.ledger, ...dated], nextDay),

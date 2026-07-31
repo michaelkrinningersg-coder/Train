@@ -1,5 +1,12 @@
 import type { CityId, GameState, LineId } from '@game/domain'
-import { generalisedCost, odKey, waitFromHeadway, type Alternative } from '@game/demand'
+import {
+  TRANSFER_TIME_WEIGHT,
+  WAIT_TIME_WEIGHT,
+  generalisedCost,
+  odKey,
+  waitFromHeadway,
+  type Alternative,
+} from '@game/demand'
 import { distanceKm } from '@game/geo'
 import { legFare, rideSeconds, type LineOffer } from './offers.js'
 
@@ -19,28 +26,47 @@ import { legFare, rideSeconds, type LineOffer } from './offers.js'
  * schließt genau den Fall aus, um den es geht — den Zubringerbus zum Bahnhof.
  * Liegen die beiden Halte auseinander, kostet der Weg dazwischen Zeit.
  *
- * **Höchstens ein Umstieg.** Zwei Umstiege wären ein spürbar größeres Stück
- * Arbeit (die Kandidatenmenge wächst kubisch, und man braucht eine echte
- * Verbindungssuche statt einer Aufzählung), bringen aber in einem Netz dieser
- * Größe wenig: die zweite Umsteigestrafe frisst den Gewinn meist auf. Sollte
- * sich das mit einem europaweiten Netz ändern, ist der Ersatz dieser Datei durch
- * einen RAPTOR-Lauf der richtige Weg — die Schnittstelle bleibt dieselbe.
+ * **Rundenweise Suche statt Aufzählung.** Die erste Fassung zählte Ketten mit
+ * genau einem Umstieg über alle Linienpaare auf. Das war für einen Umstieg
+ * kurz und richtig, ließ sich aber nicht erweitern: jeder weitere Umstieg
+ * hätte eine Schleifenebene mehr gekostet. Die Suche arbeitet jetzt in Runden
+ * nach der Bauart von RAPTOR — Runde 0 sind die Direktverbindungen, Runde r
+ * alles mit r Umstiegen. Ein weiterer Umstieg ist damit eine Runde mehr, keine
+ * Umschreibung.
+ *
+ * Was die Suche *nicht* tut: einzelne Fahrten betrachten. Sie rechnet mit Takt
+ * und Fahrzeit, nicht mit konkreten Abfahrtszeiten, und kennt deshalb keine
+ * knappen oder verpassten Anschlüsse. Für ein Spiel, in dem der Spieler Takte
+ * und keine Einzelfahrten plant, ist das die richtige Auflösung.
  */
 
-export const MAX_TRANSFERS = 1
+/**
+ * Wie oft ein Fahrgast höchstens umsteigt.
+ *
+ * Zwei sind das Maß, das ein Netz dieser Größe braucht: Zubringer → Fernlinie →
+ * Zubringer. Der dritte Umstieg bringt kaum noch Relationen dazu, weil die
+ * Umsteigestrafe (zweifach gewichtet, je Segment 8 bis 25 Minuten) den Gewinn
+ * auffrisst — die Suche kann ihn aber, sie braucht nur eine Runde mehr.
+ */
+export const MAX_TRANSFERS = 2
+/** Wie viele *verschiedene Wege* die Suche je Stadt weiterverfolgt. */
+export const MAX_ROUTES_PER_CITY = 4
+/**
+ * Wie viele austauschbare Linienkombinationen je Weg behalten werden.
+ *
+ * Sie duerfen sich nicht verdraengen: zwei parallele Linien auf demselben Weg
+ * sind kein Grund, eine davon zu vergessen, sondern der Grund fuer einen
+ * dichteren gemeinsamen Takt.
+ */
+export const MAX_MEMBERS_PER_ROUTE = 4
+/** Mittlere Umsteigestrafe für die Rangfolge während der Suche. */
+export const TRANSFER_PENALTY_SEC = 900
 /** Mindestzeit für einen Umstieg, auch am selben Bahnsteig. */
 export const MIN_INTERCHANGE_SEC = 120
 /** Fußweg zwischen zwei Halten derselben Stadt. */
 export const INTERCHANGE_WALK_KMH = 4.5
 /** Mehr Wahlmöglichkeiten je Relation bringen im Logit kaum noch Unterschied. */
 export const MAX_ITINERARIES_PER_OD = 3
-/**
- * Obergrenze für die *ungebündelten* Ketten je Relation. Großzügiger als die
- * Zahl der Verbindungen, weil erst das Zusammenfassen austauschbare Ketten zu
- * einer Verbindung macht — würde hier zu früh gekappt, verschwänden Linien aus
- * einem gemeinsamen Takt, statt ihn zu verdichten.
- */
-export const MAX_CHAINS_PER_OD = 12
 
 export interface ItineraryLeg {
   readonly lineId: LineId
@@ -77,17 +103,6 @@ export function itineraryAlternative(itinerary: Itinerary, ascOffset: number): A
     comfort: itinerary.comfort,
     ...(ascOffset === 0 ? {} : { ascOffset }),
   }
-}
-
-/** Städte einer Linie mit dem Index ihres ersten Halts. */
-function citiesOf(offer: LineOffer): Map<CityId, number> {
-  const map = new Map<CityId, number>()
-  offer.stops.forEach((stop, index) => {
-    // Fährt eine Linie dieselbe Stadt zweimal an, zählt der erste Halt. Ein
-    // Ringverkehr durch dieselbe Stadt ist im Spiel nicht vorgesehen.
-    if (!map.has(stop.cityId)) map.set(stop.cityId, index)
-  })
-  return map
 }
 
 function singleLeg(offer: LineOffer, a: number, b: number): ItineraryLeg {
@@ -142,18 +157,6 @@ function combine(offers: readonly LineOffer[], od: string, legs: readonly Itiner
 }
 
 /**
- * Neutrale Rangfolge, um je Relation die besten Ketten zu behalten.
- *
- * Gewertet wird mit den Parametern der Besuchsreisenden — ein Segment in der
- * Mitte des Feldes, weder besonders zeitkritisch noch besonders preissensibel.
- * Eine segmentgenaue Auswahl wäre schöner, aber die Auswahl entscheidet nur,
- * *welche* drei Ketten ins Logit gehen, nicht wie es ausgeht.
- */
-function neutralCost(itinerary: Itinerary): number {
-  return generalisedCost('vfr', itineraryAlternative(itinerary, 0))
-}
-
-/**
  * Eine Verbindung, wie der Reisende sie wahrnimmt: „mit dem Bus über
  * Kreuzstadt", unabhängig davon, welche der drei Linien ihn dorthin bringt.
  *
@@ -202,23 +205,31 @@ export function optionAlternative(option: ItineraryOption, ascOffset: number): A
 /** Städtefolge und Verkehrsmittel — was zwei Ketten austauschbar macht. */
 function optionKey(offers: readonly LineOffer[], itinerary: Itinerary): string {
   const byId = new Map(offers.map((o) => [o.lineId, o]))
-  const parts: string[] = []
-  for (const leg of itinerary.legs) {
-    const offer = byId.get(leg.lineId)!
-    parts.push(`${offer.stops[leg.fromIndex]!.cityId}>${offer.stops[leg.toIndex]!.cityId}:${offer.mode}`)
-  }
-  return parts.join('+')
+  return itinerary.legs
+    .map((leg) => {
+      const offer = byId.get(leg.lineId)!
+      return `${offer.stops[leg.fromIndex]!.cityId}>${offer.stops[leg.toIndex]!.cityId}:${offer.mode}`
+    })
+    .join('+')
 }
 
 /**
  * Fasst austauschbare Ketten zu einer Verbindung zusammen.
  *
- * Die Takte addieren sich als Frequenzen: zwei Linien im Stundentakt ergeben
- * einen Halbstundentakt und damit die halbe Wartezeit. Fahrzeit, Preis und
- * Komfort werden nach Fahrtenangebot gemittelt — wer öfter fährt, prägt das
- * Bild der Verbindung stärker.
+ * Gerechnet wird **je Teilstrecke**: an jedem Umsteigepunkt addieren sich die
+ * Takte der dort verfügbaren Linien zu einem gemeinsamen, und die Wartezeit der
+ * Verbindung ist die Summe dieser Teilwartezeiten. Ein einziger gemeinsamer
+ * Takt für die ganze Kette wäre falsch — wer zweimal umsteigt, wartet auch
+ * zweimal.
+ *
+ * Der Anteil einer einzelnen Linienkombination ist das Produkt ihrer Anteile an
+ * jedem Umsteigepunkt: wer am Bahnsteig steht, nimmt was zuerst kommt, und das
+ * an jedem Punkt der Reise neu.
  */
 function mergeOptions(offers: readonly LineOffer[], chains: readonly Itinerary[]): ItineraryOption[] {
+  const byId = new Map(offers.map((o) => [o.lineId, o]))
+  const frequency = (lineId: LineId): number => 60 / Math.max(1, byId.get(lineId)!.headwayMin)
+
   const groups = new Map<string, Itinerary[]>()
   for (const chain of chains) {
     const key = optionKey(offers, chain)
@@ -229,35 +240,48 @@ function mergeOptions(offers: readonly LineOffer[], chains: readonly Itinerary[]
 
   const options: ItineraryOption[] = []
   for (const list of groups.values()) {
-    // Fahrten je Stunde als Kehrwert des Takts; die erste Teilstrecke bestimmt,
-    // wie oft man ueberhaupt losfahren kann.
-    const frequency = list.map((c) => 60 / Math.max(1, headwayOf(offers, c)))
-    const total = frequency.reduce((a, b) => a + b, 0)
+    const legCount = list[0]!.legs.length
+
+    // Je Teilstrecke: welche Linien stehen zur Wahl, und wie oft fahren sie?
+    const perPosition = Array.from({ length: legCount }, (_, i) => {
+      const lines = new Map<LineId, number>()
+      for (const chain of list) {
+        const lineId = chain.legs[i]!.lineId
+        if (!lines.has(lineId)) lines.set(lineId, frequency(lineId))
+      }
+      const total = [...lines.values()].reduce((a, b) => a + b, 0)
+      return { lines, total }
+    })
+
+    const waitTimeSec = perPosition.reduce((s, p) => s + waitFromHeadway(60 / p.total), 0)
+
+    const rawShares = list.map((chain) =>
+      chain.legs.reduce((product, leg, i) => {
+        const position = perPosition[i]!
+        return product * ((position.lines.get(leg.lineId) ?? 0) / position.total)
+      }, 1),
+    )
+    const shareTotal = rawShares.reduce((a, b) => a + b, 0) || 1
+    const shares = rawShares.map((s) => s / shareTotal)
+
     const weight = (pick: (c: Itinerary) => number): number =>
-      list.reduce((s, c, i) => s + pick(c) * (frequency[i]! / total), 0)
+      list.reduce((sum, chain, i) => sum + pick(chain) * shares[i]!, 0)
 
     const first = list[0]!
     options.push({
       od: first.od,
       mode: first.mode,
       travelTimeSec: weight((c) => c.travelTimeSec),
-      // Gemeinsamer Takt aus der Summe der Frequenzen.
-      waitTimeSec: waitFromHeadway(60 / total),
+      waitTimeSec,
       fareCents: weight((c) => c.fareCents),
       comfort: weight((c) => c.comfort),
       transfers: first.transfers,
       reach: weight((c) => c.reach),
       punctuality: weight((c) => c.punctuality),
-      members: list.map((itinerary, i) => ({ itinerary, share: frequency[i]! / total })),
+      members: list.map((itinerary, i) => ({ itinerary, share: shares[i]! })),
     })
   }
   return options
-}
-
-/** Takt der Kette: der dünnste ihrer Teilstrecken begrenzt sie. */
-function headwayOf(offers: readonly LineOffer[], itinerary: Itinerary): number {
-  const byId = new Map(offers.map((o) => [o.lineId, o]))
-  return Math.max(...itinerary.legs.map((l) => byId.get(l.lineId)!.headwayMin))
 }
 
 /**
@@ -266,9 +290,13 @@ function headwayOf(offers: readonly LineOffer[], itinerary: Itinerary): number {
  * Die Relationen sind gerichtet: A→B und B→A stehen getrennt, weil Nachfrage
  * und Fahrplan nicht symmetrisch sein müssen.
  */
-export function buildOptions(state: GameState, offers: readonly LineOffer[]): Map<string, ItineraryOption[]> {
+export function buildOptions(
+  state: GameState,
+  offers: readonly LineOffer[],
+  maxTransfers: number = MAX_TRANSFERS,
+): Map<string, ItineraryOption[]> {
   const merged = new Map<string, ItineraryOption[]>()
-  for (const [od, chains] of buildItineraries(state, offers)) {
+  for (const [od, chains] of buildItineraries(state, offers, maxTransfers)) {
     const options = mergeOptions(offers, chains)
     if (options.length <= MAX_ITINERARIES_PER_OD) {
       merged.set(od, options)
@@ -283,74 +311,201 @@ export function buildOptions(state: GameState, offers: readonly LineOffer[]): Ma
 const neutralOptionCost = (option: ItineraryOption): number =>
   generalisedCost('vfr', optionAlternative(option, 0))
 
-/** Die einzelnen Ketten, vor dem Zusammenfassen. */
-export function buildItineraries(state: GameState, offers: readonly LineOffer[]): Map<string, Itinerary[]> {
+/**
+ * Die einzelnen Ketten, vor dem Zusammenfassen.
+ *
+ * Rundenweise Suche in der Bauart von RAPTOR: Runde 0 findet alle
+ * Direktverbindungen, Runde r alles, was mit r Umstiegen erreichbar ist. In
+ * jeder Runde wird von den in der Vorrunde neu erreichten Städten aus in jede
+ * dort haltende Linie umgestiegen.
+ *
+ * Der Vorgänger zählte Ketten mit genau einem Umstieg auf, mit doppelt
+ * geschachtelter Schleife über alle Linienpaare. Das ließ sich nicht auf zwei
+ * Umstiege erweitern, ohne kubisch zu werden — die Rundenform kostet dagegen je
+ * zusätzlichem Umstieg nur einen weiteren Durchgang.
+ */
+export function buildItineraries(
+  state: GameState,
+  offers: readonly LineOffer[],
+  maxTransfers: number = MAX_TRANSFERS,
+): Map<string, Itinerary[]> {
   const result = new Map<string, Itinerary[]>()
-  const cityIndex = offers.map((offer) => ({ offer, cities: citiesOf(offer) }))
+  const boardings = boardingIndex(offers)
 
-  const add = (itinerary: Itinerary): void => {
-    const list = result.get(itinerary.od)
-    if (list) list.push(itinerary)
-    else result.set(itinerary.od, [itinerary])
-  }
-
-  // Direktverbindungen.
-  for (const offer of offers) {
-    for (let a = 0; a < offer.stops.length; a++) {
-      for (let b = 0; b < offer.stops.length; b++) {
-        if (a === b) continue
-        const from = offer.stops[a]!
-        const to = offer.stops[b]!
-        if (from.cityId === to.cityId) continue
-        add(combine(offers, odKey(from.cityId, to.cityId), [singleLeg(offer, a, b)], 0))
-      }
+  for (const origin of boardings.keys()) {
+    for (const [destination, labels] of searchFrom(state, boardings, origin, maxTransfers)) {
+      const od = odKey(origin, destination)
+      result.set(
+        od,
+        labels.map((label) => combine(offers, od, label.legs, label.extraTimeSec)),
+      )
     }
   }
 
-  // Ketten mit genau einem Umstieg.
-  for (const first of cityIndex) {
-    for (const second of cityIndex) {
-      if (first.offer.lineId === second.offer.lineId) continue
+  return result
+}
 
-      for (const [transferCity, exitIndex] of first.cities) {
-        const entryIndex = second.cities.get(transferCity)
-        if (entryIndex === undefined) continue
+/** Wo lässt sich in welche Linie einsteigen? Je Stadt und Linie der erste Halt. */
+function boardingIndex(offers: readonly LineOffer[]): Map<CityId, Boarding[]> {
+  const index = new Map<CityId, Boarding[]>()
+  for (const offer of offers) {
+    const seen = new Set<CityId>()
+    offer.stops.forEach((stop, stopIndex) => {
+      // Faehrt eine Linie dieselbe Stadt zweimal an, zaehlt der erste Halt.
+      if (seen.has(stop.cityId)) return
+      seen.add(stop.cityId)
+      const list = index.get(stop.cityId)
+      if (list) list.push({ offer, stopIndex })
+      else index.set(stop.cityId, [{ offer, stopIndex }])
+    })
+  }
+  return index
+}
 
-        const walk = interchangeSeconds(
-          state,
-          first.offer.stops[exitIndex]!.stationId,
-          second.offer.stops[entryIndex]!.stationId,
-        )
+interface Boarding {
+  readonly offer: LineOffer
+  readonly stopIndex: number
+}
 
-        for (let a = 0; a < first.offer.stops.length; a++) {
-          const origin = first.offer.stops[a]!
-          if (a === exitIndex || origin.cityId === transferCity) continue
+interface Label {
+  readonly legs: readonly ItineraryLeg[]
+  /** Städtefolge und Verkehrsmittel — Ketten mit gleichem Weg sind austauschbar. */
+  readonly routeKey: string
+  /** Summe der Umsteigezeiten. */
+  readonly extraTimeSec: number
+  /** Zwischensummen, damit die Bewertung ohne Neuaufbau der Kette auskommt. */
+  readonly travelSec: number
+  readonly waitSec: number
+  readonly fareCents: number
+  readonly score: number
+  readonly lastLineId: LineId
+  readonly lastStationId: string
+}
 
-          for (let b = 0; b < second.offer.stops.length; b++) {
-            const destination = second.offer.stops[b]!
-            if (b === entryIndex || destination.cityId === transferCity) continue
-            if (destination.cityId === origin.cityId) continue
+/**
+ * Rangfolge während der Suche, in Sekunden.
+ *
+ * Bewusst nicht `generalisedCost`: das bräuchte je Zwischenschritt eine
+ * vollständige Kette. Die Formel ist dieselbe Gewichtung mit dem Zeitwert der
+ * Besuchsreisenden, nur inkrementell fortschreibbar. Sie entscheidet
+ * ausschließlich, *welche* Wege weiterverfolgt werden — die eigentliche Wahl
+ * trifft später das Logit je Segment mit den echten Parametern.
+ */
+function scoreOf(travelSec: number, waitSec: number, fareCents: number, transfers: number): number {
+  return travelSec + WAIT_TIME_WEIGHT * waitSec + TRANSFER_TIME_WEIGHT * TRANSFER_PENALTY_SEC * transfers + fareCents * 4
+}
 
-            add(
-              combine(
-                offers,
-                odKey(origin.cityId, destination.cityId),
-                [singleLeg(first.offer, a, exitIndex), singleLeg(second.offer, entryIndex, b)],
-                walk,
-              ),
-            )
+/** Erreichte Wege einer Stadt: je Weg die austauschbaren Linienkombinationen. */
+type Routes = Map<string, Label[]>
+
+/** Alle von einer Stadt aus erreichbaren Ziele, mit den besten Wegen dorthin. */
+function searchFrom(
+  state: GameState,
+  boardings: ReadonlyMap<CityId, readonly Boarding[]>,
+  origin: CityId,
+  maxTransfers: number,
+): Map<CityId, Label[]> {
+  const reached = new Map<CityId, Routes>()
+  let frontier: CityId[] = [origin]
+
+  for (let round = 0; round <= maxTransfers; round++) {
+    const marked = new Set<CityId>()
+
+    for (const city of frontier) {
+      // In Runde 0 startet die Reise; danach zaehlt, womit man angekommen ist.
+      const arrivals: readonly (Label | null)[] =
+        round === 0 ? [null] : [...(reached.get(city)?.values() ?? [])].flat()
+
+      for (const arrival of arrivals) {
+        if (arrival && arrival.legs.length !== round) continue
+
+        for (const { offer, stopIndex } of boardings.get(city) ?? []) {
+          // In dieselbe Linie umzusteigen ist kein Umstieg, sondern ein Umweg.
+          if (arrival && arrival.lastLineId === offer.lineId) continue
+
+          const interchange = arrival
+            ? interchangeSeconds(state, arrival.lastStationId, offer.stops[stopIndex]!.stationId)
+            : 0
+
+          for (let target = 0; target < offer.stops.length; target++) {
+            if (target === stopIndex) continue
+            const destination = offer.stops[target]!
+            if (destination.cityId === city || destination.cityId === origin) continue
+
+            const leg = singleLeg(offer, stopIndex, target)
+            const legs = arrival ? [...arrival.legs, leg] : [leg]
+            const step = `${city}>${destination.cityId}:${offer.mode}`
+            const routeKey = arrival ? `${arrival.routeKey}+${step}` : step
+
+            const extraTimeSec = (arrival?.extraTimeSec ?? 0) + interchange
+            const travelSec = (arrival?.travelSec ?? 0) + leg.timeSec + interchange
+            const waitSec = (arrival?.waitSec ?? 0) + waitFromHeadway(offer.headwayMin)
+            const fareCents = (arrival?.fareCents ?? 0) + leg.fareCents
+
+            const label: Label = {
+              legs,
+              routeKey,
+              extraTimeSec,
+              travelSec,
+              waitSec,
+              fareCents,
+              score: scoreOf(travelSec, waitSec, fareCents, legs.length - 1),
+              lastLineId: offer.lineId,
+              lastStationId: destination.stationId,
+            }
+
+            if (insert(reached, destination.cityId, label)) marked.add(destination.cityId)
           }
         }
       }
     }
+
+    frontier = [...marked]
+    if (frontier.length === 0) break
   }
 
-  // Je Relation nur die besten Ketten behalten.
-  for (const [od, list] of result) {
-    if (list.length <= MAX_CHAINS_PER_OD) continue
-    list.sort((x, y) => neutralCost(x) - neutralCost(y))
-    result.set(od, list.slice(0, MAX_CHAINS_PER_OD))
+  reached.delete(origin)
+  const out = new Map<CityId, Label[]>()
+  for (const [city, routes] of reached) out.set(city, [...routes.values()].flat())
+  return out
+}
+
+/**
+ * Nimmt ein Label auf, wenn es zu den besten Wegen dieser Stadt gehört.
+ *
+ * Verdrängt wird **nur zwischen verschiedenen Wegen**. Zwei Linien auf demselben
+ * Weg stehen nebeneinander, statt sich auszustechen — sonst verschwände die
+ * zweite Linie eines Korridors aus der Rechnung, obwohl sie den Takt verdichtet.
+ */
+function insert(reached: Map<CityId, Routes>, city: CityId, label: Label): boolean {
+  let routes = reached.get(city)
+  if (!routes) {
+    routes = new Map()
+    reached.set(city, routes)
   }
 
-  return result
+  const members = routes.get(label.routeKey)
+  if (members) {
+    // Derselbe Weg, andere Linie: aufnehmen, solange Platz ist.
+    if (members.some((m) => m.legs.every((leg, i) => leg.lineId === label.legs[i]!.lineId))) return false
+    members.push(label)
+    members.sort((a, b) => a.score - b.score)
+    if (members.length > MAX_MEMBERS_PER_ROUTE) members.length = MAX_MEMBERS_PER_ROUTE
+    return members.includes(label)
+  }
+
+  const best = (list: readonly Label[]): number => Math.min(...list.map((l) => l.score))
+  // Ein Weg, der weder schneller noch umstiegsaermer ist als ein gefundener,
+  // bringt nichts.
+  for (const list of routes.values()) {
+    if (best(list) <= label.score && list[0]!.legs.length <= label.legs.length) return false
+  }
+
+  routes.set(label.routeKey, [label])
+  if (routes.size > MAX_ROUTES_PER_CITY) {
+    const worst = [...routes.entries()].sort((a, b) => best(b[1]) - best(a[1]))[0]!
+    routes.delete(worst[0])
+    if (worst[0] === label.routeKey) return false
+  }
+  return true
 }

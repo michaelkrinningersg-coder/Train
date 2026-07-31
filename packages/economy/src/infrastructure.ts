@@ -174,6 +174,39 @@ export function railStationUpkeep(platforms: number): Money {
   return STATION_UPKEEP_BASE + STATION_UPKEEP_PER_PLATFORM * platforms
 }
 
+/**
+ * Aufschlag auf einen Bahnsteiganbau gegenüber dem Neubau auf der grünen Wiese.
+ *
+ * Unter laufendem Betrieb zu bauen ist teurer: Bauzustände, Provisorien,
+ * Nachtarbeit. Ein Drittel Aufschlag ist eine konservative Schätzung — real
+ * liegt der Unterschied bei innerstädtischen Bahnhöfen deutlich höher.
+ */
+export const STATION_EXPANSION_SURCHARGE = 1.35
+
+/** Kosten für zusätzliche Bahnsteiggleise an einem bestehenden Bahnhof. */
+export function stationExpansionCost(
+  population: number,
+  distanceToCentreKm: number,
+  fromPlatforms: number,
+  toPlatforms: number,
+): Money {
+  const added = Math.max(0, toPlatforms - fromPlatforms)
+  if (added === 0) return 0
+  const radius = cityRadiusKm(population)
+  const size = 1 + radius / 20
+  const base = STATION_PLATFORM_COST * added
+  return Math.round(
+    base * landPriceFactor(distanceToCentreKm, radius) * size * STATION_EXPANSION_SURCHARGE,
+  )
+}
+
+/** Bauzeit einer Bahnhofserweiterung. */
+export function stationExpansionDays(fromPlatforms: number, toPlatforms: number): number {
+  const added = Math.max(0, toPlatforms - fromPlatforms)
+  if (added === 0) return 0
+  return 90 + 60 * added
+}
+
 /** Anzahl Blockabschnitte einer Strecke - bestimmt die Kapazität in Phase 3. */
 export function blockCount(lengthKm: number, signalling: Signalling): number {
   return Math.max(1, Math.ceil(lengthKm / BLOCK_LENGTH_KM[signalling]))

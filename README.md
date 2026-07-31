@@ -150,13 +150,26 @@ Zu knapp verliert Fahrgäste, zu üppig verbrennt Geld.
 
 ### Umsteigen — warum sich ein Netz lohnt
 
-Fahrgäste können **einmal umsteigen**, und zwar in einer *Stadt*: der Bus kann an der
+Fahrgäste können **bis zu zweimal umsteigen**, und zwar in einer *Stadt*: der Bus kann an der
 Bushaltestelle enden, die Bahn am Bahnhof, der Fußweg dazwischen kostet Zeit. Damit lohnt
 sich ein Zubringerbus aus einer Stadt ohne eigene Fernverbindung — die Nachfrage dorthin gab
 es vorher schlicht nicht.
 
+Jede neue Linie bringt mehr als ihre eigene Relation. In einem Busnetz aus 11 Linien quer
+durch Bayern werden 22 Städtepaare direkt bedient, 56 mit einem Umstieg und **84 mit zwei**.
+
 Im Linienpanel steht unter *davon Umsteiger*, wie viele Fahrgäste einer Linie nur ein
 Teilstück ihrer Reise auf ihr zurücklegen.
+
+### Bahnhöfe ausbauen
+
+Bahnsteiggleise bestimmen, wie viele Züge gleichzeitig im Bahnhof stehen dürfen — an einem
+Umsteigeknoten mit mehreren Linien ist das schnell der Engpass. Sie lassen sich nachträglich
+anbauen: Stadt anklicken → **Auf N Gleise ausbauen**.
+
+Zwei Dinge dabei: der Anbau unter laufendem Betrieb kostet ein Drittel mehr als beim Neubau,
+und **während der Bauzeit ist ein bestehendes Gleis gesperrt**. Wer erst ausbaut, wenn es eng
+ist, macht es für ein halbes Jahr enger.
 
 Bahnbau kostet ein Vielfaches des Busbetriebs; die erste Strecke ist das Ziel mehrerer
 Spieljahre. Zum Ausprobieren ohne Vorlauf: `VITE_STARTING_CASH=50000000000 pnpm dev`.

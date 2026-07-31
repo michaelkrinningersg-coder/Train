@@ -1,5 +1,12 @@
-import { SEGMENTS, cityRadiusKm, stationCatchment, type CityId } from '@game/domain'
-import { busStopCost, formatMoney, railStationCost } from '@game/economy'
+import { MAX_PLATFORMS, SEGMENTS, cityRadiusKm, platformsInService, stationCatchment, type CityId } from '@game/domain'
+import {
+  busStopCost,
+  formatMoney,
+  railStationCost,
+  railStationUpkeep,
+  stationExpansionCost,
+  stationExpansionDays,
+} from '@game/economy'
 import { distanceKm } from '@game/geo'
 import { useGame } from '../game/store.js'
 
@@ -20,6 +27,13 @@ export function CityPanel({ cityId }: { readonly cityId: CityId }): React.JSX.El
   const stop = stations.find((s) => s.mode !== 'rail')
   const railStation = stations.find((s) => s.mode !== 'bus')
   const cost = busStopCost(city.population)
+
+  // Ausbau immer um zwei Gleise: ein einzelnes zusaetzliches Gleis bringt an
+  // einem Umsteigeknoten selten genug, um die Bauzeit zu rechtfertigen.
+  const nextPlatforms = Math.min(MAX_PLATFORMS, (railStation?.platforms ?? 0) + 2)
+  const expansionCost = railStation
+    ? stationExpansionCost(city.population, railStation.distanceToCentreKm, railStation.platforms, nextPlatforms)
+    : 0
 
   // Erzeugte Reisen: Stufe 1 des Nachfragemodells, direkt aus den Potenzialen.
   const generated = Object.values(SEGMENTS).map((s) => ({
@@ -81,10 +95,41 @@ export function CityPanel({ cityId }: { readonly cityId: CityId }): React.JSX.El
       )}
 
       {railStation ? (
-        <p className="ok small">
-          ✓ Bahnhof · {railStation.platforms} Bahnsteiggleise · {railStation.distanceToCentreKm.toFixed(1)} km vom
-          Zentrum · Einzugsgrad {Math.round(railStation.catchment * 100)} %
-        </p>
+        <>
+          <p className="ok small">
+            ✓ Bahnhof · {platformsInService(railStation, state.day)} Bahnsteiggleise ·{' '}
+            {railStation.distanceToCentreKm.toFixed(1)} km vom Zentrum · Einzugsgrad{' '}
+            {Math.round(railStation.catchment * 100)} %
+          </p>
+          {railStation.construction ? (
+            <p className="muted small">
+              Umbau auf {railStation.platforms} Gleise läuft — noch{' '}
+              <b className="num">{railStation.construction.finishesOnDay - state.day}</b> Tage. Solange ist ein
+              Bahnsteig gesperrt.
+            </p>
+          ) : (
+            railStation.platforms < MAX_PLATFORMS && (
+              <>
+                <button
+                  type="button"
+                  className="wide"
+                  disabled={state.cash < expansionCost}
+                  title="Mehr Bahnsteiggleise heißt: mehr Züge dürfen gleichzeitig im Bahnhof stehen. Das ist der Engpass an Umsteigeknoten."
+                  onClick={() =>
+                    dispatch({ kind: 'upgrade_station', stationId: railStation.id, platforms: nextPlatforms })
+                  }
+                >
+                  Auf {nextPlatforms} Gleise ausbauen · {formatMoney(expansionCost, { compact: true })}
+                </button>
+                <p className="muted small">
+                  {stationExpansionDays(railStation.platforms, nextPlatforms)} Tage Bauzeit ·{' '}
+                  {formatMoney(railStationUpkeep(nextPlatforms))}/Tag Unterhalt statt{' '}
+                  {formatMoney(railStationUpkeep(railStation.platforms))}
+                </p>
+              </>
+            )
+          )}
+        </>
       ) : (
         <button type="button" className="primary wide" onClick={() => beginStation(cityId)}>
           Bahnhof bauen …

@@ -4,6 +4,7 @@ import {
   SIGNAL_REACTION_SEC,
   dwellWithCrowding,
   expandDepartures,
+  platformsInService,
   runId as brandRun,
   trainClass,
   type GameState,
@@ -242,7 +243,10 @@ function buildRun(
 
   const stationAt = (nodeId: NodeId): { id: StationId; platforms: number; name: string } | null => {
     const station = [...state.network.stations.values()].find((s) => s.nodeId === nodeId)
-    return station ? { id: station.id, platforms: station.platforms, name: station.name } : null
+    // Waehrend eines Umbaus zaehlen nur die Gleise, die tatsaechlich befahrbar sind.
+    return station
+      ? { id: station.id, platforms: platformsInService(station, state.day), name: station.name }
+      : null
   }
 
   const first = stationAt(plan.stopNodes[0]!)

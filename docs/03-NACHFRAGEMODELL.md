@@ -219,10 +219,37 @@ an die Haltestellen-Identität knüpft, schließt genau den Fall aus, um den es 
 Zubringerbus zum Bahnhof. Liegen die Halte auseinander, kostet der Fußweg Zeit
 (`MIN_INTERCHANGE_SEC` plus 4,5 km/h Gehgeschwindigkeit).
 
-**Höchstens ein Umstieg.** Zwei Umstiege ließen die Kandidatenmenge kubisch wachsen und
-brauchten eine echte Verbindungssuche statt einer Aufzählung, bringen in einem Netz dieser
-Größe aber wenig: die zweite Umsteigestrafe frisst den Gewinn meist auf. Für ein europaweites
-Netz wäre ein RAPTOR-Lauf der Ersatz — die Schnittstelle bliebe dieselbe.
+**Rundenweise Suche statt Aufzählung.** Die erste Fassung zählte Ketten mit *genau einem*
+Umstieg über alle Linienpaare auf. Das war kurz und richtig, ließ sich aber nicht erweitern:
+jeder weitere Umstieg hätte eine Schleifenebene mehr gekostet. Die Suche arbeitet jetzt in
+Runden nach der Bauart von **RAPTOR** — Runde 0 sind die Direktverbindungen, Runde *r* alles
+mit *r* Umstiegen. Ein weiterer Umstieg ist damit eine Runde mehr, keine Umschreibung.
+
+Standard sind **zwei Umstiege** (`MAX_TRANSFERS`); `buildOptions` nimmt die Zahl als Parameter.
+Gemessen an einem bayerischen Busnetz mit 11 Linien:
+
+| maxTransfers | bediente Relationen | davon mit Umstieg | Rechenzeit |
+|---|---|---|---|
+| 0 | 22 | 0 | 0,3 ms |
+| 1 | 56 | 34 | 0,8 ms |
+| **2** | **84** | **62** | **1,3 ms** |
+| 3 | 100 | 78 | 2,8 ms |
+
+Der zweite Umstieg erschließt 28 weitere Relationen für eine halbe Millisekunde. Der dritte
+bringt noch 16 dazu — die schwächsten, weil drei Umsteigestrafen (je Segment 8 bis 25 Minuten,
+doppelt gewichtet) den Nutzen weitgehend auffressen. Deshalb steht der Standard auf 2, nicht
+weil mehr nicht ginge. Ein ganzer Betriebstag dieses Netzes rechnet in 5 ms.
+
+**Was die Suche nicht tut:** einzelne Fahrten betrachten. Sie rechnet mit Takt und Fahrzeit,
+nicht mit konkreten Abfahrtszeiten, und kennt deshalb keine knappen oder verpassten
+Anschlüsse. Für ein Spiel, in dem der Spieler Takte plant und keine Einzelfahrten, ist das
+die richtige Auflösung.
+
+**Verdrängt wird zwischen Wegen, nicht zwischen Linien.** Die Suche behält je Stadt die vier
+besten *Wege* (Städtefolge und Verkehrsmittel) und je Weg bis zu vier austauschbare
+Linienkombinationen. Diese Unterscheidung ist nicht kosmetisch: eine Pareto-Verdrängung über
+alle Ketten würde die zweite Linie eines Korridors wegwerfen, obwohl sie genau die ist, die
+den gemeinsamen Takt verdichtet (siehe nächster Abschnitt).
 
 ### Warum austauschbare Linien zusammengefasst werden
 
@@ -233,10 +260,15 @@ identische Buslinie auf denselben Korridor zu legen verdoppelt die Fahrgastzahle
 weil das Angebot besser wäre, sondern weil das Modell zweimal zählt.
 
 Deshalb werden Verbindungen mit **derselben Städtefolge und denselben Verkehrsmitteln** zu
-einer Alternative zusammengefasst, deren Takte sich addieren. Zwei Stundentakte sind ein
-Halbstundentakt; der Zugewinn kommt aus der halbierten Wartezeit, also aus dem echten
-Mechanismus. Die gewählten Reisenden werden anschließend nach Fahrtenangebot auf die
-beteiligten Linien verteilt — wer am Bahnsteig steht, nimmt, was zuerst kommt.
+einer Alternative zusammengefasst, deren Takte sich addieren. Gerechnet wird **je
+Teilstrecke**: an jedem Umsteigepunkt addieren sich die Takte der dort verfügbaren Linien zu
+einem gemeinsamen, und die Wartezeit der Verbindung ist die Summe dieser Teilwartezeiten. Ein
+einziger gemeinsamer Takt für die ganze Kette wäre falsch — wer zweimal umsteigt, wartet auch
+zweimal.
+
+Der Anteil einer einzelnen Linienkombination ist das Produkt ihrer Anteile an jedem
+Umsteigepunkt: wer am Bahnsteig steht, nimmt was zuerst kommt, und das an jedem Punkt der
+Reise neu.
 
 Der Test dazu ist scharf formuliert: *zwei parallele Linien im Stundentakt müssen genau so
 viele Fahrgäste bringen wie eine einzige im Halbstundentakt.*
@@ -247,9 +279,11 @@ viele Fahrgäste bringen wie eine einzige im Halbstundentakt.*
   Aktuell zählt die Summe der Sitzplätze einer Stunde. Bei einem Taktfahrplan mit gleichen
   Zügen ist das dasselbe Ergebnis; interessant wird es erst, wenn Eil- und Nahverkehrszüge
   auf derselben Linie fahren.
-- Zwei und mehr Umstiege.
+- **Anschlüsse.** Die Suche kennt Takte, keine Abfahrtszeiten — ein abgestimmter Anschluss ist
+  darin genauso gut wie ein zufälliger. Das ist die größte offene Vereinfachung des
+  Umsteigemodells und die Voraussetzung für einen echten Integralen Taktfahrplan.
 - Die Reihenfolge am Bahnsteig: alle Gruppen eines Abschnitts werden gleich behandelt.
-- Ein Umsteiger, der auf dem zweiten Teilstück keinen Platz mehr bekommt, gilt als *halb*
+- Ein Umsteiger, der auf einem späteren Teilstück keinen Platz mehr bekommt, gilt als *anteilig*
   bedient statt als gestrandet. Die Wahrheit bräuchte einen zweiten Zuordnungsdurchgang;
   der Fahrschein für das erste Teilstück wäre in beiden Fällen verkauft.
 
@@ -418,16 +452,18 @@ Das ist die gewünschte Form: **es gibt ein Optimum, und es liegt nicht am Rand.
 knapp fährt, verliert über Monate Fahrgäste an das Auto; wer zu üppig fährt, verbrennt Geld
 im Betriebsaufwand. Der 30-Minuten-Takt trifft beides.
 
-Der Zubringer zeigt den zweiten Effekt:
+Der Umsteigeblock zeigt den zweiten Effekt:
 
 | | Fahrgäste/Tag | davon Umsteiger |
 |---|---|---|
 | nur München–Augsburg (30′) | 1 381 | 0 |
-| + Zubringer Landsberg–Augsburg | 1 497 | 80 |
+| + Zubringer Landsberg–Augsburg | 1 484 | 63 |
+| + Anschluss München–Rosenheim | 1 865 | 76 |
 
 Landsberg hat keine eigene Verbindung nach München und bekommt sie über den Umstieg in
-Augsburg. Beide Linien verdienen daran — vor Phase 4 wäre diese Nachfrage schlicht
-verschwunden.
+Augsburg. Die dritte Linie bringt mehr als ihre eigene Relation: Landsberg erreicht über
+**zwei** Umstiege auch Rosenheim. Genau das ist der Unterschied zwischen einer Sammlung von
+Korridoren und einem Netz — und vor Phase 4 wäre diese Nachfrage schlicht verschwunden.
 
 **Ehrliche Einschränkung:** die Zufriedenheit pendelt sich ungefähr dort ein, wo der
 mitgenommene Anteil liegt. Der Exponent 2,5 und die Gewichte sind gesetzt, nicht gemessen —

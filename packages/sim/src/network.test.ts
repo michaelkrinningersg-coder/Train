@@ -27,6 +27,7 @@ import {
   buildOptions,
   itineraryAlternative,
   MAX_ITINERARIES_PER_OD,
+  MAX_TRANSFERS,
   type Itinerary,
 } from './itineraries.js'
 import { prepareLines, type LineOffer } from './offers.js'
@@ -60,11 +61,14 @@ const city = (name: string, population: number, lng: number, lat: number): City 
 const FEEDER = 'Feldstadt'
 const HUB = 'Kreuzstadt'
 const TARGET = 'Grossstadt'
+// Vierte Stadt hinter dem Ziel: Feldstadt -> Weitendorf braucht zwei Umstiege.
+const FAR = 'Weitendorf'
 
 const CITIES = withPotentials([
   city(FEEDER, 40_000, 10.4, 48.2),
   city(HUB, 300_000, 10.9, 48.35),
   city(TARGET, 1_200_000, 11.6, 48.14),
+  city(FAR, 90_000, 12.1, 47.85),
 ])
 
 const id = (name: string): CityId => CITIES.find((c) => c.name === name)!.id
@@ -83,6 +87,8 @@ interface BuildOptions {
   readonly trains?: number
   /** Eine zweite, gleichwertige Buslinie auf dem Hauptkorridor. */
   readonly duplicateTrunk?: boolean
+  /** Anschlusslinie hinter dem Ziel — erzwingt eine Kette mit zwei Umstiegen. */
+  readonly tail?: boolean
 }
 
 /** Baut ein kleines Netz und stellt es auf einen Dienstag mit fertiger Strecke. */
@@ -129,6 +135,11 @@ function network(options: BuildOptions = {}): GameState {
   if (options.duplicateTrunk) {
     apply({ kind: 'buy_vehicle', classId: 'intercity', units: options.buses ?? 6 })
   }
+  if (options.tail) {
+    apply({ kind: 'place_bus_stop', cityId: id(FAR) })
+    if (trunkAsRail) apply({ kind: 'place_bus_stop', cityId: id(TARGET) })
+    apply({ kind: 'buy_vehicle', classId: 'intercity', units: options.buses ?? 4 })
+  }
 
   const makeLine = (
     name: string,
@@ -163,6 +174,12 @@ function network(options: BuildOptions = {}): GameState {
     makeLine('Parallellinie', trunkMode, [
       { name: HUB, mode: trunkMode },
       { name: TARGET, mode: trunkMode },
+    ])
+  }
+  if (options.tail) {
+    makeLine('Anschluss', 'bus', [
+      { name: TARGET, mode: 'bus' },
+      { name: FAR, mode: 'bus' },
     ])
   }
 
@@ -265,9 +282,31 @@ describe('Umsteigen', () => {
     )
   })
 
-  it('lässt höchstens einen Umstieg zu', () => {
-    const chains = chainsOf(network({ feeder: true, duplicateTrunk: true }))
-    expect(Math.max(...[...chains.values()].flat().map((c) => c.transfers))).toBeLessThanOrEqual(1)
+  it('findet auch eine Kette über zwei Umstiege', () => {
+    // Feldstadt -> Kreuzstadt (Bus), Kreuzstadt -> Grossstadt (Bahn),
+    // Grossstadt -> Weitendorf (Bus): anders ist Weitendorf nicht erreichbar.
+    const state = network({ feeder: true, tail: true })
+    const chain = chainsOf(state).get(odKey(id(FEEDER), id(FAR)))
+    expect(chain).toBeDefined()
+    expect(chain!.some((c) => c.transfers === 2)).toBe(true)
+    expect(chain![0]!.legs).toHaveLength(3)
+  })
+
+  it('bietet nicht mehr als MAX_TRANSFERS Umstiege an', () => {
+    const chains = chainsOf(network({ feeder: true, tail: true, duplicateTrunk: true }))
+    expect(Math.max(...[...chains.values()].flat().map((c) => c.transfers))).toBeLessThanOrEqual(MAX_TRANSFERS)
+  })
+
+  it('bucht einen Fahrgast mit zwei Umstiegen auf alle drei Linien', () => {
+    const state = network({ feeder: true, tail: true })
+    const { byLine } = assignDemand(state, demand, buildOptions(state, offersOf(state)))
+    const od = odKey(id(FEEDER), id(FAR))
+
+    for (const name of ['Zubringer', 'Hauptlinie', 'Anschluss']) {
+      const lineId = lineNamed(state, name).id
+      const flows = [...(byLine.get(lineId)?.forward ?? []), ...(byLine.get(lineId)?.backward ?? [])]
+      expect(flows.some((f) => f.od === od), `${name} traegt die Relation`).toBe(true)
+    }
   })
 
   it('behält je Relation nur die besten Verbindungen', () => {
