@@ -32,10 +32,14 @@ export function seedData(seedDir: string): Plugin {
           return
         }
 
-        res.setHeader(
-          'Content-Type',
-          filePath.endsWith('.pbf') ? 'application/x-protobuf' : 'application/json; charset=utf-8',
-        )
+        const contentType = filePath.endsWith('.pbf')
+          ? 'application/x-protobuf'
+          : filePath.endsWith('.png')
+            ? 'image/png'
+            : filePath.endsWith('.bin')
+              ? 'application/octet-stream'
+              : 'application/json; charset=utf-8'
+        res.setHeader('Content-Type', contentType)
         res.setHeader('Cache-Control', 'no-cache')
         createReadStream(filePath).pipe(res)
       })

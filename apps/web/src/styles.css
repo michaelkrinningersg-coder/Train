@@ -806,3 +806,14 @@ select {
 .legend__stroke--demand {
   background: var(--demand);
 }
+
+.basemap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.basemap select {
+  padding: 3px 6px;
+  font-size: 12px;
+}

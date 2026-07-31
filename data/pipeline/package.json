@@ -8,17 +8,21 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "basemap": "tsx src/03-basemap.ts"
+    "basemap": "tsx src/03-basemap.ts",
+    "terrain": "tsx src/06-terrain.ts",
+    "osm": "tsx src/07-osm-cache.ts"
   },
   "dependencies": {
     "@game/domain": "workspace:*",
     "@game/geo": "workspace:*",
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.2",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@types/pngjs": "^6.0.5"
   }
 }

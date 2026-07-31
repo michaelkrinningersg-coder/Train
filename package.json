@@ -14,7 +14,9 @@
     "test": "pnpm -r test",
     "data:cities": "pnpm --filter @game/pipeline cities",
     "data:basemap": "pnpm --filter @game/pipeline basemap",
-    "calibrate": "tsx tools/calibrate.ts"
+    "calibrate": "tsx tools/calibrate.ts",
+    "data:terrain": "pnpm --filter @game/pipeline terrain",
+    "data:osm": "pnpm --filter @game/pipeline osm"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

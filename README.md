@@ -23,11 +23,31 @@ pnpm data:basemap     # optional: lokaler Kachelcache, macht die Entwicklung off
 pnpm dev              # http://localhost:5173
 ```
 
-Mit lokalem Kachelcache:
+Mit lokalem Kachelcache (macht die Entwicklung netzunabhängig):
 
 ```bash
-VITE_BASEMAP_TILES='/seed/basemap/{z}/{x}/{y}.pbf' pnpm dev
+VITE_BASEMAP_TILES='/seed/basemap/{z}/{x}/{y}.pbf' \
+VITE_OSM_STYLE='/seed/osm/liberty/style.json' pnpm dev
 ```
+
+## Basiskarte
+
+Oben rechts lässt sich die Karte umschalten:
+
+| Stil | Wofür |
+|---|---|
+| **Schlicht** | Nur Land und Grenzen — das eigene Netz steht im Vordergrund |
+| **OSM farbig** | Vollständige OpenStreetMap: Straßen, Bahnstrecken, Wälder, Gewässer, Gebäude |
+| **OSM hell** | Zurückhaltend in Grau — gute Lesbarkeit für die Netzplanung |
+| **OSM dunkel** | Voller Detailgrad, gedämpfte Farben |
+
+Die OSM-Stile kommen von [OpenFreeMap](https://openfreemap.org) — vollständige
+OpenStreetMap-Vektorkacheln ohne API-Schlüssel und ohne Nutzungslimit. Die Kachelserver der
+OpenStreetMap Foundation selbst dürfen für so etwas ausdrücklich nicht verwendet werden.
+
+Auf hellen Karten schaltet das Spiel auf eine eigene, für helle Flächen geprüfte
+Markenpalette um; Linien bekommen zusätzlich eine Umrandung, weil auf einer detaillierten
+Karte keine einzelne Farbe garantierten Kontrast hat.
 
 Hinter einem Proxy braucht Node's `fetch` ein Flag: `NODE_USE_ENV_PROXY=1 pnpm data:cities`.
 
@@ -38,7 +58,9 @@ Hinter einem Proxy braucht Node's `fetch` ein Flag: `NODE_USE_ENV_PROXY=1 pnpm d
 | `pnpm test` | Vitest über alle Pakete |
 | `pnpm build` | Produktionsbuild |
 | `pnpm data:cities [-- --region=dach]` | Städtedatensatz erzeugen |
-| `pnpm data:basemap [-- --region=dach]` | Basiskacheln der Region cachen |
+| `pnpm data:basemap [-- --region=dach]` | Schlichte Basiskacheln cachen |
+| `pnpm data:terrain [-- --region=dach]` | Höhenraster für Baukosten erzeugen |
+| `pnpm data:osm [-- --style=liberty]` | OSM-Basiskarte lokal cachen (offline-fähig) |
 | `pnpm calibrate` | Kalibrierungsbericht für Nachfrage und Wirtschaftlichkeit |
 
 ## Struktur

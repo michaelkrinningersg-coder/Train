@@ -13,6 +13,7 @@ import {
 } from '@game/domain'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
 import { advanceDay, applyCommand, createGame } from '@game/sim'
+import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
 import { create } from 'zustand'
 
 export type Tab = 'network' | 'fleet' | 'finance'
@@ -34,6 +35,7 @@ interface GameStore {
   readonly selectedCityId: CityId | null
   readonly selectedLineId: LineId | null
   readonly showDemand: boolean
+  readonly basemap: string
   readonly message: string | null
 
   start: (cities: readonly City[]) => void
@@ -45,6 +47,7 @@ interface GameStore {
   selectCity: (id: CityId | null) => void
   selectLine: (id: LineId | null) => void
   toggleDemand: () => void
+  setBasemap: (id: string) => void
   notify: (message: string | null) => void
 
   beginLine: () => void
@@ -64,6 +67,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectedCityId: null,
   selectedLineId: null,
   showDemand: false,
+  basemap: DEFAULT_BASEMAP,
   message: null,
 
   start: (cities) => {
@@ -103,6 +107,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectCity: (selectedCityId) => set({ selectedCityId }),
   selectLine: (selectedLineId) => set({ selectedLineId, tab: 'network' }),
   toggleDemand: () => set((s) => ({ showDemand: !s.showDemand })),
+  setBasemap: (basemap) => set({ basemap }),
   notify: (message) => set({ message }),
 
   beginLine: () => set({ mapMode: 'draw-line', draft: [], selectedLineId: null, tab: 'network' }),

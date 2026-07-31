@@ -3,7 +3,7 @@ import type { Layer } from '@deck.gl/core'
 import type { City, CityId, GameState, LineId, StationId } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
 import { distanceKm } from '@game/geo'
-import { rgba, THEME } from '../theme.js'
+import { MARKS, rgba, type MarkPalette, type Tone } from '../theme.js'
 
 /** Punktradius in Pixeln. Einwohnerzahl per Wurzelskala auf die Flaeche abgebildet. */
 export function dotRadius(population: number): number {
@@ -76,12 +76,14 @@ export interface LayerContext {
   readonly selectedLineId: LineId | null
   readonly draft: readonly StationId[]
   readonly showDemand: boolean
+  readonly tone: Tone
   readonly onPickCity: (city: City | null) => void
   readonly onPickLine: (id: LineId) => void
 }
 
 export function buildLayers(ctx: LayerContext): Layer[] {
   const { state, cities, zoom, selectedCityId, selectedLineId, draft, showDemand } = ctx
+  const c: MarkPalette = MARKS[ctx.tone]
   const labelled = declutter(cities, zoom)
   const characterSet = new Set<string>()
   for (const c of labelled) for (const ch of c.name) characterSet.add(ch)
@@ -115,7 +117,7 @@ export function buildLayers(ctx: LayerContext): Layer[] {
         data: arcs,
         getSourcePosition: (d) => d.from,
         getTargetPosition: (d) => d.to,
-        getColor: rgba(THEME.demand, 115),
+        getColor: rgba(c.demand, 150),
         // Hoher Exponent: schwache Relationen sollen verschwinden, nicht das Bild fuellen.
         getWidth: (d) => 0.6 + 7 * (d.trips / maxTrips) ** 0.75,
         widthUnits: 'pixels',
@@ -134,18 +136,34 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       radiusUnits: 'meters',
       filled: true,
       stroked: false,
-      getFillColor: rgba(THEME.city, 16),
+      getFillColor: rgba(c.city, ctx.tone === 'light' ? 26 : 16),
       pickable: false,
     }),
   )
 
   if (linePaths.length > 0) {
+    // Umrandung zuerst, dann die farbige Linie darauf. Auf einer detaillierten
+    // OSM-Karte hat keine einzelne Farbe garantierten Kontrast - der Untergrund
+    // reicht von Weiss ueber Waldgruen bis Wasserblau. Die Umrandung loest das
+    // unabhaengig davon, worueber die Linie gerade verlaeuft.
     layers.push(
+      new PathLayer<(typeof linePaths)[number]>({
+        id: 'bus-lines-casing',
+        data: linePaths,
+        getPath: (d) => d.path,
+        getColor: rgba(c.casing, 190),
+        getWidth: (d) => (d.id === selectedLineId ? 8.5 : 6.5),
+        widthUnits: 'pixels',
+        capRounded: true,
+        jointRounded: true,
+        pickable: false,
+        updateTriggers: { getWidth: selectedLineId },
+      }),
       new PathLayer<(typeof linePaths)[number]>({
         id: 'bus-lines',
         data: linePaths,
         getPath: (d) => d.path,
-        getColor: (d) => (d.id === selectedLineId ? rgba(THEME.textPrimary) : rgba(THEME.line)),
+        getColor: (d) => (d.id === selectedLineId ? rgba(c.selected) : rgba(c.line)),
         getWidth: (d) => (d.id === selectedLineId ? 5 : 3.5),
         widthUnits: 'pixels',
         capRounded: true,
@@ -166,7 +184,7 @@ export function buildLayers(ctx: LayerContext): Layer[] {
         id: 'draft-line',
         data: [{ path: draftPath }],
         getPath: (d) => d.path,
-        getColor: rgba(THEME.textPrimary, 200),
+        getColor: rgba(c.selected, 210),
         getWidth: 3,
         widthUnits: 'pixels',
         capRounded: true,
@@ -187,11 +205,11 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       stroked: true,
       lineWidthUnits: 'pixels',
       getLineWidth: (d) => (d.id === selectedCityId ? 2.5 : 2),
-      getFillColor: rgba(THEME.city),
-      getLineColor: (d) => (d.id === selectedCityId ? rgba(THEME.textPrimary) : rgba(THEME.surface)),
+      getFillColor: rgba(c.city),
+      getLineColor: (d) => (d.id === selectedCityId ? rgba(c.selected) : rgba(c.casing, 220)),
       pickable: true,
       autoHighlight: true,
-      highlightColor: [255, 255, 255, 70],
+      highlightColor: ctx.tone === 'light' ? [0, 0, 0, 60] : [255, 255, 255, 70],
       onClick: ({ object }) => {
         ctx.onPickCity(object ?? null)
         return true
@@ -210,7 +228,7 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       stroked: true,
       lineWidthUnits: 'pixels',
       getLineWidth: 1.6,
-      getLineColor: rgba(THEME.line, 235),
+      getLineColor: rgba(c.line, 245),
       pickable: false,
     }),
     new TextLayer<City>({
@@ -221,11 +239,11 @@ export function buildLayers(ctx: LayerContext): Layer[] {
       getText: (d) => d.name,
       getSize: 11,
       sizeUnits: 'pixels',
-      getColor: rgba(THEME.textSecondary),
+      getColor: rgba(c.label),
       getPixelOffset: (d) => [0, -(dotRadius(d.population) + 13)],
       fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
       outlineWidth: 3,
-      outlineColor: rgba(THEME.plane, 220),
+      outlineColor: rgba(c.labelHalo, 235),
       fontSettings: { sdf: true },
       pickable: false,
     }),

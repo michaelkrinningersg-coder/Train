@@ -17,3 +17,6 @@ data/seed/*.parquet
 
 # Kachelcache aus pnpm data:basemap - reproduzierbar, gehoert nicht ins Repo.
 data/seed/basemap/
+
+# OSM-Kachelcache aus pnpm data:osm - reproduzierbar und gross.
+data/seed/osm/

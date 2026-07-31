@@ -7,11 +7,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { THEME } from '../theme.js'
 import { buildLayers } from './layers.js'
-import { resolveStyle } from './mapStyle.js'
+import { basemapById, hidePlaceLabels, loadStyle, PLAIN_STYLE } from './mapStyle.js'
 
-const ATTRIBUTION =
-  'Basiskarte © <a href="https://maplibre.org/">MapLibre</a> · ' +
-  'Städte <a href="https://www.geonames.org/">GeoNames</a> (CC BY 4.0)'
+// Nur unsere eigene Quelle. Die Herkunft der Basiskarte liefert der jeweilige
+// Stil selbst mit - bei den OSM-Stilen ist das die von der ODbL geforderte
+// Nennung der OpenStreetMap-Mitwirkenden.
+const ATTRIBUTION = 'Städte <a href="https://www.geonames.org/">GeoNames</a> (CC BY 4.0)'
 
 export interface MapViewProps {
   readonly view: { readonly centre: readonly [number, number]; readonly zoom: number }
@@ -31,6 +32,9 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
   const draft = useGame((s) => s.draft)
   const showDemand = useGame((s) => s.showDemand)
   const mapMode = useGame((s) => s.mapMode)
+  const basemapId = useGame((s) => s.basemap)
+  const basemap = basemapById(basemapId)
+  const mapRef = useRef<maplibregl.Map | null>(null)
 
   // Aktionen ueber ein Ref, damit der Karten-Effekt nur einmal laeuft.
   const actions = useRef({ mapMode, draft })
@@ -42,7 +46,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
 
     const map = new maplibregl.Map({
       container,
-      style: resolveStyle(),
+      style: PLAIN_STYLE,
       center: [view.centre[0], view.centre[1]],
       zoom: view.zoom,
       minZoom: 3,
@@ -74,6 +78,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
     })
     map.addControl(overlay)
     overlayRef.current = overlay
+    mapRef.current = map
 
     map.on('load', () => setZoom(map.getZoom()))
     map.on('moveend', () => setZoom(map.getZoom()))
@@ -91,11 +96,31 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
 
     return () => {
       overlayRef.current = null
+      mapRef.current = null
       map.remove()
     }
     // Absichtlich nur einmal: die Startansicht ist kein reaktiver Zustand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Stilwechsel. Das deck.gl-Overlay haengt als Control an der Karte und
+  // ueberlebt setStyle, es muss also nicht neu aufgebaut werden.
+  useEffect(() => {
+    let cancelled = false
+    loadStyle(basemap)
+      .then((style) => {
+        const map = mapRef.current
+        if (cancelled || !map) return
+        map.setStyle(style)
+        map.once('styledata', () => hidePlaceLabels(map))
+      })
+      .catch((err: unknown) => {
+        useGame.getState().notify(`Kartenstil "${basemap.label}" nicht ladbar: ${String(err)}`)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [basemap])
 
   const layers = useMemo(() => {
     if (!state || !demand) return []
@@ -110,6 +135,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       selectedLineId,
       draft,
       showDemand,
+      tone: basemap.tone,
       onPickLine: (id) => useGame.getState().selectLine(id),
       onPickCity: (city) => {
         const store = useGame.getState()
@@ -128,7 +154,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
         store.selectCity(city.id)
       },
     })
-  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand])
+  }, [state, demand, zoom, selectedCityId, selectedLineId, draft, showDemand, basemap.tone])
 
   useEffect(() => {
     overlayRef.current?.setProps({ layers })
