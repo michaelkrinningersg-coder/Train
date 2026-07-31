@@ -3,7 +3,6 @@ import type { Vehicle } from './fleet.js'
 import type {
   BlockId,
   CityId,
-  GameTime,
   LineId,
   LngLat,
   Money,
@@ -46,14 +45,17 @@ export type SimEvent =
   | { readonly at: Sec; readonly kind: 'disruption'; readonly trackId: TrackId; readonly durationSec: number }
 
 export interface Loan {
+  readonly id: string
+  /** Restschuld in Cent. */
   readonly principal: Money
+  /** Jahreszins, z. B. 0,065 fuer 6,5 Prozent. */
   readonly interestRate: number
-  readonly takenAt: GameTime
+  readonly takenOnDay: number
   readonly termYears: number
 }
 
 export interface LedgerEntry {
-  readonly at: GameTime
+  readonly day: number
   readonly category:
     | 'ticket_revenue'
     | 'track_upkeep'
@@ -64,16 +66,45 @@ export interface LedgerEntry {
     | 'construction'
     | 'vehicle_purchase'
     | 'loan'
+    | 'repayment'
     | 'interest'
+    | 'stop_construction'
   readonly amount: Money
   readonly lineId?: LineId
   readonly note?: string
 }
 
+/** Tagesergebnis einer Linie. */
+export interface LineDayResult {
+  readonly lineId: LineId
+  readonly passengers: Readonly<Record<SegmentId, number>>
+  readonly totalPassengers: number
+  /** Fahrgaeste, die wegen Kapazitaetsmangel stehen geblieben sind. */
+  readonly leftBehind: number
+  readonly revenue: Money
+  readonly operatingCost: Money
+  /** Hoechste Streckenauslastung des Tages, 0..1+ (ueber 1 = ueberfuellt). */
+  readonly peakLoadFactor: number
+  readonly vehicleKm: number
+  readonly departuresPerDirection: number
+  /** Takt, der mit den zugeteilten Fahrzeugen tatsaechlich erreicht wird. */
+  readonly effectiveHeadwayMin: number
+  readonly warnings: readonly string[]
+}
+
+export interface DayResult {
+  readonly day: number
+  readonly lines: readonly LineDayResult[]
+  readonly revenue: Money
+  readonly costs: Money
+  readonly profit: Money
+  readonly passengers: number
+}
+
 export interface GameState {
   readonly seed: number
-  readonly time: GameTime
-  readonly year: number
+  /** Ganze Tage seit Spielbeginn, siehe calendar.ts. */
+  readonly day: number
   readonly cash: Money
   readonly loans: readonly Loan[]
 
@@ -87,8 +118,13 @@ export interface GameState {
   readonly lines: ReadonlyMap<LineId, Line>
   readonly patterns: ReadonlyMap<PatternId, ServicePattern>
 
+  /** Zuglaeufe der Betriebssimulation. Bleibt bis Phase 3 leer. */
   readonly runs: ReadonlyMap<RunId, TrainRun>
   readonly ledger: readonly LedgerEntry[]
+  /** Ergebnis des zuletzt simulierten Betriebstags. */
+  readonly lastDay: DayResult | null
+  /** Gleitende Historie fuer die Finanzansicht. */
+  readonly history: readonly DayResult[]
 }
 
 export interface TrackSpec {
@@ -109,6 +145,11 @@ export type Command =
   | { readonly kind: 'set_pattern'; readonly pattern: Omit<ServicePattern, 'id'> }
   | { readonly kind: 'set_fare'; readonly lineId: LineId; readonly fare: Line['fare'] }
   | { readonly kind: 'take_loan'; readonly amount: Money; readonly termYears: number }
+  | { readonly kind: 'repay_loan'; readonly loanId: string; readonly amount: Money }
+  | { readonly kind: 'place_bus_stop'; readonly cityId: CityId }
+  | { readonly kind: 'remove_bus_stop'; readonly stationId: StationId }
+  | { readonly kind: 'delete_line'; readonly lineId: LineId }
+  | { readonly kind: 'assign_vehicles'; readonly patternId: PatternId; readonly vehicleIds: readonly VehicleId[] }
 
 export type CommandResult =
   | { readonly ok: true; readonly state: GameState; readonly cost: Money }

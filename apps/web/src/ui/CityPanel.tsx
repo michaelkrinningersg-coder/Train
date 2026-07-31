@@ -1,24 +1,40 @@
-import type { City } from '@game/domain'
-import { SEGMENTS } from '@game/domain'
+import { SEGMENTS, type CityId } from '@game/domain'
+import { busStopCost, formatMoney } from '@game/economy'
+import { useGame } from '../game/store.js'
 
 const de = (n: number): string => n.toLocaleString('de-DE')
 
-export interface CityPanelProps {
-  readonly city: City | null
-  readonly onClose: () => void
-}
+export function CityPanel({ cityId }: { readonly cityId: CityId }): React.JSX.Element | null {
+  const state = useGame((s) => s.state)
+  const demand = useGame((s) => s.demand)
+  const dispatch = useGame((s) => s.dispatch)
+  const selectCity = useGame((s) => s.selectCity)
+  if (!state) return null
 
-export function CityPanel({ city, onClose }: CityPanelProps): React.JSX.Element | null {
+  const city = state.cities.get(cityId)
   if (!city) return null
 
-  // Grobe Vorschau des Quellpotenzials. Die belastbare Rechnung kommt in Phase 1
-  // mit @game/demand - hier nur Stufe 1 (Verkehrserzeugung), damit die Groessen-
-  // ordnungen frueh sichtbar und diskutierbar sind.
+  const stop = [...state.network.stations.values()].find((s) => s.cityId === cityId)
+  const cost = busStopCost(city.population)
+
+  // Erzeugte Reisen: Stufe 1 des Nachfragemodells, direkt aus den Potenzialen.
   const generated = Object.values(SEGMENTS).map((s) => ({
     label: s.label,
-    trips: Math.round(city.population * s.populationShare * s.tripsPerPersonDay),
+    trips: Math.round(city.potential?.[s.id].origin ?? 0),
   }))
   const totalTrips = generated.reduce((n, g) => n + g.trips, 0)
+
+  // Staerkste Ziele dieser Stadt - die Vorlage fuer die naechste Linie.
+  const destinations = demand
+    ? demand.pairs
+        .filter((p) => p.from === cityId)
+        .slice(0, 6)
+        .map((p) => ({
+          name: state.cities.get(p.to)?.name ?? '?',
+          trips: Math.round(p.totalTrips),
+          km: Math.round(p.distanceKm),
+        }))
+    : []
 
   return (
     <aside className="panel" aria-label={`Details zu ${city.name}`}>
@@ -27,7 +43,7 @@ export function CityPanel({ city, onClose }: CityPanelProps): React.JSX.Element 
           <h2>{city.name}</h2>
           <p className="muted">{city.country}</p>
         </div>
-        <button type="button" className="panel__close" onClick={onClose} aria-label="Schliessen">
+        <button type="button" className="panel__close" onClick={() => selectCity(null)} aria-label="Schließen">
           ×
         </button>
       </header>
@@ -42,28 +58,44 @@ export function CityPanel({ city, onClose }: CityPanelProps): React.JSX.Element 
           <dd className="num">{city.radiusKm.toFixed(1)} km</dd>
         </div>
         <div>
-          <dt>Position</dt>
-          <dd className="num">
-            {city.centre[1].toFixed(3)}° N, {city.centre[0].toFixed(3)}° O
-          </dd>
+          <dt>Erzeugte Reisen</dt>
+          <dd className="num">{de(totalTrips)} / Tag</dd>
         </div>
       </dl>
 
-      {city.absorbed && city.absorbed.length > 0 && (
+      {stop ? (
+        <p className="ok small">✓ Haltestelle vorhanden · Unterhalt {formatMoney(stop.upkeepPerDay)}/Tag</p>
+      ) : (
+        <button
+          type="button"
+          className="primary wide"
+          disabled={state.cash < cost}
+          onClick={() => dispatch({ kind: 'place_bus_stop', cityId })}
+        >
+          Haltestelle bauen · {formatMoney(cost)}
+        </button>
+      )}
+
+      {destinations.length > 0 && (
         <section>
-          <h3>Zur Agglomeration gerechnet</h3>
-          <ul className="chips">
-            {city.absorbed.map((a) => (
-              <li key={a.name}>
-                {a.name} <span className="muted num">+{de(a.population)}</span>
-              </li>
-            ))}
-          </ul>
+          <h3>Stärkste Ziele</h3>
+          <table className="segments">
+            <tbody>
+              {destinations.map((d) => (
+                <tr key={d.name}>
+                  <th scope="row">{d.name}</th>
+                  <td className="num">{de(d.trips)}</td>
+                  <td className="num muted">{d.km} km</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted small">Reisen pro Tag in diese Richtung, über alle Verkehrsmittel.</p>
         </section>
       )}
 
       <section>
-        <h3>Erzeugte Reisen pro Tag</h3>
+        <h3>Reisende nach Segment</h3>
         <table className="segments">
           <tbody>
             {generated.map((g) => (
@@ -77,9 +109,6 @@ export function CityPanel({ city, onClose }: CityPanelProps): React.JSX.Element 
             ))}
           </tbody>
         </table>
-        <p className="muted small">
-          Stufe 1 des Nachfragemodells (Verkehrserzeugung). Verteilung und Verkehrsmittelwahl folgen in Phase 1.
-        </p>
       </section>
     </aside>
   )

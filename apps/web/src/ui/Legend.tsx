@@ -1,4 +1,6 @@
-/** Groessenlegende: die Einwohnerzahl ist ueber den Radius kodiert, nicht ueber die Farbe. */
+import { useGame } from '../game/store.js'
+
+/** Größenlegende: die Einwohnerzahl ist über den Radius kodiert, nicht über die Farbe. */
 const SAMPLES = [
   { population: 50_000, label: '50 Tsd.' },
   { population: 250_000, label: '250 Tsd.' },
@@ -10,6 +12,7 @@ function dotRadius(population: number): number {
 }
 
 export function Legend(): React.JSX.Element {
+  const showDemand = useGame((s) => s.showDemand)
   const maxDiameter = dotRadius(Math.max(...SAMPLES.map((s) => s.population))) * 2
 
   return (
@@ -23,9 +26,18 @@ export function Legend(): React.JSX.Element {
           {s.label}
         </span>
       ))}
-      <span className="legend__item legend__item--catch">
-        <span className="legend__ring" /> Stadtradius
+      <span className="legend__sep" />
+      <span className="legend__item">
+        <span className="legend__ring legend__ring--stop" /> Haltestelle
       </span>
+      <span className="legend__item">
+        <span className="legend__stroke legend__stroke--line" /> Linie
+      </span>
+      {showDemand && (
+        <span className="legend__item">
+          <span className="legend__stroke legend__stroke--demand" /> Nachfrage
+        </span>
+      )}
     </div>
   )
 }

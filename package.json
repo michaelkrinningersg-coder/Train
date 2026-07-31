@@ -13,11 +13,18 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "data:cities": "pnpm --filter @game/pipeline cities",
-    "data:basemap": "pnpm --filter @game/pipeline basemap"
+    "data:basemap": "pnpm --filter @game/pipeline basemap",
+    "calibrate": "tsx tools/calibrate.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@game/domain": "workspace:*",
+    "@game/demand": "workspace:*",
+    "@game/economy": "workspace:*",
+    "@game/sim": "workspace:*",
+    "@game/geo": "workspace:*",
+    "tsx": "^4.20.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

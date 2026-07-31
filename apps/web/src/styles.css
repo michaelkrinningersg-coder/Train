@@ -11,6 +11,10 @@
   --text-secondary: #c3c2b7;
   --text-muted: #898781;
   --city: #3987e5;
+  --line: #199e70;
+  --demand: #c98500;
+  --good: #0ca30c;
+  --critical: #d03b3b;
 
   color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -99,6 +103,19 @@ body,
 .map {
   position: absolute;
   inset: 0;
+  z-index: 0;
+}
+
+/*
+ * Die Leinwaende von MapLibre und deck.gl liegen im selben Stapelkontext wie die
+ * Bedienflaechen. Ohne explizite z-index-Angabe zeichnen Kartenbeschriftungen
+ * ueber die Panels.
+ */
+.legend,
+.panel,
+.sidebar,
+.toast {
+  z-index: 2;
 }
 
 .maplibregl-ctrl-attrib {
@@ -180,7 +197,7 @@ body,
 /* ── Detailpanel ─────────────────────────────────────────────────────────── */
 .panel {
   position: absolute;
-  right: 12px;
+  right: 384px;
   top: 12px;
   bottom: 12px;
   width: 320px;
@@ -188,8 +205,8 @@ body,
   padding: 16px;
   border: 1px solid var(--hairline);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--surface) 99%, transparent);
+  backdrop-filter: blur(10px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
@@ -305,4 +322,487 @@ body,
   /* 4px gerundete Datenenden, an der Grundlinie verankert. */
   border-radius: 0 4px 4px 0;
   background: var(--city);
+}
+
+/* ── Kopfzeile, erweitert ────────────────────────────────────────────────── */
+.topbar__date {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.topbar__stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.topbar__label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.topbar__stat--bad b {
+  color: var(--critical);
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+.pos {
+  color: var(--good);
+}
+
+.neg {
+  color: var(--critical);
+}
+
+.ok {
+  color: var(--good);
+}
+
+.warn {
+  color: var(--critical);
+}
+
+.chip,
+.speed__btn {
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip:hover,
+.speed__btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.chip--on,
+.speed__btn--on {
+  background: color-mix(in srgb, var(--city) 22%, transparent);
+  border-color: var(--city);
+  color: var(--text-primary);
+}
+
+.speed {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* ── Seitenleiste ────────────────────────────────────────────────────────── */
+.sidebar {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 99%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.tabs button {
+  flex: 1;
+  padding: 10px 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tabs button.on {
+  color: var(--text-primary);
+  border-bottom-color: var(--city);
+}
+
+.sidebar__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.detail {
+  padding: 14px 16px 22px;
+}
+
+.detail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.detail h3 {
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.detail h3 .muted {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+/* ── Bedienelemente ──────────────────────────────────────────────────────── */
+button.primary {
+  padding: 6px 12px;
+  border: 1px solid var(--city);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--city) 24%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--city) 38%, transparent);
+}
+
+button.wide {
+  width: 100%;
+  margin: 10px 0 4px;
+}
+
+button.danger {
+  margin-top: 22px;
+  padding: 5px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: none;
+  color: var(--critical);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--city);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button.linkish:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.field {
+  margin: 10px 0;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.field input[type='range'] {
+  width: 100%;
+  accent-color: var(--city);
+}
+
+.field input[type='text'],
+select {
+  padding: 4px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--plane);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.field input[type='text'] {
+  width: 100%;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  padding: 4px 10px;
+  border: 0;
+  border-right: 1px solid var(--hairline);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button.on {
+  background: color-mix(in srgb, var(--city) 26%, transparent);
+  color: var(--text-primary);
+}
+
+/* ── Listen und Tabellen ─────────────────────────────────────────────────── */
+.linelist,
+.picklist,
+.loans,
+.catalogue,
+.draftlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.linelist li + li,
+.catalogue li + li {
+  margin-top: 6px;
+}
+
+.linelist button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.linelist button:hover {
+  border-color: var(--line);
+}
+
+.linelist__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.margin {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.badge {
+  color: var(--critical);
+}
+
+.draftlist {
+  counter-reset: stop;
+  margin: 8px 0;
+}
+
+.draftlist li {
+  counter-increment: stop;
+  padding: 4px 0 4px 24px;
+  position: relative;
+  font-size: 13px;
+}
+
+.draftlist li::before {
+  content: counter(stop);
+  position: absolute;
+  left: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.picklist label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.picklist label > span:nth-child(2) {
+  flex: 1;
+}
+
+.picklist input {
+  accent-color: var(--city);
+}
+
+.catalogue li {
+  padding: 9px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+}
+
+.catalogue__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.catalogue__specs {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.catalogue .row {
+  margin-top: 7px;
+}
+
+.catalogue button {
+  padding: 3px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fleet,
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.fleet th,
+.ledger th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--text-secondary);
+  padding: 3px 0;
+}
+
+.fleet thead th {
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.fleet td,
+.ledger td {
+  padding: 3px 0 3px 8px;
+  text-align: right;
+}
+
+.fleet td:first-child,
+.fleet td:nth-child(3) {
+  text-align: left;
+}
+
+.ledger__total th,
+.ledger__total td {
+  border-top: 1px solid var(--hairline);
+  padding-top: 6px;
+  font-weight: 600;
+}
+
+.loans li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.loans li > span:first-child {
+  flex: 1;
+}
+
+.spark {
+  width: 100%;
+  height: 64px;
+  display: block;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.map--picking {
+  cursor: crosshair;
+}
+
+/* ── Legende, erweitert ──────────────────────────────────────────────────── */
+.legend__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--hairline);
+}
+
+.legend__ring--stop {
+  border-color: var(--line);
+  background: none;
+}
+
+.legend__stroke {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legend__stroke--line {
+  background: var(--line);
+}
+
+.legend__stroke--demand {
+  background: var(--demand);
 }

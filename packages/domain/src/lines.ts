@@ -69,3 +69,19 @@ export function expandDepartures(pattern: ServicePattern): readonly Sec[] {
   for (let t = h.firstDeparture; t <= h.lastDeparture; t += step) out.push(t)
   return out
 }
+
+/**
+ * Standardtarif einer neuen Buslinie. Der Grundpreis ist bewusst spuerbar:
+ * ohne ihn waeren kurze Relationen unter jeder Kostendeckung, weil die Kosten
+ * einer Fahrt nicht linear mit der Entfernung fallen.
+ */
+export const DEFAULT_BUS_FARE: FarePolicy = {
+  perKm: { first: 25, second: 15 },
+  baseFare: 250,
+  priceIndex: 1,
+}
+
+export const DEFAULT_RUNTIME_RESERVE = 1.07
+
+/** Betriebszeit einer neuen Linie: 5 bis 21 Uhr. */
+export const DEFAULT_SERVICE_WINDOW = { firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 } as const

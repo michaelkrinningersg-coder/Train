@@ -1,61 +1,98 @@
-import type { City, CityId } from '@game/domain'
-import { useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { useCityDataset } from './data/dataset.js'
+import { SPEED_INTERVAL_MS, useGame, type Tab } from './game/store.js'
 import { MapView } from './map/MapView.js'
 import { CityPanel } from './ui/CityPanel.js'
+import { FinanceTab } from './ui/FinanceTab.js'
+import { FleetTab } from './ui/FleetTab.js'
 import { Legend } from './ui/Legend.js'
+import { NetworkTab } from './ui/NetworkTab.js'
+import { TopBar } from './ui/TopBar.js'
 
 const REGION = import.meta.env['VITE_REGION'] ?? 'bavaria'
 
+const TABS: { readonly id: Tab; readonly label: string }[] = [
+  { id: 'network', label: 'Netz' },
+  { id: 'fleet', label: 'Fuhrpark' },
+  { id: 'finance', label: 'Finanzen' },
+]
+
 export function App(): React.JSX.Element {
-  const state = useCityDataset(REGION)
-  const [selectedId, setSelectedId] = useState<CityId | null>(null)
+  const dataset = useCityDataset(REGION)
+  const ready = useGame((s) => s.ready)
+  const start = useGame((s) => s.start)
+  const tab = useGame((s) => s.tab)
+  const setTab = useGame((s) => s.setTab)
+  const speed = useGame((s) => s.speed)
+  const step = useGame((s) => s.step)
+  const selectedCityId = useGame((s) => s.selectedCityId)
+  const message = useGame((s) => s.message)
+  const notify = useGame((s) => s.notify)
 
-  const cities = state.status === 'ready' ? state.data.cities : []
-  const selected = useMemo(() => cities.find((c) => c.id === selectedId) ?? null, [cities, selectedId])
+  useEffect(() => {
+    if (dataset.status === 'ready' && !ready) start(dataset.data.cities)
+  }, [dataset, ready, start])
 
-  const totalPopulation = useMemo(() => cities.reduce((n, c) => n + c.population, 0), [cities])
+  // Spieluhr. Bewusst ein einfacher Timer: ein Betriebstag rechnet in wenigen
+  // Millisekunden, ein Web Worker waere hier noch verfrueht.
+  useEffect(() => {
+    if (speed === 0) return
+    const id = setInterval(() => step(1), SPEED_INTERVAL_MS[speed])
+    return () => clearInterval(id)
+  }, [speed, step])
+
+  useEffect(() => {
+    if (!message) return
+    const id = setTimeout(() => notify(null), 4000)
+    return () => clearTimeout(id)
+  }, [message, notify])
+
+  if (dataset.status === 'loading') {
+    return <p className="notice">Städte werden geladen …</p>
+  }
+  if (dataset.status === 'error') {
+    return (
+      <div className="notice notice--error">
+        <p>{dataset.message}</p>
+        <pre>pnpm data:cities</pre>
+      </div>
+    )
+  }
 
   return (
     <div className="app">
-      <header className="topbar">
-        <span className="topbar__brand">Rail &amp; Road</span>
-        {state.status === 'ready' && (
-          <>
-            <span className="topbar__region">{state.data.label}</span>
-            <span className="topbar__stat">
-              <b className="num">{cities.length}</b> Staedte
-            </span>
-            <span className="topbar__stat">
-              <b className="num">{totalPopulation.toLocaleString('de-DE')}</b> Einwohner
-            </span>
-            <span className="topbar__stat muted">
-              ab {state.data.minPopulation.toLocaleString('de-DE')} Einwohnern
-            </span>
-          </>
-        )}
-        <span className="topbar__phase">Phase 0</span>
-      </header>
-
+      <TopBar />
       <main className="stage">
-        {state.status === 'loading' && <p className="notice">Staedte werden geladen …</p>}
-        {state.status === 'error' && (
-          <div className="notice notice--error">
-            <p>{state.message}</p>
-            <pre>pnpm data:cities</pre>
+        {ready && <MapView view={dataset.data.view} />}
+        <Legend />
+        {selectedCityId && <CityPanel cityId={selectedCityId} />}
+
+        <aside className="sidebar">
+          <nav className="tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                className={tab === t.id ? 'on' : ''}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <div className="sidebar__body">
+            {tab === 'network' && <NetworkTab />}
+            {tab === 'fleet' && <FleetTab />}
+            {tab === 'finance' && <FinanceTab />}
           </div>
-        )}
-        {state.status === 'ready' && (
-          <>
-            <MapView
-              cities={cities}
-              view={state.data.view}
-              selectedId={selectedId}
-              onSelect={(city: City | null) => setSelectedId(city?.id ?? null)}
-            />
-            <Legend />
-            <CityPanel city={selected} onClose={() => setSelectedId(null)} />
-          </>
+        </aside>
+
+        {message && (
+          <div className="toast" role="status">
+            {message}
+          </div>
         )}
       </main>
     </div>

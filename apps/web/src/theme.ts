@@ -4,9 +4,14 @@
  * Referenzpalette (dunkle Flaeche #1a1a19).
  *
  * Wichtig zur Kodierung: die Einwohnerzahl wird ueber die *Groesse* der Punkte
- * kodiert, nicht zusaetzlich ueber die Farbe. Doppelte Kodierung derselben
- * Groesse bringt keine Information - und die Farbe wird spaeter fuer den
- * Netzstatus gebraucht (angebunden / nicht angebunden / ueberlastet).
+ * kodiert, nicht zusaetzlich ueber die Farbe. Die drei Kartenfarben trennen
+ * stattdessen die drei Datenarten: Staedte (blau), Nachfrage (orange), eigenes
+ * Netz (aqua). Als Satz gegen die dunkle Flaeche geprueft.
+ *
+ * Die Wirtschaftlichkeit einer Linie wird bewusst NICHT ueber Rot/Gruen auf der
+ * Karte kodiert - dieses Paar ist fuer Rotgruenblinde nicht unterscheidbar und
+ * ein Linienzug traegt keine Beschriftung, die das auffangen koennte. Zahlen und
+ * Status stehen in der Seitenleiste, wo Farbe, Zahl und Wort zusammenstehen.
  */
 export const THEME = {
   surface: '#1a1a19',
@@ -22,8 +27,10 @@ export const THEME = {
 
   /** Staedte. Kategorischer Slot 1 (blau), auf dunkler Flaeche >= 3:1. */
   city: '#3987e5',
-  /** Reserviert fuer den zweiten Datenkontext (Slot 2, orange). */
-  accent2: '#c98500',
+  /** Nachfrage-Overlay (Slot 2, orange). */
+  demand: '#c98500',
+  /** Eigenes Liniennetz (Slot 3, aqua). */
+  line: '#199e70',
 
   good: '#0ca30c',
   warning: '#fab219',

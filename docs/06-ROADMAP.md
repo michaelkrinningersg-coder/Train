@@ -34,22 +34,43 @@ je Segment.
 
 ---
 
-## Phase 1 — Busse und Nachfrage (2–3 Wochen)
+## Phase 1 — Busse und Nachfrage ✅ abgeschlossen
 
 **Ziel**: Das *Wirtschaftsspiel* funktioniert, ohne dass eine einzige Schiene existiert.
 
-- `packages/demand`: Gravitationsmodell + Logit, Reisezeiten zunächst per Luftlinien-Näherung
-- Bushaltestellen platzieren, Buslinien zwischen Städten anlegen
-- Busse kaufen, Takt und Preis setzen
-- `packages/economy`: Bilanz, Cashflow, Kredite
-- Nachfrage-Overlay auf der Karte (welche Relation hat wie viel Potenzial?)
+- [x] `packages/demand`: Verkehrserzeugung, Gravitationsverteilung, Logit-Verkehrsmittelwahl,
+      Tages-/Wochen-/Jahresganglinien. Reisezeiten per Luftlinien-Näherung.
+- [x] `packages/economy`: Bau- und Betriebskosten, Journal, Kredite, Fahrzeugalterung
+- [x] `packages/sim`: Befehle als reine Funktionen, Liniengeometrie, Betriebstag mit
+      stundenweiser Kapazitätsprüfung, Tagesabrechnung
+- [x] Bushaltestellen platzieren, Linien auf der Karte zeichnen, Busse kaufen und zuteilen
+- [x] Takt, Betriebszeit, Verkehrstage und Tarif einstellbar
+- [x] Nachfrage-Overlay auf der Karte
+- [x] Spieluhr mit Pause / Normal / Schnell / Einzelschritt
+- [x] `pnpm calibrate` als Balancing-Werkzeug
 
-**Abnahme**: Ich kann ein Busnetz in Bayern aufbauen, Preise variieren und sehe, wie sich
-Fahrgastzahlen und Gewinn verändern. Zu teuer → keiner fährt. Zu billig → voll, aber Verlust.
+**Abnahme erreicht**: Ein Busnetz in Bayern lässt sich aufbauen; Preis, Takt und Fahrzeugzahl
+verändern Fahrgastzahlen und Gewinn in die erwartete Richtung. Der Bericht in
+[03-NACHFRAGEMODELL §8](03-NACHFRAGEMODELL.md#8-kalibrierung) zeigt: nur dichte Korridore
+tragen sich, Überangebot wird bestraft.
+
+**Was aus Phase 1 offen blieb:**
+
+- Die Kapazitätsprüfung skaliert stundenweise über den **stärkst belasteten Abschnitt** der
+  ganzen Linie, nicht abschnittsweise. Bei langen Linien mit sehr ungleicher Belastung ist das
+  etwas zu streng. Für zwei- bis vierpunktige Buslinien ist der Unterschied vernachlässigbar;
+  spätestens bei der Bahn wird es abschnittsweise gerechnet.
+- Ein Umlauf darf gemischt besetzt sein; Sitzplätze, Komfort und Kosten werden dann gemittelt.
+  Etwas großzügig, aber ehrlicher als den Spieler zu einheitlichen Fahrzeugtypen zu zwingen.
+- Kein Umsteigen zwischen eigenen Linien — jede Relation wird nur direkt bedient. Das kommt
+  mit dem Netzrouting in Phase 3.
+- Die Simulation läuft im Hauptthread. Ein Betriebstag rechnet in wenigen Millisekunden;
+  der Web Worker wäre hier noch verfrüht. `@game/sim` ist bereits I/O-frei, der Umzug ist
+  später ein Verschieben, kein Umschreiben.
 
 > Warum Busse zuerst? Weil sie das komplette Nachfrage- und Wirtschaftsmodell testen, ohne die
-> aufwändige Betriebssimulation zu brauchen. Wenn das Balancing hier nicht stimmt, stimmt es
-> mit Zügen erst recht nicht.
+> aufwändige Betriebssimulation zu brauchen. Das hat sich ausgezahlt: das Balancing war beim
+> ersten Wurf um den Faktor 5 daneben, und das ließ sich hier in Stunden statt Wochen finden.
 
 ---
 

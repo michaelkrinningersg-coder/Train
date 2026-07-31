@@ -39,6 +39,7 @@ Hinter einem Proxy braucht Node's `fetch` ein Flag: `NODE_USE_ENV_PROXY=1 pnpm d
 | `pnpm build` | Produktionsbuild |
 | `pnpm data:cities [-- --region=dach]` | Städtedatensatz erzeugen |
 | `pnpm data:basemap [-- --region=dach]` | Basiskacheln der Region cachen |
+| `pnpm calibrate` | Kalibrierungsbericht für Nachfrage und Wirtschaftlichkeit |
 
 ## Struktur
 
@@ -46,10 +47,26 @@ Hinter einem Proxy braucht Node's `fetch` ein Flag: `NODE_USE_ENV_PROXY=1 pnpm d
 apps/web/          React + Vite + MapLibre + deck.gl
 packages/domain/   Reine Typen und Konstanten des Spiels
 packages/geo/      Distanzen, Polylinienlängen, Bounding-Boxen
+packages/demand/   Verkehrserzeugung, Gravitationsmodell, Verkehrsmittelwahl
+packages/economy/  Kosten, Journal, Kredite, Fahrzeugalterung
+packages/sim/      Befehle, Betriebstag, Tagesabrechnung
 data/pipeline/     Offline-Aufbereitung (GeoNames, Kacheln)
 data/seed/         Erzeugte Artefakte, zur Laufzeit unter /seed/… geladen
+tools/             Kalibrierungswerkzeug
 docs/              Konzept, Tech-Stack, Modelle, Roadmap
 ```
+
+## So spielt man
+
+1. Eine Stadt auf der Karte anklicken → **Haltestelle bauen**
+2. Dasselbe in einer zweiten Stadt
+3. Reiter **Fuhrpark** → Busse kaufen
+4. Reiter **Netz** → **Neue Linie** → die Haltestellen der Reihe nach anklicken → anlegen
+5. In der Linie Fahrzeuge zuteilen, Takt und Tarif einstellen
+6. Oben rechts **▶** — und zusehen, ob es sich trägt
+
+Der Knopf **Nachfrage** blendet die stärksten Reiserelationen ein. Wo dort dicke Linien
+verlaufen, lohnt sich eine Buslinie.
 
 ## Dokumentation
 
@@ -65,5 +82,6 @@ docs/              Konzept, Tech-Stack, Modelle, Roadmap
 
 ## Status
 
-**Phase 0 abgeschlossen** — Monorepo, Domänenmodell, Städtepipeline und Kartenansicht
-stehen. Als Nächstes Phase 1: Busse und das Nachfragemodell.
+**Phase 1 abgeschlossen** — spielbar: Haltestellen bauen, Buslinien anlegen, Fahrzeuge
+kaufen, Takt und Preis einstellen, Betriebstage simulieren und die Bilanz verfolgen.
+Als Nächstes Phase 2: das Schienennetz bauen.

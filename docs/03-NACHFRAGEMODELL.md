@@ -208,14 +208,60 @@ Optional später: **Klassen** (1./2.) mit getrennter Preissetzung, und Zeitkarte
 
 ## 8. Kalibrierung
 
-Vorgehen, sobald die Pipeline steht:
+`pnpm calibrate` (Skript in `tools/calibrate.ts`) erzeugt einen Bericht über alle drei
+Stufen plus die Wirtschaftlichkeit. Er ist zum Lesen gedacht, nicht zum Bestehen: es gibt
+keine Sollgröße, sondern Größenordnungen, die man gegen die Wirklichkeit hält.
+
+### Stand nach Phase 1
+
+**Was gegenüber den Startwerten geändert wurde und warum:**
+
+1. **Bestandsverkehr ergänzt.** Ohne ihn hätte die erste Buslinie ein Monopol auf den
+   gesamten öffentlichen Verkehr eines Korridors gehabt — München–Augsburg amortisierte
+   sich in 96 Tagen. Der Bestandsverkehr ist ein durchschnittliches Regionalbahnangebot,
+   dessen Qualität von der **kleineren** der beiden Städte abhängt: Großstädte liegen an
+   Hauptstrecken (Stundentakt, 95 km/h), Kleinstädte an Nebenbahnen (3-Stunden-Takt,
+   60 km/h, ein Umstieg). Ohne diese Staffelung wäre zwischen Bayreuth und Hof dasselbe
+   Angebot unterstellt wie zwischen München und Augsburg.
+
+2. **`ASC` für den Bus deutlich gesenkt** (Berufspendler −0,6 → −1,8; Geschäftsreisende
+   −1,8 → −2,6). Die Startwerte ergaben 25 % Busanteil bei Pendlern auf einer 70-km-Relation
+   — real liegt der Interregio-Busanteil bei wenigen Prozent.
+
+3. **Betriebskosten realistisch angehoben.** `fuelCostPerKm` deckt jetzt auch Reifen und
+   Verschleiß, `crewCostPerHour` ist Arbeitgeberaufwand statt Bruttolohn (22 → 38 €/h).
+   Neu ist ein Verwaltungs- und Vertriebsanteil von 18 % des Fahrgelderlöses plus 80 €/Tag
+   je betriebener Linie. Ohne diesen Posten war jede Linie absurd profitabel: Kraftstoff
+   und Personal decken den Fahrbetrieb ab, nicht den Apparat drumherum.
+
+**Ergebnis** (Wochenmittel, Bayern-Datensatz):
+
+| Korridor | Angebot | Fahrgäste/Tag | Ergebnis | Amortisation |
+|---|---|---|---|---|
+| München–Augsburg (71 km) | 4 Überlandbusse, 60′ | 919 | +6 454 €/Tag | 0,4 Jahre |
+| München–Augsburg | 8 Reisebusse, 30′ | 1 335 | +7 167 €/Tag | 0,8 Jahre |
+| Nürnberg–Fürth–Erlangen (25 km) | 4 Überlandbusse, 60′ | 985 | +2 163 €/Tag | 1,3 Jahre |
+| München–Ingolstadt (88 km) | 4 Überlandbusse, 60′ | 282 | −474 €/Tag | Verlust |
+| Bayreuth–Hof (59 km) | 3 Überlandbusse, 60′ | 64 | −2 217 €/Tag | Verlust |
+| Bayreuth–Hof | 1 Kleinbus, 180′ | 15 | −604 €/Tag | Verlust |
+| München–Augsburg | 24 Überlandbusse, 10′ | 1 592 | −2 074 €/Tag | Verlust |
+
+Das ist die gewünschte Form: **nur dichte Korridore tragen sich, Überangebot wird bestraft,
+und Skalierung senkt die Rendite** — die erste Linie ist ein Glücksfall, jede weitere harte
+Arbeit. Dass München–Augsburg sich in unter einem Jahr amortisiert, ist die Belohnung dafür,
+den stärksten Korridor Bayerns gefunden zu haben.
+
+**Ehrliche Einschränkung:** Kalibriert ist gegen Plausibilität, nicht gegen Messwerte.
+Der Abgleich mit echten Fahrgastzahlen von Referenzstrecken steht noch aus — dafür braucht es
+Zahlen, die frei verfügbar und vergleichbar sind. Bis dahin gilt: die *Verhältnisse* zwischen
+Korridoren sind belastbarer als die absoluten Zahlen.
+
+### Vorgehen für die nächste Runde
 
 1. Referenzrelationen mit bekannten Fahrgastzahlen zusammenstellen (10–15 Stück, gemischt
    nach Distanz und Land).
-2. Modell mit Standardparametern rechnen, Verhältnis Modell/Realität je Relation ermitteln.
-3. Globale Skalierung `K` so setzen, dass der Median passt.
-4. `d₀` je Segment anpassen, bis die Distanzverteilung stimmt (kurze vs. lange Relationen).
-5. `ASC` anpassen, bis die Modal-Split-Anteile plausibel sind.
-
-Diese Kalibrierung gehört als Skript nach `data/pipeline/calibrate.ts` mit einem
-Regressionstest, damit spätere Parameteränderungen nicht unbemerkt das Balancing zerstören.
+2. Verhältnis Modell/Realität je Relation ermitteln, globale Skalierung am Median setzen.
+3. `d₀` je Segment anpassen, bis die Distanzverteilung stimmt.
+4. `ASC` anpassen, bis die Modal-Split-Anteile passen.
+5. Ergebnis als Regressionstest festhalten, damit spätere Parameteränderungen das Balancing
+   nicht unbemerkt zerstören.
