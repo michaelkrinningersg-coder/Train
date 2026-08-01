@@ -566,6 +566,77 @@ Wiederholen eines Schritts mit dem Netz von vorher.
 
 ---
 
+## Phase 5e — Aufträge nachgerechnet (erledigt)
+
+**Anlass**: Ein Testlauf im Browser. „Die Nord-Süd-Achse" gab 400 Mio. € und
+verlangte Hamburg–München mit der Bahn. Der erste Abschnitt, Hamburg nach
+Hannover, kostete 215 Mio. — nach dem zweiten war Schluss. Der Auftrag war
+**unlösbar**, und niemandem wäre es aufgefallen: die Ziele hatte nie jemand
+nachgerechnet.
+
+Daraus wurde `tools/missions.ts` (`pnpm missions`) — was `calibrate` für das
+Modell ist, ist das hier für die Aufträge. Gespielt wird nicht optimal, sondern
+**plausibel**; kommt eine ordentliche Lösung nicht durch, ist der Auftrag zu
+schwer und nicht der Spieler zu ungeschickt. Jeder Auftrag läuft in mehreren
+Varianten, denn ein Ziel ist erst dann richtig gesetzt, wenn die knappe Lösung
+scheitert und die ordentliche durchkommt.
+
+### Was die Korridore kosten
+
+| Bauweise | Hamburg–München (753 km) | Duisburg–Dortmund (49 km) |
+|---|---|---|
+| einfach (120, 1 Gleis, Diesel) | 1 765 Mio. € | 90 Mio. € |
+| solide (160, 1 Gleis, elektrisch) | 2 534 Mio. € | 132 Mio. € |
+| zweigleisig (160, elektrisch) | 4 539 Mio. € | 238 Mio. € |
+| Schnellfahrstrecke (250, ETCS) | 7 756 Mio. € | 405 Mio. € |
+
+### Die Nord-Süd-Achse, gemessen
+
+| Lösung | Fahrgäste | Pünktlichkeit | Kasse nach 6 Jahren |
+|---|---|---|---|
+| eingleisig elektrisch, 60′ | 347 | 0 % | 3 659 Mio. € |
+| zweigleisig, 60′ | 4 113 | 100 % | 1 813 Mio. € |
+| zweigleisig, 60′ + 7 Zubringer | **5 370** | **100 %** | **1 805 Mio. €** |
+| zweigleisig, 30′ + 7 Zubringer | 6 458 | 99 % | 1 275 Mio. € |
+
+Drei Befunde:
+
+- **Eingleisig über 753 km ist unbrauchbar**: 0 % Pünktlichkeit, 347 Fahrgäste.
+  Jede Begegnung blockiert. Eine Fernachse *muss* zweigleisig sein — das ist
+  keine Balancing-Entscheidung, das fällt aus dem Blockmodell heraus.
+- **Die Achse allein trägt nicht.** 4 113 Fahrgäste sind 30 % der angebotenen
+  Plätze; erst die Zubringer bringen sie auf 5 370.
+- **Mehr Takt ist nicht besser.** Der Halbstundentakt bringt tausend Fahrgäste
+  mehr und kostet 530 Mio. € Kasse — der Betrieb wächst schneller als der Erlös.
+
+Die Ziele stehen jetzt so, dass genau die dritte Zeile durchkommt: 5 000
+Fahrgäste (schließt „ohne Zubringer" aus), 90 % Pünktlichkeit (schließt
+„eingleisig" aus), 1 500 Mio. € auf dem Konto (schließt „Halbstundentakt" aus).
+Startkapital 7 000 Mio. statt 400.
+
+### Pendlerland Ruhr
+
+| Lösung | Fahrgäste | Tagesgewinn | Zufriedenheit |
+|---|---|---|---|
+| eine Achse, 30′ | 2 688 | 8 686 € | 94 % |
+| Achse 15′ + Südast | **6 909** | **22 Tsd. €** | **99 %** |
+
+Ziele: 4 000 Fahrgäste und 15 000 € Tagesgewinn — beides trennt. Die Frist ging
+von vier auf drei Jahre; erfüllt war der Auftrag ohnehin nach einem Monat.
+
+**Was dabei sonst auffiel:** ein Ziel mit Geldbetrag stand als „2.257.930
+Tagesgewinn" im Bericht — der Modellwert in Cent, ungerechnet. Eine Zahl, die
+man einmal glaubt und dann falsch entscheidet. Geldbeträge werden jetzt überall
+kompakt formatiert, auch in der Auftragsanzeige.
+
+**Was offen bleibt:** Die Fernverkehrsnachfrage ist womöglich zu niedrig
+kalibriert. 4 113 Fahrgäste auf der ganzen Achse Hamburg–München sind wenig für
+eine Relation, auf der real ein Vielfaches fährt. Das ist eine Frage an das
+Nachfragemodell (`decayKm` der Segmente) und nicht an den Auftrag — sie steht
+als eigener Punkt aus.
+
+---
+
 ## Phase 5 — Europa (2–3 Wochen)
 
 - Pipeline auf Mitteleuropa, dann Europa hochziehen

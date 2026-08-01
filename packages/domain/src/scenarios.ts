@@ -162,12 +162,16 @@ export const SCENARIOS: readonly Scenario[] = [
       'ist das Auto hier ein harter Gegner. Kurze Wege verzeihen keine Umwege und keine ' +
       'langen Takte. Bauen Sie ein Netz, das trotzdem trägt.',
     startingCash: 8_000_000_00,
-    deadlineDays: 4 * YEAR,
+    deadlineDays: 3 * YEAR,
+    // Nachgerechnet mit `pnpm missions`: eine Achse im Halbstundentakt bringt
+    // 2 713 Fahrgaeste und 8 794 € am Tag, dieselbe Achse im Viertelstundentakt
+    // mit Suedast 6 996 und 23 000 €. Die Ziele liegen dazwischen - die knappe
+    // Loesung scheitert, die ordentliche kommt durch.
     goals: [
       { kind: 'connect', from: 'Duisburg', to: 'Dortmund', maxTransfers: 1 },
       { kind: 'daily_passengers', count: 4_000 },
-      { kind: 'daily_profit', amount: 5_000_00 },
-      { kind: 'satisfaction', value: 0.85 },
+      { kind: 'daily_profit', amount: 15_000_00 },
+      { kind: 'satisfaction', value: 0.9 },
     ],
     hints: [
       'Bei kurzen Entfernungen entscheidet der Takt, nicht die Geschwindigkeit.',
@@ -189,14 +193,27 @@ export const SCENARIOS: readonly Scenario[] = [
       'schnell genug ist und der Fahrplan hält. Bauen Sie die Achse, halten Sie sie ' +
       'pünktlich, und lassen Sie sich nicht von den Streckenbaukosten überraschen: ' +
       'sie fallen an, bevor der erste Fahrgast zahlt.',
-    startingCash: 400_000_000_00,
+    // 753 km zweigleisig elektrisch kosten 4 539 Mio. €, dazu Zuege und
+    // Reserve. Mit den urspruenglichen 400 Mio. reichte es fuer *einen*
+    // Abschnitt - der Auftrag war unloesbar, und aufgefallen ist es erst, als
+    // ihn jemand nachgerechnet hat.
+    startingCash: 7_000_000_000_00,
     deadlineDays: 6 * YEAR,
+    /**
+     * Alle vier Ziele sind gemessen (`pnpm missions`), und jedes trennt:
+     *
+     * - **Puenktlichkeit** erzwingt zweigleisig. Eingleisig ueber 753 km ergibt
+     *   0 % und 347 Fahrgaeste — jede Begegnung blockiert.
+     * - **Fahrgaeste** erzwingen Zubringer. Die Achse allein bringt 4 113, mit
+     *   sieben Zubringerbussen 5 370.
+     * - **Kasse** verbietet das Uebertreiben. Halbstundentakt bringt 6 458
+     *   Fahrgaeste, kostet aber 381 Tsd. € am Tag und endet bei 1 275 Mio.
+     */
     goals: [
       { kind: 'connect', from: 'Hamburg', to: 'München', maxTransfers: 1 },
-      { kind: 'lines', count: 2, mode: 'rail' },
-      { kind: 'daily_passengers', count: 12_000 },
+      { kind: 'daily_passengers', count: 5_000 },
       { kind: 'punctuality', value: 0.9 },
-      { kind: 'daily_profit', amount: 20_000_00 },
+      { kind: 'cash', amount: 1_500_000_000_00 },
     ],
     hints: [
       'Eine eingleisige Fernstrecke trägt keinen dichten Takt — jede Begegnung kostet Wartezeit.',
@@ -211,7 +228,7 @@ export const SCENARIOS: readonly Scenario[] = [
         'Hamburg', 'Hannover', 'Kassel', 'Frankfurt am Main', 'Mannheim', 'Stuttgart', 'Augsburg', 'München',
       ],
     },
-    grant: 300_000_000_00,
+    grant: 6_500_000_000_00,
   },
 
   {

@@ -1,3 +1,4 @@
+import { formatMoney } from '@game/economy'
 import { formatDate, type CityId, type GameState, type Goal, type LineDayResult, type Scenario } from '@game/domain'
 
 /**
@@ -146,11 +147,13 @@ function progressOf(state: GameState, goal: Goal): GoalProgress {
     case 'daily_passengers':
       return make(`${goal.count.toLocaleString('de-DE')} Fahrgäste am Tag`, day?.passengers ?? 0, goal.count)
 
+    // Kompakt, nicht ausgeschrieben: "1.500.000.000 € auf dem Konto" liest
+    // niemand richtig, "1.500 Mio. €" schon.
     case 'daily_profit':
-      return make(`${(goal.amount / 100).toLocaleString('de-DE')} € Tagesgewinn`, day?.profit ?? 0, goal.amount)
+      return make(`${formatMoney(goal.amount, { compact: true })} Tagesgewinn`, day?.profit ?? 0, goal.amount)
 
     case 'cash':
-      return make(`${(goal.amount / 100).toLocaleString('de-DE')} € auf dem Konto`, state.cash, goal.amount)
+      return make(`${formatMoney(goal.amount, { compact: true })} auf dem Konto`, state.cash, goal.amount)
 
     case 'lines': {
       const matching = [...state.lines.values()].filter((l) => !goal.mode || l.mode === goal.mode)

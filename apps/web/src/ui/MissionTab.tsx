@@ -1,4 +1,5 @@
 import { campaignStep, scenarioById, formatDate } from '@game/domain'
+import { formatMoney } from '@game/economy'
 import { scenarioStatus } from '@game/sim'
 import { useMemo } from 'react'
 import { useGame } from '../game/store.js'
@@ -124,7 +125,7 @@ export function MissionOutcome(): React.JSX.Element | null {
           </div>
           <div>
             <dt>Kasse</dt>
-            <dd className="num">{(state.cash / 100).toLocaleString('de-DE')} €</dd>
+            <dd className="num">{formatMoney(state.cash, { compact: true })}</dd>
           </div>
           <div>
             <dt>Linien</dt>
@@ -152,7 +153,7 @@ export function MissionOutcome(): React.JSX.Element | null {
         {won && next && (
           <p className="muted small">
             Netz, Fuhrpark und Kasse bleiben stehen
-            {next.grant ? `, dazu ${(next.grant / 100).toLocaleString('de-DE')} € Zuschuss` : ''}.
+            {next.grant ? `, dazu ${formatMoney(next.grant, { compact: true })} Zuschuss` : ''}.
           </p>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { CAMPAIGNS, SCENARIOS, formatDate, type City, type Goal } from '@game/domain'
+import { formatMoney } from '@game/economy'
 import { useGame } from '../game/store.js'
 
 /**
@@ -52,7 +53,7 @@ export function StartScreen({ cities }: { readonly cities: readonly City[] }): R
                   ))}
                 </ol>
                 <footer className="mission__foot">
-                  <span>{(first.startingCash / 100).toLocaleString('de-DE')} € Startkapital</span>
+                  <span>{formatMoney(first.startingCash, { compact: true })} Startkapital</span>
                   <span>{steps.length} Aufträge nacheinander</span>
                 </footer>
               </button>
@@ -73,7 +74,7 @@ export function StartScreen({ cities }: { readonly cities: readonly City[] }): R
                 ))}
               </ul>
               <footer className="mission__foot">
-                <span>{(scenario.startingCash / 100).toLocaleString('de-DE')} € Startkapital</span>
+                <span>{formatMoney(scenario.startingCash, { compact: true })} Startkapital</span>
                 <span>{years(scenario.deadlineDays)}</span>
               </footer>
             </button>
@@ -95,9 +96,9 @@ function goalLabel(goal: Goal): string {
     case 'daily_passengers':
       return `${goal.count.toLocaleString('de-DE')} Fahrgäste am Tag`
     case 'daily_profit':
-      return `${(goal.amount / 100).toLocaleString('de-DE')} € Tagesgewinn`
+      return `${formatMoney(goal.amount, { compact: true })} Tagesgewinn`
     case 'cash':
-      return `${(goal.amount / 100).toLocaleString('de-DE')} € auf dem Konto`
+      return `${formatMoney(goal.amount, { compact: true })} auf dem Konto`
     case 'lines':
       return `${goal.count} ${goal.mode === 'rail' ? 'Bahnlinien' : goal.mode === 'bus' ? 'Buslinien' : 'Linien'}`
     case 'stations':
