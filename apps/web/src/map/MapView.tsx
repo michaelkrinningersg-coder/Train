@@ -212,6 +212,10 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
             else store.notify(`${city.name} hat ${rail ? 'noch keinen Bahnhof' : 'noch keine Haltestelle'}.`)
             return
           }
+          // In den Bauwerkzeugen wertet die Kartenebene den Klick selbst aus.
+          // Das Stadtpanel duerfte hier nicht aufgehen: es legt sich ueber
+          // genau den Kartenausschnitt, in dem gerade weitergebaut wird.
+          if (actions.current.mapMode !== 'idle') return
           store.selectCity(city.id)
         },
       }),

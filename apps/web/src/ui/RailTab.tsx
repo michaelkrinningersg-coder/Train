@@ -233,6 +233,9 @@ function TrackDraftPanel(): React.JSX.Element | null {
   if (!state || !draft) return null
 
   const start = draft.from ? state.network.nodes.get(draft.from) : undefined
+  const fromName = start
+    ? ([...state.network.stations.values()].find((s) => s.nodeId === start.id)?.name ?? 'hier')
+    : 'hier'
   const geometry = start
     ? [start.position, ...draft.waypoints, ...(hoverPoint ? [hoverPoint] : [])]
     : []
@@ -244,8 +247,27 @@ function TrackDraftPanel(): React.JSX.Element | null {
       <p className="muted small">
         {!draft.from
           ? 'Startbahnhof auf der Karte anklicken.'
-          : 'Weiter klicken setzt Stützpunkte der Trasse; ein Klick auf einen Bahnhof schließt sie ab. Rücktaste nimmt einen Stützpunkt zurück, Escape bricht ab.'}
+          : draft.chain.segments === 0
+            ? 'Weiter klicken setzt Stützpunkte der Trasse; ein Klick auf einen Bahnhof schließt sie ab. Rücktaste nimmt einen Stützpunkt zurück, Escape bricht ab.'
+            : `Der Abschnitt ist vergeben. Es geht ab ${fromName} weiter — nächsten Bahnhof anklicken oder mit „Fertig“ aufhören.`}
       </p>
+
+      {draft.chain.segments > 0 && (
+        <dl className="facts facts--strip">
+          <div>
+            <dt>Abschnitte</dt>
+            <dd className="num">{draft.chain.segments}</dd>
+          </div>
+          <div>
+            <dt>Kette</dt>
+            <dd className="num">{draft.chain.lengthKm.toFixed(0)} km</dd>
+          </div>
+          <div>
+            <dt>bisher</dt>
+            <dd className="num">{formatMoney(draft.chain.cost, { compact: true })}</dd>
+          </div>
+        </dl>
+      )}
 
       <h3>Ausbaustand</h3>
       <div className="field">
@@ -347,8 +369,10 @@ function TrackDraftPanel(): React.JSX.Element | null {
         <button type="button" disabled={draft.waypoints.length === 0} onClick={undo}>
           Stützpunkt zurück
         </button>
-        <button type="button" onClick={cancelBuild}>
-          Abbrechen
+        {/* Nach dem ersten Abschnitt gibt es nichts mehr abzubrechen — das
+            Gebaute steht. Der Knopf beendet dann nur noch die Kette. */}
+        <button type="button" className={draft.chain.segments > 0 ? 'primary' : ''} onClick={cancelBuild}>
+          {draft.chain.segments > 0 ? 'Fertig' : 'Abbrechen'}
         </button>
       </div>
     </div>

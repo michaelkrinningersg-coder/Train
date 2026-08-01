@@ -282,6 +282,17 @@ body,
   font-size: 13px;
 }
 
+/* Drei Zahlen nebeneinander statt untereinander — fuer Zwischenstaende,
+   die begleiten sollen, ohne das Panel zu verlaengern. */
+.facts--strip {
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.facts--strip > div {
+  display: block;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

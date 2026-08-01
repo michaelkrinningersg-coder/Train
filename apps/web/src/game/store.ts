@@ -22,7 +22,7 @@ import {
 } from '@game/domain'
 import type { ElevationGrid } from '@game/geo'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
-import { applyCommand, applyScenarioSetup, createGame, makeSave, readSave, STARTING_CASH } from '@game/sim'
+import { applyCommand, applyScenarioSetup, createGame, makeSave, previewTrack, readSave, STARTING_CASH } from '@game/sim'
 import { createSimClient } from './simClient.js'
 import { AUTOSAVE_SLOT, writeSlot } from './storage.js'
 import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
@@ -40,6 +40,9 @@ export const DEFAULT_TRACK_SPEC: TrackSpec = {
   tracks: 1,
   signalling: 'classic',
 }
+
+/** Noch nichts gebaut - der Ausgangswert jeder Baukette. */
+const EMPTY_CHAIN = { segments: 0, lengthKm: 0, cost: 0 } as const
 
 /** Spieltage zwischen zwei automatischen Speicherungen. */
 export const AUTOSAVE_EVERY_DAYS = 30
@@ -111,6 +114,13 @@ interface GameStore {
     readonly from: NodeId | null
     readonly waypoints: readonly LngLat[]
     readonly spec: TrackSpec
+    /**
+     * Was in diesem Zug bereits gebaut wurde. Eine Achse ueber 800 km besteht
+     * aus sieben Abschnitten; jeden einzeln zu starten waere Klickarbeit ohne
+     * Erkenntniswert. Nach jedem Abschluss laeuft der Entwurf am Zielbahnhof
+     * weiter, und diese Summe zeigt, was die Kette bis hierhin gekostet hat.
+     */
+    readonly chain: { readonly segments: number; readonly lengthKm: number; readonly cost: number }
   } | null
   readonly selectedTrackId: TrackId | null
   /** Wird gerade eine Bus- oder eine Bahnlinie entworfen? */
@@ -376,11 +386,11 @@ export const useGame = create<GameStore>((set, get) => ({
   beginTrack: () =>
     set({
       mapMode: 'draw-track',
-      trackDraft: { from: null, waypoints: [], spec: DEFAULT_TRACK_SPEC },
+      trackDraft: { from: null, waypoints: [], spec: DEFAULT_TRACK_SPEC, chain: EMPTY_CHAIN },
       stationDraft: null,
       selectedTrackId: null,
-  draftMode: 'bus',
-  showTimetable: false,
+      draftMode: 'bus',
+      showTimetable: false,
       tab: 'rail',
     }),
 
@@ -406,14 +416,47 @@ export const useGame = create<GameStore>((set, get) => ({
     const to = state?.network.nodes.get(nodeId)
     if (!from || !to) return
 
+    // Steht der Abschnitt schon, ist der Klick kein Fehler, sondern der Wunsch
+    // weiterzugehen: die Kette springt ueber die vorhandene Strecke hinweg.
+    const existing = [...(state?.network.tracks.values() ?? [])].some(
+      (t) =>
+        (t.from === from.id && t.to === to.id) || (t.from === to.id && t.to === from.id),
+    )
+    if (existing) {
+      set({
+        trackDraft: { ...trackDraft, from: nodeId, waypoints: [] },
+        hoverPoint: null,
+        message: 'Dieser Abschnitt steht schon — weiter ab hier.',
+      })
+      return
+    }
+
+    const geometry = [from.position, ...trackDraft.waypoints, to.position]
+    const preview = previewTrack(geometry, trackDraft.spec, get().elevation ?? undefined)
     const ok = dispatch({
       kind: 'build_track',
       from: trackDraft.from,
       to: nodeId,
-      geometry: [from.position, ...trackDraft.waypoints, to.position],
+      geometry,
       spec: trackDraft.spec,
     })
-    if (ok) set({ mapMode: 'idle', trackDraft: null, hoverPoint: null })
+    if (!ok) return
+
+    // Kettenbau: der Zielbahnhof wird zum neuen Startbahnhof. Wer nur einen
+    // Abschnitt wollte, drueckt Escape - wer eine Achse baut, klickt weiter.
+    set({
+      trackDraft: {
+        from: nodeId,
+        waypoints: [],
+        spec: trackDraft.spec,
+        chain: {
+          segments: trackDraft.chain.segments + 1,
+          lengthKm: trackDraft.chain.lengthKm + preview.lengthKm,
+          cost: trackDraft.chain.cost + preview.cost,
+        },
+      },
+      hoverPoint: null,
+    })
   },
 
   trackAddWaypoint: (point) =>
