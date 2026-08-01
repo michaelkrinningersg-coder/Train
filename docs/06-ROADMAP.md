@@ -629,11 +629,11 @@ Tagesgewinn" im Bericht — der Modellwert in Cent, ungerechnet. Eine Zahl, die
 man einmal glaubt und dann falsch entscheidet. Geldbeträge werden jetzt überall
 kompakt formatiert, auch in der Auftragsanzeige.
 
-**Was offen bleibt:** Die Fernverkehrsnachfrage ist womöglich zu niedrig
-kalibriert. 4 113 Fahrgäste auf der ganzen Achse Hamburg–München sind wenig für
-eine Relation, auf der real ein Vielfaches fährt. Das ist eine Frage an das
-Nachfragemodell (`decayKm` der Segmente) und nicht an den Auftrag — sie steht
-als eigener Punkt aus.
+**Was hier offen blieb** und in Phase 5h erledigt wurde: die Fernverkehrsnachfrage
+war zu niedrig kalibriert. 4 113 Fahrgäste auf der ganzen Achse Hamburg–München
+sind wenig für eine Relation, auf der real ein Vielfaches fährt. Es war eine
+Frage an das Nachfragemodell und nicht an den Auftrag — die Zahlen in diesem
+Abschnitt stammen deshalb aus der Zeit davor und sind mit Phase 5h überholt.
 
 ---
 
@@ -755,6 +755,71 @@ Nachfragematrix wird neu gebaut, wenn eine Änderung greift; das kostet für
 Deutschland rund eine Sekunde, einmal auf 365 Betriebstage.
 
 Speicherformat **5**.
+
+---
+
+## Phase 5h — Die Fernverkehrsnachfrage, gemessen (erledigt)
+
+Die größte bekannte Unwahrheit im Modell, und sie stand seit Phase 5e als offener Punkt in
+diesem Dokument: **728 Reisen am Tag zwischen Hamburg und München**, über alle
+Verkehrsmittel. Damit kann sich keine 4,5-Milliarden-Trasse tragen — die Kernfantasie des
+Spiels war wirtschaftlich sinnlos, und der Auftrag „Die Nord-Süd-Achse" nur lösbar, weil er
+sieben Milliarden geschenkt bekam.
+
+Kalibriert wurde gegen amtliche Zahlen (Destatis, Umweltbundesamt); Herleitung, Anker und
+ehrliche Einschränkungen stehen in
+[03 §8](03-NACHFRAGEMODELL.md#stand-nach-phase-5h--die-fernverkehrsnachfrage-gemessen).
+Das Ergebnis: die *Form* der Abklingfunktion war richtig, nur das *Niveau* der drei
+Fernsegmente um den Faktor vier zu niedrig.
+
+| | vorher | nachher |
+|---|---|---|
+| Reisen ab 100 km | 887 000/Tag (0,31× Ziel) | **2,75 Mio./Tag (0,98×)** |
+| Hamburg – München | 728/Tag | **2 882/Tag** |
+| München – Berlin | 3 329/Tag | **13 188/Tag** |
+
+### Was daran hing
+
+**Die Aufträge mussten neu eingemessen** (`pnpm missions`), und diesmal wurden sie besser
+statt nur anders. Die Nord-Süd-Achse trägt jetzt 16 894 Fahrgäste statt 4 113, also braucht
+sie kein geschenktes Kapital mehr: **5 500 statt 7 000 Mio.**, und davon kostet die Trasse
+allein 4 539. Der Auftrag ist damit eine Frage des Betriebs geworden statt des Bauens.
+
+Vier Lösungen, gemessen, und genau eine besteht:
+
+| Lösung | Fahrgäste | Pünktlichkeit | Kasse nach 6 Jahren | |
+|---|---|---|---|---|
+| eingleisig, 60′ | 1 132 | 0 % | 2 181 Mio. | Trasse zu schwach |
+| zweigleisig, 60′ | 13 155 | 100 % | 483 Mio. | Ulm und Ingolstadt unerreicht |
+| **zweigleisig, 60′ + Zubringer** | **16 894** | **100 %** | **515 Mio.** | **erfüllt** |
+| zweigleisig, 30′ + Zubringer | 20 210 | 99 % | 39 Mio. | zu teuer erkauft |
+
+**Zubringer werden jetzt über Erreichbarkeit verlangt, nicht über eine Fahrgastzahl.** Ulm
+und Ingolstadt liegen neben der Achse und sind mit einem Umstieg nur erreichbar, wenn dort
+ein Bus fährt. Der Versuch, dasselbe über eine Fahrgastschwelle zu erzwingen, scheiterte
+messbar: der Unterschied zwischen „mit" und „ohne Zubringer" (16 894 gegen 13 155) ist
+kleiner als die Schwankung zwischen Anfangsschub und eingependeltem Betrieb (21 725 gegen
+16 894). Eine Schwelle, die beide trennt, gibt es nicht.
+
+### Ein Fehler, der dabei auffiel
+
+Beim Nachmessen fiel die Fahrgastzahl der Nord-Süd-Achse zwischen zwei Prüfungen von 25 482
+auf 14 515 — ohne dass sich am Netz etwas geändert hätte. Ursache: **Tag 2190 ist ein
+Sonntag.** Die Pendler fehlen.
+
+Das traf nicht nur das Messwerkzeug, sondern das Spiel selbst: ein Ziel „12 000 Fahrgäste am
+Tag" wäre unter der Woche erfüllt gewesen und am Wochenende wieder offen. Tagesziele werden
+deshalb jetzt über den **Wochenschnitt** gemessen. Das ist auch die ehrlichere Frage — ob
+ein Netz zwölftausend Menschen am Tag trägt, entscheidet sich nicht an einem Mittwoch.
+
+### Werkzeuge
+
+- `pnpm fernverkehr` misst gegen die Anker, `--fit` sucht Parameter.
+- `pnpm missions <auftrag>` schränkt auf einen Auftrag ein — ein voller Durchlauf spielt
+  vierzehn Varianten über je sechs Jahre und dauert zehn Minuten.
+- Das Nachfragemodell nimmt jetzt eine abweichende Segmenttabelle entgegen. Ohne das müsste
+  jeder Parametersatz im Quelltext stehen und der Prozess neu starten — genau das, was der
+  Kommentar über der Tabelle seit Phase 1 versprach nicht tun zu müssen.
 
 ---
 

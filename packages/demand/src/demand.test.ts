@@ -187,3 +187,70 @@ describe('Ganglinien', () => {
     expect(dayFactor('tourist', 5, 7)).toBeGreaterThan(dayFactor('tourist', 5, 10))
   })
 })
+
+/**
+ * Die Fernverkehrskalibrierung, festgenagelt.
+ *
+ * Sie ist gegen veröffentlichte Zahlen gefittet (siehe `tools/fernverkehr.ts`),
+ * und genau deshalb muss sie einen Regressionstest haben: die Segmenttabelle
+ * lädt zum Drehen ein, und wer dort eine Zahl ändert, verschiebt die
+ * Größenordnung des ganzen Spiels, ohne dass irgendetwas fehlschlägt.
+ *
+ * Geprüft wird an einem **kleinen, eigenen Städtesatz** und nicht am
+ * Deutschland-Datensatz: der Test soll die Parameter festhalten, nicht die
+ * Datenpipeline mitprüfen, und er soll in Millisekunden laufen.
+ */
+describe('Fernverkehrskalibrierung', () => {
+  // Zwei große Städte weit auseinander, zwei kleine dazwischen.
+  const REFERENCE = [
+    city('Nordstadt', 1_800_000, 10.0, 53.55),
+    city('Südstadt', 1_500_000, 11.58, 48.14),
+    city('Mittelstadt', 200_000, 9.5, 51.3),
+    city('Nachbarort', 60_000, 10.2, 53.3),
+  ]
+
+  const matrix = (): ReturnType<typeof buildDemandMatrix> =>
+    buildDemandMatrix(REFERENCE, { minTripsPerDay: 0 })
+
+  it('schickt den größeren Teil der Verkehrsleistung über 100 km', () => {
+    const m = matrix()
+    const pkm = (min: number): number =>
+      m.pairs.filter((p) => p.distanceKm >= min).reduce((s, p) => s + p.totalTrips * p.distanceKm, 0)
+    // Fernreisen sind wenige Fahrten, aber der Löwenanteil der Leistung. Vor
+    // der Kalibrierung lag dieser Anteil bei rund einem Drittel.
+    expect(pkm(100) / pkm(0)).toBeGreaterThan(0.85)
+  })
+
+  it('lässt die Fernsegmente den Fernverkehr tragen', () => {
+    const m = matrix()
+    const far = m.pairs.filter((p) => p.distanceKm >= 100)
+    const share = (id: (typeof SEGMENT_IDS)[number]): number =>
+      far.reduce((s, p) => s + p.trips[id], 0) / far.reduce((s, p) => s + p.totalTrips, 0)
+    // Über 100 km fahren Besuchs-, Urlaubs- und Geschäftsreisende, keine
+    // Pendler. Auf dem Deutschland-Datensatz sind es 90 % gegen 10 %; dieser
+    // Satz aus vier Städten ist gröber, die Aussage bleibt dieselbe.
+    expect(share('vfr') + share('tourist') + share('business')).toBeGreaterThan(0.65)
+    expect(share('commuter')).toBeLessThan(0.3)
+  })
+
+  it('hält die Erzeugungsraten dort, wo sie gemessen wurden', () => {
+    // In Reisen je Einwohner und Jahr — die Größe, in der sich die Werte gegen
+    // die Wirklichkeit prüfen lassen. Ändert sich einer, war das hoffentlich
+    // Absicht: siehe docs/03-NACHFRAGEMODELL.md Abschnitt 8.
+    const perYear = (id: (typeof SEGMENT_IDS)[number]): number =>
+      SEGMENTS[id].populationShare * SEGMENTS[id].tripsPerPersonDay * 365
+    expect(perYear('business')).toBeCloseTo(2.19, 1)
+    expect(perYear('tourist')).toBeCloseTo(8.76, 1)
+    expect(perYear('vfr')).toBeCloseTo(17.52, 1)
+  })
+
+  it('lässt sich für die Kalibrierung von außen andere Parameter geben', () => {
+    // Ohne diesen Weg müsste `pnpm fernverkehr` die Segmenttabelle im
+    // Quelltext ändern und den Prozess neu starten, um einen zweiten Wert zu
+    // probieren.
+    const doubled = { ...SEGMENTS, vfr: { ...SEGMENTS.vfr, tripsPerPersonDay: SEGMENTS.vfr.tripsPerPersonDay * 2 } }
+    const before = matrix().totalTripsPerDay
+    const after = buildDemandMatrix(REFERENCE, { minTripsPerDay: 0, params: doubled }).totalTripsPerDay
+    expect(after).toBeGreaterThan(before * 1.2)
+  })
+})

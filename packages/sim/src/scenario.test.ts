@@ -153,6 +153,33 @@ describe('Aufträge', () => {
     expect(status.reason).toContain('erfüllt')
   })
 
+  it('misst ein Tagesziel über die Woche statt am einzelnen Tag', () => {
+    // Am Sonntag fehlen die Pendler. Beim Nachrechnen der Nord-Sued-Achse fiel
+    // die gemessene Fahrgastzahl allein deshalb von 25 000 auf 14 500 - ein
+    // Spieler haette seinen Auftrag unter der Woche erfuellt gesehen und am
+    // Wochenende wieder offen.
+    let state = withLine(fresh(), ['Anfang', 'Mitte'])
+    state = advanceDays(state, demand, 40)
+
+    const goal: Scenario = { ...TEST_SCENARIO, goals: [{ kind: 'daily_passengers', count: 1 }] }
+    const werte: number[] = []
+    for (let i = 0; i < 7; i++) {
+      state = advanceDays(state, demand, 1)
+      werte.push(scenarioStatus(state, goal).goals[0]!.value)
+    }
+
+    // Ueber eine ganze Woche darf sich der gemessene Wert kaum bewegen: jeder
+    // Tag mittelt dieselben sieben Wochentage, nur in anderer Reihenfolge.
+    const min = Math.min(...werte)
+    const max = Math.max(...werte)
+    expect(min).toBeGreaterThan(0)
+    expect(max / min).toBeLessThan(1.05)
+
+    // Zum Vergleich: die einzelnen Tage schwanken deutlich staerker.
+    const roh = state.history.slice(-7).map((d) => d.passengers)
+    expect(Math.max(...roh) / Math.min(...roh)).toBeGreaterThan(1.2)
+  })
+
   it('verliert mit Ablauf der Frist', () => {
     const state = advanceDays(fresh(), demand, TEST_SCENARIO.deadlineDays)
     const status = scenarioStatus(state, TEST_SCENARIO)

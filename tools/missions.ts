@@ -124,6 +124,16 @@ function corridorCost(names: readonly string[], spec: TrackSpec): { km: number; 
 const AXIS = ['Hamburg', 'Hannover', 'Kassel', 'Frankfurt am Main', 'Mannheim', 'Stuttgart', 'Augsburg', 'München']
 const RUHR = ['Duisburg', 'Essen', 'Bochum', 'Dortmund']
 
+/**
+ * Auf einen Auftrag einschraenken: `pnpm missions ruhr`.
+ *
+ * Ein voller Durchlauf spielt vierzehn Varianten ueber je sechs Jahre und
+ * dauert zehn Minuten. Beim Ausbalancieren dreht man an einer Zahl und will
+ * *diesen* Auftrag sehen, nicht alle.
+ */
+const only = process.argv[2]?.toLowerCase()
+const wanted = (id: string): boolean => !only || id.includes(only)
+
 console.log('═══ 1. Was die Korridore kosten ═══\n')
 for (const [label, names] of [
   ['Nord-Süd-Achse (Hamburg–München)', AXIS],
@@ -165,6 +175,7 @@ function report(
   variant = '',
   cashOverride?: number,
 ): void {
+  if (!wanted(base.id)) return
   // Mit dem Ueberschreiben laesst sich fragen, *wie viel* Kapital ein Auftrag
   // braeuchte - ohne ihn dafuer zu aendern.
   const scenario: Scenario = cashOverride ? { ...base, startingCash: cashOverride } : base
@@ -178,6 +189,11 @@ function report(
   state = build(state)
 
   const firstMet = new Map<string, number>()
+  // Der Hoechststand je Ziel. Ein Auftrag gilt als erfuellt, sobald alle Ziele
+  // *gleichzeitig* zutreffen - auch wenn die Zahl danach wieder faellt. Beim
+  // Ausbalancieren zaehlt deshalb der Hoechststand und nicht der Endstand, und
+  // ohne ihn setzt man Schwellen, die eine Loesung nur scheinbar verfehlt.
+  const peak = new Map<string, number>()
   let won: number | null = null
 
   while (state.day < scenario.deadlineDays) {
@@ -185,6 +201,7 @@ function report(
     const status = scenarioStatus(state, scenario)
     status.goals.forEach((goal) => {
       if (goal.done && !firstMet.has(goal.label)) firstMet.set(goal.label, state.day)
+      peak.set(goal.label, Math.max(peak.get(goal.label) ?? -Infinity, goal.value))
     })
     if (status.outcome === 'won' && won === null) won = state.day
     if (state.cash <= -5_000_000_00) break
@@ -207,9 +224,15 @@ function report(
           : money
             ? formatMoney(Math.round(goal.value), { compact: true })
             : Math.round(goal.value).toLocaleString('de-DE')
+    const top = peak.get(goal.label)
+    const highest =
+      top !== undefined && top > goal.value + 0.001 && goal.goal.kind !== 'connect'
+        ? `  Höchststand ${money ? formatMoney(Math.round(top), { compact: true }) : goal.goal.kind === 'satisfaction' || goal.goal.kind === 'punctuality' ? `${Math.round(top * 100)} %` : Math.round(top).toLocaleString('de-DE')}`
+        : ''
     console.log(
       `  ${goal.done ? '✓' : '✗'} ${goal.label.padEnd(46)} ${value.padStart(12)}` +
-        (met !== undefined ? `  erreicht am Tag ${met}` : ''),
+        (met !== undefined ? `  erreicht am Tag ${met}` : '') +
+        highest,
     )
   }
   // Die Trassenauslastung: die Frage, an der ein zweites Gleis haengt.
@@ -228,6 +251,16 @@ function report(
           .slice(0, 4)
           .map(([id, l]) => `${nameOf(id)} ${Math.round(l * 100)} %`)
           .join(', '),
+    )
+  }
+  // Wie es der Linie am Ende geht - daran haengt, ob ein Rueckgang der
+  // Fahrgastzahl Ueberlastung ist oder etwas anderes.
+  const worst = [...(state.lastDay?.lines ?? [])].sort((a, b) => b.totalPassengers - a.totalPassengers)[0]
+  if (worst) {
+    console.log(
+      `  Stärkste Linie: Last ${worst.peakLoadFactor.toFixed(2)} · ` +
+        `Zufriedenheit ${Math.round((worst.satisfaction ?? 1) * 100)} % · ` +
+        `stehen geblieben ${Math.round(worst.leftBehind).toLocaleString('de-DE')}/Tag`,
     )
   }
   console.log(
@@ -396,11 +429,13 @@ const FEEDERS: readonly (readonly [string, readonly string[]])[] = [
   ['Zubringer Ingolstadt', ['Ingolstadt', 'München']],
 ]
 
-for (const [label, spec, headway, trains, feeders] of [
-  ['eingleisig elektrisch, Stundentakt', SPECS['solide (160, 1 Gleis, elektrisch)']!, 60, 14, false],
-  ['zweigleisig, Stundentakt', SPECS['zweigleisig (160, elektrisch)']!, 60, 14, false],
-  ['zweigleisig, Stundentakt + Zubringer', SPECS['zweigleisig (160, elektrisch)']!, 60, 14, true],
-  ['zweigleisig, Halbstundentakt + Zubringer', SPECS['zweigleisig (160, elektrisch)']!, 30, 26, true],
+for (const [label, spec, headway, trains, feeders, cash] of [
+  ['eingleisig elektrisch, Stundentakt', SPECS['solide (160, 1 Gleis, elektrisch)']!, 60, 14, false, undefined],
+  ['zweigleisig, Stundentakt', SPECS['zweigleisig (160, elektrisch)']!, 60, 14, false, undefined],
+  ['zweigleisig, Stundentakt + Zubringer', SPECS['zweigleisig (160, elektrisch)']!, 60, 14, true, undefined],
+  // Der dichtere Takt ist eine Falle: mehr Fahrgaeste, aber die zwoelf
+  // zusaetzlichen Zuege kosten mehr, als sie einbringen.
+  ['zweigleisig, Halbstundentakt + Zubringer', SPECS['zweigleisig (160, elektrisch)']!, 30, 26, true, undefined],
 ] as const) {
   report(
     scenario('north-south'),
@@ -412,5 +447,6 @@ for (const [label, spec, headway, trains, feeders] of [
       return current
     },
     label,
+    cash,
   )
 }

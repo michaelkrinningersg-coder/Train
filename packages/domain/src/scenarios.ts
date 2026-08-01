@@ -163,14 +163,16 @@ export const SCENARIOS: readonly Scenario[] = [
       'langen Takte. Bauen Sie ein Netz, das trotzdem trägt.',
     startingCash: 8_000_000_00,
     deadlineDays: 3 * YEAR,
-    // Nachgerechnet mit `pnpm missions`: eine Achse im Halbstundentakt bringt
-    // 2 713 Fahrgaeste und 8 794 € am Tag, dieselbe Achse im Viertelstundentakt
-    // mit Suedast 6 996 und 23 000 €. Die Ziele liegen dazwischen - die knappe
-    // Loesung scheitert, die ordentliche kommt durch.
+    // Nachgerechnet mit `pnpm missions` nach der Fernverkehrskalibrierung: eine
+    // Achse im Halbstundentakt bringt 3 679 Fahrgaeste und 15 Tsd. € am Tag,
+    // dieselbe Achse im Viertelstundentakt mit Suedast 9 849 und 42 Tsd. €. Die
+    // Ziele liegen dazwischen - die knappe Loesung scheitert, die ordentliche
+    // kommt durch, und zwar nicht nur voruebergehend: auch der Hoechststand der
+    // knappen Loesung bleibt unter beiden Schwellen.
     goals: [
       { kind: 'connect', from: 'Duisburg', to: 'Dortmund', maxTransfers: 1 },
-      { kind: 'daily_passengers', count: 4_000 },
-      { kind: 'daily_profit', amount: 15_000_00 },
+      { kind: 'daily_passengers', count: 7_000 },
+      { kind: 'daily_profit', amount: 25_000_00 },
       { kind: 'satisfaction', value: 0.9 },
     ],
     hints: [
@@ -196,24 +198,36 @@ export const SCENARIOS: readonly Scenario[] = [
     // 753 km zweigleisig elektrisch kosten 4 539 Mio. €, dazu Zuege und
     // Reserve. Mit den urspruenglichen 400 Mio. reichte es fuer *einen*
     // Abschnitt - der Auftrag war unloesbar, und aufgefallen ist es erst, als
-    // ihn jemand nachgerechnet hat.
-    startingCash: 7_000_000_000_00,
+    // ihn jemand nachgerechnet hat. Danach standen hier 7 000 Mio., und auch
+    // das war noch eine Kruecke: die Achse trug im Modell nur 728 Reisende am
+    // Tag und konnte sich unmoeglich rechnen. Seit die Fernnachfrage kalibriert
+    // ist, traegt sie 16 894 - und 5 500 Mio. reichen knapp fuer Trasse, Zuege
+    // und Zubringer.
+    startingCash: 5_500_000_000_00,
     deadlineDays: 6 * YEAR,
     /**
-     * Alle vier Ziele sind gemessen (`pnpm missions`), und jedes trennt:
+     * Alle Ziele sind gemessen (`pnpm missions`), und jedes trennt:
      *
      * - **Puenktlichkeit** erzwingt zweigleisig. Eingleisig ueber 753 km ergibt
-     *   0 % und 347 Fahrgaeste — jede Begegnung blockiert.
-     * - **Fahrgaeste** erzwingen Zubringer. Die Achse allein bringt 4 113, mit
-     *   sieben Zubringerbussen 5 370.
-     * - **Kasse** verbietet das Uebertreiben. Halbstundentakt bringt 6 458
-     *   Fahrgaeste, kostet aber 381 Tsd. € am Tag und endet bei 1 275 Mio.
+     *   0 % Puenktlichkeit und 1 132 Fahrgaeste — jede Begegnung blockiert, und
+     *   die Trassenauslastung steht bei 149 bis 183 %.
+     * - **Ulm und Ingolstadt** erzwingen Zubringer. Beide liegen neben der
+     *   Achse; mit einem Umstieg sind sie nur erreichbar, wenn dort ein Bus
+     *   faehrt. Das ist der ehrlichere Weg, Zubringer zu verlangen, als eine
+     *   Fahrgastzahl: die schwankt zwischen Werktag und Wochenende und zwischen
+     *   Anfangsschub und eingependeltem Betrieb staerker, als der Zubringer
+     *   ausmacht.
+     * - **Kasse** verbietet das Uebertreiben. Halbstundentakt bringt 20 210
+     *   Fahrgaeste statt 16 894, kostet aber zwoelf zusaetzliche Zuege und endet
+     *   bei 39 statt 515 Mio. — mehr Angebot, weniger Geld.
      */
     goals: [
       { kind: 'connect', from: 'Hamburg', to: 'München', maxTransfers: 1 },
-      { kind: 'daily_passengers', count: 5_000 },
+      { kind: 'connect', from: 'Ulm', to: 'Hamburg', maxTransfers: 1 },
+      { kind: 'connect', from: 'Ingolstadt', to: 'Hamburg', maxTransfers: 1 },
+      { kind: 'daily_passengers', count: 12_000 },
       { kind: 'punctuality', value: 0.9 },
-      { kind: 'cash', amount: 1_500_000_000_00 },
+      { kind: 'cash', amount: 400_000_000_00 },
     ],
     hints: [
       'Eine eingleisige Fernstrecke trägt keinen dichten Takt — jede Begegnung kostet Wartezeit.',

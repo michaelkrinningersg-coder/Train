@@ -1,7 +1,7 @@
 import { DISTANCE_POWER, SEGMENTS, SEGMENT_IDS } from '@game/domain'
 import type { City, CityId, SegmentId } from '@game/domain'
 import { distanceKm } from '@game/geo'
-import { cityPotentials } from './potentials.js'
+import { cityPotentials, type SegmentTable } from './potentials.js'
 
 /**
  * Stufe 2 des Nachfragemodells: Verteilung ueber ein Gravitationsmodell.
@@ -52,6 +52,15 @@ export interface GravityOptions {
   readonly minTripsPerDay?: number
   /** Monat fuer die Saisonalitaet der Zielattraktivitaet. */
   readonly month?: number
+  /**
+   * Segmentparameter. Ohne Angabe die des Spiels.
+   *
+   * Nur zum Kalibrieren gedacht: dort wird derselbe Datensatz mit vielen
+   * Parametersaetzen durchgerechnet. Wird sie angegeben, werden auch die
+   * Potenziale neu gerechnet - eine mitgelieferte `city.potential` stammt sonst
+   * aus der Tabelle des Spiels und passte nicht zu den uebergebenen Werten.
+   */
+  readonly params?: SegmentTable
 }
 
 /**
@@ -98,7 +107,10 @@ export function buildDemandMatrix(cities: readonly City[], options: GravityOptio
   const minTrips = options.minTripsPerDay ?? 1
   const month = options.month ?? 5
 
-  const potentials = cities.map((c) => c.potential ?? cityPotentials(c, month))
+  const params = options.params ?? SEGMENTS
+  const potentials = options.params
+    ? cities.map((c) => cityPotentials(c, month, params))
+    : cities.map((c) => c.potential ?? cityPotentials(c, month))
 
   const n = cities.length
   const segments = SEGMENT_IDS.length
@@ -107,8 +119,8 @@ export function buildDemandMatrix(cities: readonly City[], options: GravityOptio
   const minDistance = new Float64Array(segments)
   const decayKm = new Float64Array(segments)
   SEGMENT_IDS.forEach((seg, s) => {
-    minDistance[s] = SEGMENTS[seg].minDistanceKm
-    decayKm[s] = SEGMENTS[seg].decayKm
+    minDistance[s] = params[seg].minDistanceKm
+    decayKm[s] = params[seg].decayKm
   })
 
   // Quell- und Zielpotenziale flach, damit die innerste Schleife nur noch

@@ -1,5 +1,5 @@
 import { formatMoney } from '@game/economy'
-import { formatDate, type CityId, type GameState, type Goal, type LineDayResult, type Scenario } from '@game/domain'
+import { formatDate, type CityId, type DayResult, type GameState, type Goal, type LineDayResult, type Scenario } from '@game/domain'
 
 /**
  * Auswertung eines Auftrags.
@@ -131,8 +131,34 @@ function meanQuality(state: GameState, pick: (line: LineDayResult) => number | u
   return riders > 0 ? weighted / riders : 0
 }
 
+/**
+ * Tage der letzten Woche, jüngster zuerst.
+ *
+ * Ein Tagesziel am einzelnen Tag zu messen ist unfair, und zwar systematisch:
+ * am Sonntag fehlen die Pendler. Beim Nachrechnen der Nord-Süd-Achse fiel die
+ * gemessene Fahrgastzahl von 25 000 auf 14 500, allein weil der letzte Prüftag
+ * ein Sonntag war. Ein Spieler hätte dasselbe erlebt — sein Auftrag wäre unter
+ * der Woche erfüllt gewesen und am Wochenende wieder offen.
+ *
+ * Deshalb zählt der Wochenschnitt. Er ist auch die ehrlichere Frage: ob ein
+ * Netz zwölftausend Menschen am Tag trägt, entscheidet sich nicht an einem
+ * Mittwoch.
+ */
+function lastWeek(state: GameState): readonly DayResult[] {
+  const days = state.lastDay ? [state.lastDay] : []
+  // Die Historie endet mit dem gestrigen Tag; `lastDay` steht daneben.
+  const earlier = state.history.slice(-8, -1)
+  return [...days, ...earlier].slice(0, 7)
+}
+
+/** Wochenschnitt einer Tagesgröße. Ohne Historie der letzte Tag allein. */
+function weeklyMean(state: GameState, pick: (day: DayResult) => number): number {
+  const days = lastWeek(state)
+  if (days.length === 0) return 0
+  return days.reduce((s, d) => s + pick(d), 0) / days.length
+}
+
 function progressOf(state: GameState, goal: Goal): GoalProgress {
-  const day = state.lastDay
   const make = (label: string, value: number, target: number, cities?: readonly CityId[]): GoalProgress => ({
     goal,
     label,
@@ -145,12 +171,20 @@ function progressOf(state: GameState, goal: Goal): GoalProgress {
 
   switch (goal.kind) {
     case 'daily_passengers':
-      return make(`${goal.count.toLocaleString('de-DE')} Fahrgäste am Tag`, day?.passengers ?? 0, goal.count)
+      return make(
+        `${goal.count.toLocaleString('de-DE')} Fahrgäste am Tag`,
+        weeklyMean(state, (d) => d.passengers),
+        goal.count,
+      )
 
     // Kompakt, nicht ausgeschrieben: "1.500.000.000 € auf dem Konto" liest
     // niemand richtig, "1.500 Mio. €" schon.
     case 'daily_profit':
-      return make(`${formatMoney(goal.amount, { compact: true })} Tagesgewinn`, day?.profit ?? 0, goal.amount)
+      return make(
+        `${formatMoney(goal.amount, { compact: true })} Tagesgewinn`,
+        weeklyMean(state, (d) => d.profit),
+        goal.amount,
+      )
 
     case 'cash':
       return make(`${formatMoney(goal.amount, { compact: true })} auf dem Konto`, state.cash, goal.amount)

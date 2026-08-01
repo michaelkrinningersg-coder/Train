@@ -500,7 +500,12 @@ describe('Zufriedenheit', () => {
   it('lässt eine gut bediente Linie deutlich besser dastehen als eine überfüllte', () => {
     const od = odKey(id(HUB), id(TARGET))
     const crowded = advanceDays(network({ trunkAsRail: false, busHeadway: 120, buses: 2 }), demand, 28)
-    const comfortable = advanceDays(network({ trunkAsRail: false, busHeadway: 15, buses: 24 }), demand, 28)
+    // Reichlich bedient heisst seit der Fernverkehrskalibrierung mehr als
+    // frueher: auf dieser Relation ist die Nachfrage rund doppelt so hoch, und
+    // ein Viertelstundentakt laesst dort noch Leute stehen. Gebunden ist die
+    // Kapazitaet am Takt, nicht an der Fahrzeugzahl - mehr Busse bei
+    // gleichem Takt aendern nichts.
+    const comfortable = advanceDays(network({ trunkAsRail: false, busHeadway: 6, buses: 80 }), demand, 28)
 
     expect(comfortable.satisfaction.get(od) ?? 1).toBeGreaterThan(0.93)
     expect(crowded.satisfaction.get(od)!).toBeLessThan(0.85)
@@ -513,9 +518,9 @@ describe('Zufriedenheit', () => {
     const ruined = state.satisfaction.get(od)!
     expect(ruined).toBeLessThan(0.9)
 
-    // Angebot verdreifachen: ab jetzt bleibt niemand mehr stehen.
+    // Angebot vervielfachen: ab jetzt bleibt niemand mehr stehen.
     const line = [...state.lines.values()][0]!
-    const bought = applyCommand(state, { kind: 'buy_vehicle', classId: 'intercity', units: 24 })
+    const bought = applyCommand(state, { kind: 'buy_vehicle', classId: 'intercity', units: 80 })
     if (!bought.ok) throw new Error(bought.reason)
     const patterned = applyCommand(bought.state, {
       kind: 'set_pattern',
@@ -524,7 +529,7 @@ describe('Zufriedenheit', () => {
         direction: 'forward',
         vehicleIds: [...bought.state.fleet.keys()],
         days: DAYS_ALL,
-        headway: { everyMinutes: 15, firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 },
+        headway: { everyMinutes: 6, firstDeparture: 5 * 3600, lastDeparture: 21 * 3600 },
       },
     })
     if (!patterned.ok) throw new Error(patterned.reason)

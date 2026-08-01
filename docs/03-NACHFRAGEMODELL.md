@@ -627,12 +627,87 @@ es gibt keine Erhebung dazu, wie lange jemand einem verpassten Bus nachträgt. W
 verteidigen lässt, ist die *Richtung* und die Größenordnung des Verhältnisses von Verfall zu
 Erholung; die absoluten Zahlen sind Balancing.
 
+### Stand nach Phase 5h — die Fernverkehrsnachfrage, gemessen
+
+Bis hierher waren die Segmentparameter **Startwerte**. Im Nahbereich waren sie plausibel,
+im Fernbereich um ein Vielfaches zu schwach. Aufgefallen ist es an einer einzigen Zahl:
+
+> Hamburg – München, 612 km: **728 Reisen am Tag** — über *alle* Verkehrsmittel.
+
+Damit kann sich keine 4,5-Milliarden-Trasse je tragen. Die Kernfantasie des Spiels war im
+Modell wirtschaftlich sinnlos, und der Auftrag „Die Nord-Süd-Achse" nur deshalb lösbar,
+weil er sieben Milliarden Startkapital geschenkt bekam. Das war ein Symptom kuriert.
+
+**Die Anker** (alle 2019, das letzte Jahr vor der Pandemie):
+
+| Größe | Wert | Quelle |
+|---|---|---|
+| Eisenbahn-Fernverkehr, Reisende | 151,4 Mio./Jahr = 414 800/Tag | [Destatis PD20_124](https://www.destatis.de/DE/Presse/Pressemitteilungen/2020/04/PD20_124_461.html) |
+| Eisenbahn-Fernverkehr, Leistung | 44,7 Mrd. Pkm/Jahr = 122,5 Mio./Tag | dieselbe |
+| daraus: mittlere Reiseweite | 295 km | — |
+| Modal Split Verkehrsleistung, MIV | 78,4 % | [Umweltbundesamt](https://www.umweltbundesamt.de/daten/verkehr/fahrleistungen-verkehrsaufwand-modal-split) |
+
+Daraus abgeleitet — und **diese Ableitung ist die unsicherste Stelle der ganzen
+Kalibrierung**:
+
+- Gesamtverkehrsleistung ≈ 1 180 Mrd. Pkm/Jahr, aus dem MIV-Anteil gegengerechnet.
+- Reisen über 100 km sind rund 2 % aller Wege, tragen aber **rund 37 % der Leistung**.
+- Also ≈ **1,20 Mrd. Pkm/Tag** über 100 km, alle Verkehrsmittel.
+- Gegenprobe: der Fernverkehr der Bahn wäre darin 122,5/1 200 = **10,2 %**. Das passt zu
+  einem Schienenanteil von rund 8 % über alle Distanzen, leicht erhöht im Fernbereich. Die
+  Ableitung ist in sich stimmig — kein Beweis, aber mehr als nichts.
+
+**Was gefittet wurde.** `tools/fernverkehr.ts` (`pnpm fernverkehr --fit`) rechnet den
+Deutschland-Datensatz mit vierzig Parametersätzen durch und misst gegen die Anker. Gedreht
+wurde nur an den drei **Fernsegmenten** — Geschäftsreisende, Touristen, Besuchsreisende.
+Pendler und Schüler blieben unangetastet: deren Verkehr ist plausibel, und ihn mitzuziehen
+hieße, einen richtigen Teil kaputtzumachen, um einen falschen zu reparieren.
+
+Zwei Regler: `level` hebt die erzeugten Reisen, `reach` streckt `d₀`. Das Ergebnis ist
+eindeutig und lehrreich:
+
+```
+                Reichw. ×1  ×1,25  ×1,5  ×1,75   ×2
+  Niveau ×1.00    0.31/0.29  0.32/0.30 ...
+  Niveau ×4.00    0.98/0.99  1.01/1.05 ...
+```
+
+**Niveau ×4, Reichweite ×1.** Die *Form* der Abklingfunktion war richtig, nur das *Niveau*
+falsch. Die mittlere Weite im Fernbereich fällt mit 253 km auf den Zielwert von 250 —
+obwohl nur Reisen und Leistung gefittet wurden. Das ist eine unabhängige Bestätigung.
+
+| | vorher | nachher | Gegenprobe |
+|---|---|---|---|
+| Geschäftsreisen je Einwohner/Jahr | 0,5 | **2,2** | ~190 Mio./Jahr in Deutschland |
+| Urlaubs- und Kurzreisen | 2,2 | **8,8** | Hin- und Rückfahrt zählen einzeln |
+| Besuchsreisen | 4,4 | **17,5** | alle drei Wochen eine |
+
+Alle drei landen in verteidigbarem Gebiet — Fit und Plausibilitätsprüfung stimmen überein.
+
+**Was das im Spiel ändert:**
+
+| | vorher | nachher |
+|---|---|---|
+| Reisen ab 100 km | 887 000/Tag (0,31× Ziel) | **2,75 Mio./Tag (0,98×)** |
+| Leistung ab 100 km | 204 Mio. Pkm (0,29×) | **697 Mio. Pkm (0,99×)** |
+| Hamburg – München | 728/Tag | **2 882/Tag** |
+| München – Berlin | 3 329/Tag | **13 188/Tag** |
+
+**Ehrliche Einschränkung:** die *größten* Einzelrelationen bleiben zu schwach. München–Berlin
+liegt real bei rund 25 000 Reisen am Tag über alle Verkehrsmittel; das Modell sagt 13 188.
+Der Aggregatwert stimmt, die Verteilung über die Relationen ist zu flach. Das wäre über den
+Größendegressionsexponenten `ω` zu korrigieren — aber dabei würden die vielen mittelgroßen
+Relationen verzerrt, und meine Vergleichszahl für München–Berlin ist selbst geschätzt. Einen
+Faktor 2 auf der größten Einzelrelation bei exakt getroffenem Aggregat nehme ich in Kauf,
+statt gegen eine unsichere Zahl zu tunen.
+
+**Festgenagelt** ist das Ergebnis in `packages/demand/src/demand.test.ts` — die
+Segmenttabelle lädt zum Drehen ein, und wer dort eine Zahl ändert, verschiebt die
+Größenordnung des ganzen Spiels, ohne dass sonst irgendetwas fehlschlägt.
+
 ### Vorgehen für die nächste Runde
 
-1. Referenzrelationen mit bekannten Fahrgastzahlen zusammenstellen (10–15 Stück, gemischt
-   nach Distanz und Land).
-2. Verhältnis Modell/Realität je Relation ermitteln, globale Skalierung am Median setzen.
-3. `d₀` je Segment anpassen, bis die Distanzverteilung stimmt.
-4. `ASC` anpassen, bis die Modal-Split-Anteile passen.
-5. Ergebnis als Regressionstest festhalten, damit spätere Parameteränderungen das Balancing
-   nicht unbemerkt zerstören.
+1. `ASC` anpassen, bis die Modal-Split-Anteile passen — bisher nur gegen den Busanteil
+   geprüft, nicht gegen den Schienenanteil im Fernverkehr.
+2. Die Größendegression `ω` gegen echte Relationsdaten prüfen, statt gegen Schätzungen.
+3. Länderparameter, sobald es mehr als Deutschland gibt.

@@ -21,6 +21,7 @@
     "calibrate": "tsx tools/calibrate.ts",
     "missions": "tsx tools/missions.ts",
     "structure": "tsx tools/structure.ts",
+    "fernverkehr": "tsx tools/fernverkehr.ts",
     "data:terrain": "pnpm --filter @game/pipeline terrain",
     "data:facilities": "pnpm --filter @game/pipeline facilities",
     "data:osm": "pnpm --filter @game/pipeline osm"

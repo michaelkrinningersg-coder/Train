@@ -39,8 +39,19 @@ export interface SegmentParams {
 }
 
 /**
- * Startwerte fuer die Kalibrierung, keine Messwerte. Bewusst als reine Datentabelle,
- * damit Balancing ohne Codeaenderung moeglich ist.
+ * Bewusst als reine Datentabelle, damit Balancing ohne Codeaenderung moeglich
+ * ist — `buildDemandMatrix` nimmt eine abweichende Tabelle entgegen, und genau
+ * davon lebt `pnpm fernverkehr`.
+ *
+ * Die drei Fernsegmente sind seit Phase 5h **gemessen** und nicht mehr
+ * geschaetzt. Vorher erzeugte das Modell 728 Reisen am Tag zwischen Hamburg und
+ * Muenchen ueber alle Verkehrsmittel; damit kann sich keine Fernstrecke je
+ * tragen. Kalibriert wurde gegen den Eisenbahn-Fernverkehr 2019 (Destatis:
+ * 151,4 Mio. Reisende, 44,7 Mrd. Pkm) und den Modal Split des
+ * Umweltbundesamts — siehe `tools/fernverkehr.ts` und
+ * docs/03-NACHFRAGEMODELL.md Abschnitt 8.
+ *
+ * Die uebrigen Werte sind weiterhin Startwerte fuer die Kalibrierung.
  */
 export const SEGMENTS: Readonly<Record<SegmentId, SegmentParams>> = {
   commuter: {
@@ -86,7 +97,8 @@ export const SEGMENTS: Readonly<Record<SegmentId, SegmentParams>> = {
     id: 'business',
     label: 'Geschäftsreisende',
     populationShare: 0.05,
-    tripsPerPersonDay: 0.03,
+    // 2,2 Geschaeftsreisen je Einwohner und Jahr.
+    tripsPerPersonDay: 0.12,
     decayKm: 420,
     minDistanceKm: 40,
     destinationExponent: 1.25,
@@ -99,7 +111,9 @@ export const SEGMENTS: Readonly<Record<SegmentId, SegmentParams>> = {
     id: 'tourist',
     label: 'Touristen',
     populationShare: 1.0,
-    tripsPerPersonDay: 0.006,
+    // 8,8 Reisen je Einwohner und Jahr - Urlaubs- und Kurzreisen zaehlen
+    // doppelt, weil Hin- und Rueckfahrt je eine Reise sind.
+    tripsPerPersonDay: 0.024,
     decayKm: 600,
     minDistanceKm: 60,
     destinationExponent: 0.55,
@@ -112,7 +126,8 @@ export const SEGMENTS: Readonly<Record<SegmentId, SegmentParams>> = {
     id: 'vfr',
     label: 'Besuchsreisende',
     populationShare: 1.0,
-    tripsPerPersonDay: 0.012,
+    // 17,5 Besuchsreisen je Einwohner und Jahr, also alle drei Wochen eine.
+    tripsPerPersonDay: 0.048,
     decayKm: 260,
     minDistanceKm: 25,
     destinationExponent: 1.0,
