@@ -1,6 +1,6 @@
 import { RAIL_DWELL_SEC, type GameState, type LineDayResult, type LineId, type Sec } from '@game/domain'
 import { adminCost, LINE_OVERHEAD_PER_DAY } from '@game/economy'
-import { assignPassengers, type OdOutcome } from './assignment.js'
+import { assignPassengers, type ChainLegOutcome, type OdOutcome } from './assignment.js'
 import { isMinor, type Conflict } from './blocks.js'
 import { meanSatisfaction } from './busDay.js'
 import type { AssignedFlows } from './demandAssignment.js'
@@ -25,6 +25,8 @@ export interface RailDayResult extends LineDayResult {
 export interface RailDayOutcome {
   readonly result: RailDayResult
   readonly odOutcomes: ReadonlyMap<string, OdOutcome>
+  /** Teilstuecke von Reiseketten - siehe `simulateDay`. */
+  readonly chainLegs: readonly ChainLegOutcome[]
 }
 
 export function finishRailDay(
@@ -125,6 +127,7 @@ export function finishRailDay(
       crowdingDwellSec: extraDwell,
     },
     odOutcomes: assignment.byOd,
+    chainLegs: assignment.chainLegs,
   }
 }
 

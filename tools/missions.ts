@@ -212,6 +212,24 @@ function report(
         (met !== undefined ? `  erreicht am Tag ${met}` : ''),
     )
   }
+  // Die Trassenauslastung: die Frage, an der ein zweites Gleis haengt.
+  const loads = Object.entries(state.lastDay?.trackLoad ?? {}).sort((a, b) => b[1] - a[1])
+  if (loads.length > 0) {
+    const nameOf = (trackId: string): string => {
+      const track = state.network.tracks.get(trackId as never)
+      if (!track) return trackId
+      const at = (nodeId: string): string =>
+        [...state.network.stations.values()].find((st) => st.nodeId === nodeId)?.name ?? 'Abzweig'
+      return `${at(track.from)} – ${at(track.to)}`
+    }
+    console.log(
+      `  Gleisauslastung: ` +
+        loads
+          .slice(0, 4)
+          .map(([id, l]) => `${nameOf(id)} ${Math.round(l * 100)} %`)
+          .join(', '),
+    )
+  }
   console.log(
     `  → ${won !== null ? `erfüllt am Tag ${won} (${formatDate(won)})` : 'nicht erfüllt'}` +
       `  ·  Kasse ${formatMoney(state.cash, { compact: true })}` +

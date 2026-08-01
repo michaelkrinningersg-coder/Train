@@ -26,6 +26,7 @@ import { applyCommand, applyScenarioSetup, createGame, makeSave, previewTrack, r
 import { createSimClient } from './simClient.js'
 import { AUTOSAVE_SLOT, writeSlot } from './storage.js'
 import { DEFAULT_BASEMAP } from '../map/mapStyle.js'
+import type { LoadView } from '../map/layers.js'
 import { create } from 'zustand'
 
 export type Tab = 'mission' | 'rail' | 'network' | 'fleet' | 'finance'
@@ -101,8 +102,14 @@ interface GameStore {
   readonly selectedCityId: CityId | null
   readonly selectedLineId: LineId | null
   readonly showDemand: boolean
-  /** Auslastungs-Heatmap ueber den eigenen Linien. */
-  readonly showLoad: boolean
+  /**
+   * Auslastungs-Heatmap: aus, die Zuege oder die Trassen.
+   *
+   * Drei Zustaende und nicht zwei, weil es zwei verschiedene Fragen sind - wie
+   * voll die Zuege sind und wie voll die Strecken. Beides zugleich zu zeichnen
+   * ergaebe ein Bild, in dem man beides nicht mehr auseinanderhaelt.
+   */
+  readonly loadView: LoadView
   readonly basemap: string
   readonly message: string | null
 
@@ -153,6 +160,7 @@ interface GameStore {
   selectLine: (id: LineId | null) => void
   toggleDemand: () => void
   toggleLoad: () => void
+  setLoadView: (view: LoadView) => void
   /**
    * Kartenausschnitt auf eine Stadt schwenken.
    *
@@ -202,7 +210,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectedCityId: null,
   selectedLineId: null,
   showDemand: false,
-  showLoad: false,
+  loadView: 'off',
   focus: null,
   basemap: DEFAULT_BASEMAP,
   message: null,
@@ -483,7 +491,10 @@ export const useGame = create<GameStore>((set, get) => ({
       return { selectedLineId, tab: mode === 'rail' ? 'rail' : 'network', showTimetable: false }
     }),
   toggleDemand: () => set((s) => ({ showDemand: !s.showDemand })),
-  toggleLoad: () => set((s) => ({ showLoad: !s.showLoad })),
+  // Der Knopf schaltet der Reihe nach durch, statt zwei Knoepfe zu brauchen.
+  toggleLoad: () =>
+    set((s) => ({ loadView: s.loadView === 'off' ? 'trains' : s.loadView === 'trains' ? 'tracks' : 'off' })),
+  setLoadView: (loadView) => set({ loadView }),
 
   focusCity: (id) => {
     const city = get().state?.cities.get(id)

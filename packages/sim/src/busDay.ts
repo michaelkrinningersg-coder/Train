@@ -1,6 +1,6 @@
 import { BUS_DWELL_SEC, SEGMENT_IDS } from '@game/domain'
 import type { GameState, LineDayResult, SegmentId } from '@game/domain'
-import { assignPassengers, type OdOutcome } from './assignment.js'
+import { assignPassengers, type ChainLegOutcome, type OdOutcome } from './assignment.js'
 import type { AssignedFlows } from './demandAssignment.js'
 import { crowdingDwellSeconds, type PreparedBusLine, type PreparedIdleLine } from './offers.js'
 
@@ -42,6 +42,8 @@ export function idleResult(prepared: PreparedIdleLine): LineDayResult {
 export interface LineDayOutcome {
   readonly result: LineDayResult
   readonly odOutcomes: ReadonlyMap<string, OdOutcome>
+  /** Teilstuecke von Reiseketten - siehe `simulateDay`. */
+  readonly chainLegs: readonly ChainLegOutcome[]
 }
 
 /**
@@ -115,6 +117,7 @@ export function finishBusDay(
       crowdingDwellSec: extraDwell,
     },
     odOutcomes: assignment.byOd,
+    chainLegs: assignment.chainLegs,
   }
 }
 

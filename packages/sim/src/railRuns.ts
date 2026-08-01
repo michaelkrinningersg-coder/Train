@@ -299,6 +299,7 @@ function buildRun(
           to: leaveTrack + clearing,
           runId,
           direction: dir,
+          trackId,
           label: `Eingleisiger Abschnitt (${track.lengthKm.toFixed(0)} km)`,
         })
       }
@@ -317,6 +318,8 @@ function buildRun(
           from: enter,
           to: leave + clearing,
           runId,
+          direction: dir,
+          trackId,
           label: `Block ${b + 1} von ${boundaries.length - 1}`,
         })
       }

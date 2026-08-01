@@ -1,5 +1,6 @@
-import type { GameState, LineDayResult, LineId, VehicleId } from '@game/domain'
+import type { GameState, LineDayResult, LineId, TrackId, VehicleId } from '@game/domain'
 import type { DemandMatrix } from '@game/demand'
+import type { ChainLegOutcome } from './assignment.js'
 import { finishBusDay, idleResult } from './busDay.js'
 import { applyConnectionHolding, type LineHold } from './connections.js'
 import { assignDemand, type AssignedFlows } from './demandAssignment.js'
@@ -7,6 +8,7 @@ import { buildOptions, type ItineraryOption } from './itineraries.js'
 import { prepareLines, type PreparedLine } from './offers.js'
 import { finishRailDay, type RailDayResult } from './railDay.js'
 import { updateSatisfaction, type ServiceObservation } from './satisfaction.js'
+import { trackLoads, type TrackLoad } from './trackLoad.js'
 
 /**
  * Ein Betriebstag des ganzen Netzes.
@@ -46,6 +48,8 @@ export interface DaySimulation {
   readonly satisfaction: ReadonlyMap<string, number>
   /** Ein- und Aussteigende je Fahrt und Halt — Eingabe für die Haltezeiten morgen. */
   readonly crowding: ReadonlyMap<LineId, readonly number[]>
+  /** Wie voll die Trassen sind — über alle Linien zusammen, siehe `trackLoads`. */
+  readonly trackLoads: ReadonlyMap<TrackId, TrackLoad>
 }
 
 /**
@@ -64,6 +68,74 @@ export interface Breakdown {
 }
 
 const NO_FLOWS: AssignedFlows = { forward: [], backward: [] }
+
+/** Ein Teilstück einer Reisekette samt der Linie, die es gefahren ist. */
+interface ChainLeg extends ChainLegOutcome {
+  readonly lineId: LineId
+}
+
+/**
+ * Reiseketten zurück zu einer Reise zusammensetzen.
+ *
+ * Jede Linie rechnet ihr Teilstück für sich ab — sie kann gar nicht anders,
+ * denn sie kennt die anderen nicht. Für eine durchgehende Fahrt reicht das.
+ * Für eine Kette mit Umstieg nicht: wer in Fulda in den vollen Zug nicht mehr
+ * hineinkommt, ist nicht *halb* gefahren, sondern **gestrandet**. Er hat den
+ * Zubringer besetzt, sein Ziel aber nie gesehen.
+ *
+ * Angekommen ist deshalb der kleinste Anteil über alle Teilstücke, und die
+ * Differenz zum Teilstück davor sind die Gestrandeten. Sie zählen bei der
+ * Linie, die sie stehen ließ — dort entscheidet der Spieler über die Kapazität.
+ *
+ * Gerechnet wird auf **Tagessummen**, nicht je Stunde: die Ganglinie je Kette
+ * und Stunde mitzuführen wäre bei zehntausenden Ketten ein Vielfaches des
+ * Speichers, den der ganze Tag sonst braucht. Eine Kette, die morgens hält und
+ * abends reißt, erscheint dadurch als eine, die den ganzen Tag halb hält.
+ */
+export function settleChains(
+  chains: ReadonlyMap<string, readonly ChainLeg[]>,
+  observations: Map<string, { wanted: number; carried: number; punctuality: number }>,
+): Map<LineId, number> {
+  const stranded = new Map<LineId, number>()
+
+  for (const legs of chains.values()) {
+    if (legs.length < 2) continue
+    const ordered = [...legs].sort((a, b) => a.leg - b.leg)
+
+    // Die Teilstücke einzeln aus der Relationsabrechnung nehmen ...
+    const od = ordered[0]!.od
+    const entry = observations.get(od)
+    let wanted = 0
+    for (const leg of ordered) {
+      wanted = Math.max(wanted, leg.wanted)
+      if (entry) {
+        entry.wanted -= leg.wanted
+        entry.carried -= leg.carried
+      }
+    }
+    if (wanted <= 0) continue
+
+    // ... und als *eine* Reise wieder einsetzen. Anteile statt Absolutwerte,
+    // weil ein Teilstück in einer Nachtstunde gefahren sein kann und das
+    // andere nicht — dann sind schon die Nachfragen nicht dieselben.
+    let share = 1
+    for (const leg of ordered) {
+      const legShare = leg.wanted > 0 ? leg.carried / leg.wanted : 0
+      const after = Math.min(share, legShare)
+      if (leg.leg > 0 && after < share) {
+        stranded.set(leg.lineId, (stranded.get(leg.lineId) ?? 0) + wanted * (share - after))
+      }
+      share = after
+    }
+
+    if (entry) {
+      entry.wanted += wanted
+      entry.carried += wanted * share
+    }
+  }
+
+  return stranded
+}
 
 export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulation {
   const raw = prepareLines(state)
@@ -86,6 +158,7 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
   const lines: LineDayResult[] = []
   const crowding = new Map<LineId, readonly number[]>()
   const observations = new Map<string, { wanted: number; carried: number; punctuality: number }>()
+  const chains = new Map<string, ChainLeg[]>()
 
   for (const line of prepared) {
     if (line.kind === 'idle') {
@@ -95,7 +168,7 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
 
     const flows = byLine.get(line.line.id) ?? NO_FLOWS
     const transfers = transferRidersByLine.get(line.line.id) ?? 0
-    const { result, odOutcomes } =
+    const { result, odOutcomes, chainLegs } =
       line.kind === 'rail'
         ? finishRailDay(state, line, flows, transfers)
         : finishBusDay(state, line, flows, transfers)
@@ -107,11 +180,16 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
     })
     if (result.stopFlowPerDeparture) crowding.set(line.line.id, result.stopFlowPerDeparture)
 
-    // Beobachtungen je Relation einsammeln. Bei einer Kette ueber zwei Linien
-    // zaehlen beide Teilstuecke - wer auf dem zweiten haengen bleibt, gilt damit
-    // als halb bedient. Das ist grosszuegiger als die Wahrheit (er kommt gar
-    // nicht an), aber ehrlicher als ihn ganz zu ignorieren, und es haelt die
-    // Rechnung ohne einen zweiten Zuordnungsdurchgang aus.
+    for (const leg of chainLegs) {
+      const entry: ChainLeg = { ...leg, lineId: line.line.id }
+      const list = chains.get(leg.chain)
+      if (list) list.push(entry)
+      else chains.set(leg.chain, [entry])
+    }
+
+    // Beobachtungen je Relation einsammeln. Reiseketten stehen hier zunaechst
+    // mit jedem Teilstueck einzeln drin; `settleChains` rechnet sie danach auf
+    // die eine Fahrt zurueck, die sie in Wahrheit sind.
     for (const [od, outcome] of odOutcomes) {
       const entry = observations.get(od)
       const punctuality = punctualityByOd.get(od) ?? 1
@@ -125,6 +203,12 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
     }
   }
 
+  const stranded = settleChains(chains, observations)
+  for (let i = 0; i < lines.length; i++) {
+    const left = stranded.get(lines[i]!.lineId)
+    if (left) lines[i] = { ...lines[i]!, strandedTransfers: left }
+  }
+
   const breakdowns: Breakdown[] = prepared.flatMap((p) =>
     p.kind !== 'rail'
       ? []
@@ -133,6 +217,13 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
             ? [{ vehicleId: d.vehicleId, lineId: p.line.id, days: d.workshopDays }]
             : [],
         ),
+  )
+
+  // Die Trassenauslastung kennt keine Linien - sie entsteht erst, wenn alle
+  // Laeufe des Netzes zusammenliegen.
+  const railRuns = prepared.flatMap((p) => (p.kind === 'rail' ? p.detail.runs : []))
+  const trainByLine = new Map(
+    prepared.flatMap((p) => (p.kind === 'rail' && p.detail.train ? [[p.line.id, p.detail.train] as const] : [])),
   )
 
   const observed: ReadonlyMap<string, ServiceObservation> = observations
@@ -144,6 +235,7 @@ export function simulateDay(state: GameState, demand: DemandMatrix): DaySimulati
     breakdowns,
     satisfaction: updateSatisfaction(state.satisfaction, observed),
     crowding,
+    trackLoads: trackLoads(state, railRuns, (run) => trainByLine.get(run.lineId) ?? undefined),
   }
 }
 

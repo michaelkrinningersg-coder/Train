@@ -155,6 +155,7 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     costs,
     profit: revenue - costs,
     passengers,
+    trackLoad: Object.fromEntries([...day.trackLoads].map(([id, l]) => [id, l.load])),
   }
 
   // Abgeschlossene Ausbauten aus dem Zustand nehmen.

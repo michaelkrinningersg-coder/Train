@@ -105,12 +105,19 @@ export function assignDemand(
 
         // Auf die beteiligten Linien nach Fahrtenangebot verteilt: wer am
         // Bahnsteig steht, nimmt, was zuerst kommt.
-        for (const { itinerary, share } of connection.members) {
+        for (let m = 0; m < connection.members.length; m++) {
+          const { itinerary, share } = connection.members[m]!
           const riders = chosen * share
           if (riders <= 0.001) continue
 
           const perHour = new Float64Array(HOURS)
           for (let h = 0; h < HOURS; h++) perHour[h] = riders * hourShare(segment, h)
+
+          // Nur Ketten mit Umstieg brauchen eine Kennung - eine direkte Fahrt
+          // haelt oder haelt nicht, da gibt es nichts zusammenzusetzen. Das
+          // Segment steht bewusst *nicht* darin: die Kette ist dieselbe, egal
+          // wer darin sitzt, und so bleibt die Zahl der Ketten ueberschaubar.
+          const chain = itinerary.legs.length > 1 ? `${od}#${i}.${m}` : undefined
 
           itinerary.legs.forEach((leg, position) => {
             const flow: AssignmentFlow = {
@@ -122,6 +129,7 @@ export function assignDemand(
               fare: leg.fareCents,
               segment,
               od,
+              ...(chain === undefined ? {} : { chain, leg: position }),
             }
             const target = flowsOf(leg.lineId)
             if (leg.fromIndex < leg.toIndex) target.forward.push(flow)

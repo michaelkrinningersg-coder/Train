@@ -1,5 +1,5 @@
 import { BLOCK_LENGTH_KM, SIGNAL_REACTION_SEC } from '@game/domain'
-import type { GameState, RunId, Sec, TrackSegment } from '@game/domain'
+import type { GameState, RunId, Sec, TrackId, TrackSegment } from '@game/domain'
 
 /**
  * Belegung von Betriebsmitteln und Konflikterkennung.
@@ -28,8 +28,16 @@ export interface Claim {
   readonly from: Sec
   readonly to: Sec
   readonly runId: RunId
-  /** Nur bei Abschnitten: +1 in Streckenrichtung, -1 dagegen. */
+  /** Bei Blöcken und Abschnitten: +1 in Streckenrichtung, -1 dagegen. */
   readonly direction?: 1 | -1
+  /**
+   * Strecke, auf der diese Belegung liegt — bei Blöcken und Abschnitten.
+   *
+   * Aus der Bezeichnerzeichenkette wäre sie herauszulesen, aber das hieße, ein
+   * Format zu parsen, das nur für die Anzeige gedacht ist. Für die
+   * Gleisauslastung wird sie direkt gebraucht.
+   */
+  readonly trackId?: TrackId
   /** Klartext für die Konfliktmeldung. */
   readonly label: string
 }
@@ -83,11 +91,30 @@ export function headwaySeconds(track: TrackSegment, speedKmh: number, trainLengt
   return blockTime + clearing + SIGNAL_REACTION_SEC[track.signalling]
 }
 
-/** Theoretische Kapazität einer Strecke in Zügen je Stunde und Richtung. */
+/**
+ * Theoretische Kapazität einer Strecke in Zügen je Stunde und Richtung.
+ *
+ * Bei zwei und mehr Gleisen hat jede Richtung ihr eigenes, und es zählt allein
+ * die Zugfolge: kürzere Blöcke heben die Kapazität, ein drittes Gleis auch.
+ *
+ * Eingleisig ist es eine **andere** Rechnung, und zwar eine viel härtere. Zwei
+ * Züge derselben Richtung dürfen im Blockabstand folgen, aber ein Gegenzug
+ * darf erst hinein, wenn der Abschnitt ganz frei ist. Bei ausgeglichenem
+ * Verkehr passt in eine Stunde also nur, was zweimal die volle Abschnittsfahrt
+ * hergibt — auf einem 50-km-Abschnitt sind das ein bis zwei Züge je Richtung,
+ * ganz gleich wie kurz die Blöcke sind.
+ *
+ * Genau deshalb ist eine Überholstelle auf einer eingleisigen Strecke oft mehr
+ * wert als jede Signaltechnik: sie teilt den Abschnitt und halbiert damit die
+ * Zeit, die ein Gegenzug abwarten muss.
+ */
 export function capacityPerHour(track: TrackSegment, speedKmh: number, trainLengthM: number): number {
   const headway = headwaySeconds(track, speedKmh, trainLengthM)
-  const directions = track.tracks >= 2 ? track.tracks / 2 : 1
-  return (3600 / headway) * directions
+  if (track.tracks >= 2) return (3600 / headway) * (track.tracks / 2)
+
+  const v = Math.max(20, Math.min(speedKmh, track.maxSpeed))
+  const sectionSec = (track.lengthKm / v) * 3600 + SIGNAL_REACTION_SEC[track.signalling]
+  return Math.min(3600 / headway, 3600 / (2 * sectionSec))
 }
 
 /**

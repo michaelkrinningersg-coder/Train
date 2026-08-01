@@ -18,7 +18,7 @@ import {
   trackUpgradeCost,
   trackUpgradeDays,
 } from '@game/economy'
-import { previewTrack } from '@game/sim'
+import { previewTrack, TRACK_LOAD_TIGHT } from '@game/sim'
 import { useState } from 'react'
 import { useGame } from '../game/store.js'
 import { RailLineDetail } from './RailLineDetail.js'
@@ -379,6 +379,38 @@ function TrackDraftPanel(): React.JSX.Element | null {
   )
 }
 
+/**
+ * Wie voll die Trasse ist — die Frage, an der ein zweites Gleis hängt.
+ *
+ * Bewusst getrennt von der Auslastung der Züge: die eine sagt, ob mehr Takt
+ * passt, die andere, ob mehr Sitzplätze nötig sind. Beides zu verwechseln ist
+ * die teuerste Fehlentscheidung, die das Spiel anbietet.
+ */
+function TrackCapacity({ trackId }: { readonly trackId: TrackId }): React.JSX.Element | null {
+  const state = useGame((s) => s.state)
+  const load = state?.lastDay?.trackLoad?.[trackId]
+  if (load === undefined) return null
+
+  const tone = load >= 1 ? 'neg' : load >= TRACK_LOAD_TIGHT ? 'warn' : 'pos'
+  return (
+    <>
+      <h3>Trassenauslastung</h3>
+      <div className="loadbar" title="Zugfahrten in der stärksten Stunde, gemessen an dem, was die Strecke tragen kann.">
+        <div className={`loadbar__fill loadbar__fill--${tone}`} style={{ width: `${Math.min(100, load * 100)}%` }} />
+      </div>
+      <p className="muted small">
+        <b className={`num ${tone === 'pos' ? 'pos' : 'neg'}`}>{Math.round(load * 100)} %</b> der Kapazität in der
+        stärksten Stunde.{' '}
+        {load >= 1
+          ? 'Die Trasse ist voll — mehr Takt geht nur noch über ein weiteres Gleis oder kürzere Blöcke.'
+          : load >= TRACK_LOAD_TIGHT
+            ? 'Eng. Jede Verspätung pflanzt sich hier fort, weil keine Lücke zum Aufholen bleibt.'
+            : 'Reichlich Luft für dichteren Takt.'}
+      </p>
+    </>
+  )
+}
+
 function terrainWord(factor: number): string {
   if (factor < 1.25) return 'eben'
   if (factor < 1.8) return 'hügelig'
@@ -466,6 +498,9 @@ function TrackDetail({ trackId }: { readonly trackId: TrackId }): React.JSX.Elem
           ⏳ {readyIn > 0 ? `Im Bau, fertig in ${readyIn} Tagen.` : `Ausbau läuft, fertig in ${worksLeft} Tagen.`}
         </p>
       )}
+
+      <TrackCapacity trackId={trackId} />
+
 
       <h3>Ausbau</h3>
       {track.construction ? (

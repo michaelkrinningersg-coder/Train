@@ -15,7 +15,7 @@ function dotRadius(population: number): number {
 
 export function Legend(): React.JSX.Element {
   const showDemand = useGame((s) => s.showDemand)
-  const showLoad = useGame((s) => s.showLoad)
+  const loadView = useGame((s) => s.loadView)
   const tone = basemapById(useGame((s) => s.basemap)).tone
   const maxDiameter = dotRadius(Math.max(...SAMPLES.map((s) => s.population))) * 2
 
@@ -42,16 +42,16 @@ export function Legend(): React.JSX.Element {
           <span className="legend__stroke legend__stroke--demand" /> Nachfrage
         </span>
       )}
-      {showLoad && (
+      {loadView !== 'off' && (
         <>
           <span className="legend__sep" />
           <span className="legend__item">
-            leer
+            {loadView === 'tracks' ? 'freie Trasse' : 'leer'}
             <span
               className="legend__ramp"
               style={{ background: `linear-gradient(to right, ${MARKS[tone].load.join(', ')})` }}
             />
-            voll
+            {loadView === 'tracks' ? 'ausgereizt' : 'voll'}
           </span>
         </>
       )}

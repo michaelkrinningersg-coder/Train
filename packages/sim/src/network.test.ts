@@ -27,7 +27,7 @@ import {
   lineConnections,
 } from './connections.js'
 import { expectedHoldSec, missProbability } from './holding.js'
-import { simulateDay } from './day.js'
+import { settleChains, simulateDay } from './day.js'
 import { assignDemand } from './demandAssignment.js'
 import {
   buildItineraries,
@@ -358,6 +358,59 @@ describe('Umsteigen', () => {
 })
 
 // ── Überlastung ─────────────────────────────────────────────────────────────
+
+describe('Gestrandete Umsteiger', () => {
+  const leg = (position: number, line: string, wanted: number, carried: number) => ({
+    chain: 'k',
+    od: 'a|b',
+    leg: position,
+    lineId: line as LineId,
+    wanted,
+    carried,
+  })
+
+  it('laesst nur so viele ankommen, wie das schwaechste Teilstueck traegt', () => {
+    // Vorher steht die Kette mit *beiden* Teilstuecken einzeln in der
+    // Relationsabrechnung — 200 gewollt, 150 mitgenommen, also drei Viertel
+    // bedient. In Wahrheit ist die Haelfte angekommen.
+    const observed = new Map([['a|b', { wanted: 200, carried: 150, punctuality: 1 }]])
+    const stranded = settleChains(new Map([['k', [leg(0, 'zubringer', 100, 100), leg(1, 'haupt', 100, 50)]]]), observed)
+
+    expect(observed.get('a|b')).toEqual({ wanted: 100, carried: 50, punctuality: 1 })
+    expect(stranded.get('haupt' as LineId)).toBeCloseTo(50, 6)
+    // Wer auf dem ersten Teilstueck nicht mitkommt, strandet nicht — er ist
+    // gar nicht erst losgefahren.
+    expect(stranded.has('zubringer' as LineId)).toBe(false)
+  })
+
+  it('zaehlt einen Fahrgast nur einmal, auch wenn die Kette zweimal reisst', () => {
+    // Das mittlere Teilstueck ist der Engpass. Das letzte traegt zwar auch
+    // weniger als die volle Nachfrage, aber die Leute, die es abweist, sitzen
+    // laengst nicht mehr im Zug — es darf sie nicht noch einmal stranden lassen.
+    const observed = new Map([['a|b', { wanted: 300, carried: 200, punctuality: 1 }]])
+    const stranded = settleChains(
+      new Map([['k', [leg(0, 'l1', 100, 100), leg(1, 'l2', 100, 40), leg(2, 'l3', 100, 60)]]]),
+      observed,
+    )
+
+    expect(observed.get('a|b')).toEqual({ wanted: 100, carried: 40, punctuality: 1 })
+    expect(stranded.get('l2' as LineId)).toBeCloseTo(60, 6)
+    expect(stranded.has('l3' as LineId)).toBe(false)
+  })
+
+  it('meldet die Gestrandeten bei der ueberlasteten Linie im laufenden Betrieb', () => {
+    const state = network({ feeder: true })
+    const day = simulateDay(state, demand)
+
+    const of = (name: string): number =>
+      day.lines.find((l) => l.lineId === lineNamed(state, name).id)?.strandedTransfers ?? 0
+
+    // Die Hauptlinie ist hoffnungslos ueberfuellt, der Zubringer nicht.
+    expect(day.lines.find((l) => l.lineId === lineNamed(state, 'Hauptlinie').id)!.peakLoadFactor).toBeGreaterThan(1)
+    expect(of('Hauptlinie')).toBeGreaterThan(0)
+    expect(of('Zubringer')).toBe(0)
+  })
+})
 
 describe('Haltezeit aus Andrang', () => {
   it('verlängert die Haltezeit mit steigendem Andrang', () => {

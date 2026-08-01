@@ -37,8 +37,9 @@ import {
   vehicleShare,
   rollDisruptions,
 } from './disruptions.js'
-import { simulateRailLine } from './day.js'
+import { simulateDay, simulateRailLine } from './day.js'
 import { timeAtKm } from './runTime.js'
+import { TRACK_LOAD_TIGHT } from './trackLoad.js'
 import { createGame } from './state.js'
 
 const city = (name: string, population: number, lng: number, lat: number): City => ({
@@ -380,6 +381,60 @@ describe('Fahrgastzuordnung', () => {
     const result = assignPassengers({ forward: [flow(0, 1, 150), flow(0, 2, 50)], backward: [], seatsPerHour: seats, departuresPerHour: perDeparture, stopCount: 3 })
     const throughScale = 100 / 200
     expect(result.totalPassengers).toBeCloseTo(200 * throughScale, 6)
+  })
+
+  it('laesst niemanden unterwegs aus dem Zug werfen: wer sitzt, bleibt sitzen', () => {
+    const seats = new Float64Array(24)
+    seats[8] = 100
+
+    // Der Zug ist ab Halt 0 voll. Am Halt 1 warten noch einmal so viele.
+    const result = assignPassengers({
+      forward: [flow(0, 2, 100), flow(1, 2, 100)],
+      backward: [],
+      seatsPerHour: seats,
+      departuresPerHour: perDeparture,
+      stopCount: 3,
+    })
+
+    // Die Durchfahrenden haben ihren Platz und behalten ihn ...
+    expect(result.byOd.get('0|2')?.carried).toBeCloseTo(100, 6)
+    // ... die Zusteiger bleiben vollstaendig am Bahnsteig.
+    expect(result.byOd.get('1|2')?.carried).toBeCloseTo(0, 6)
+    expect(result.totalPassengers).toBeCloseTo(100, 6)
+    expect(result.leftBehind).toBeCloseTo(100, 6)
+  })
+
+  it('gibt frei gewordene Plaetze am Halt weiter', () => {
+    const seats = new Float64Array(24)
+    seats[8] = 100
+
+    // Die ersten 100 steigen am Halt 1 aus - genau dann wird wieder Platz frei.
+    const result = assignPassengers({
+      forward: [flow(0, 1, 100), flow(1, 2, 100)],
+      backward: [],
+      seatsPerHour: seats,
+      departuresPerHour: perDeparture,
+      stopCount: 3,
+    })
+    expect(result.totalPassengers).toBeCloseTo(200, 6)
+    expect(result.leftBehind).toBeCloseTo(0, 6)
+  })
+
+  it('kennt die Fahrtreihenfolge auch rueckwaerts', () => {
+    const seats = new Float64Array(24)
+    seats[8] = 100
+
+    // Rueckwaerts faehrt der Zug von Halt 2 nach Halt 0: zuerst am Bahnsteig
+    // steht, wer in 2 einsteigt, nicht wer in 1 wartet.
+    const result = assignPassengers({
+      forward: [],
+      backward: [flow(2, 0, 100), flow(1, 0, 100)],
+      seatsPerHour: seats,
+      departuresPerHour: perDeparture,
+      stopCount: 3,
+    })
+    expect(result.byOd.get('2|0')?.carried).toBeCloseTo(100, 6)
+    expect(result.byOd.get('1|0')?.carried).toBeCloseTo(0, 6)
   })
 
   it('zaehlt Nachfrage ausserhalb der Betriebszeit als stehen geblieben, nicht als Ueberlastung', () => {
@@ -955,5 +1010,65 @@ describe('Fahrzeugschäden', () => {
     // Das ist der Grund, warum die Hauptuntersuchung ihr Geld wert ist: nicht
     // die Verspaetungsminuten, sondern die Tage ohne Fahrzeug.
     expect(ausfalltage(0.2)).toBeGreaterThan(ausfalltage(0.95))
+  })
+})
+
+describe('Gleisauslastung', () => {
+  const loadOf = (state: GameState): number => {
+    const day = simulateDay(state, demand)
+    return [...day.trackLoads.values()][0]?.load ?? 0
+  }
+
+  it('misst Zugfahrten je Stunde gegen die Trassenkapazitaet', () => {
+    const state = railSetup({ spec: DOUBLE, headway: 60, trains: 4 })
+    const day = simulateDay(state, demand)
+    const load = [...day.trackLoads.values()][0]
+
+    expect(load).toBeDefined()
+    // Ein Zug je Stunde und Richtung auf einer Strecke, die ein Vielfaches
+    // davon traegt — die Trasse ist praktisch leer.
+    expect(load!.peakTrainsPerHour).toBe(1)
+    expect(load!.capacityPerHour).toBeGreaterThan(5)
+    expect(load!.load).toBeLessThan(TRACK_LOAD_TIGHT)
+  })
+
+  it('steigt mit dichterem Takt', () => {
+    expect(loadOf(railSetup({ spec: DOUBLE, headway: 20, trains: 12 }))).toBeGreaterThan(
+      loadOf(railSetup({ spec: DOUBLE, headway: 60, trains: 4 })),
+    )
+  })
+
+  it('macht aus demselben Takt auf eingleisiger Strecke ein Vielfaches der Auslastung', () => {
+    // Gleiche Signaltechnik, gleiche Hoechstgeschwindigkeit, gleicher Takt.
+    // Der Unterschied ist allein, dass eingleisig der Gegenzug den ganzen
+    // Abschnitt abwarten muss — und das ist ein Unterschied von Groessenordnung,
+    // nicht von Prozenten.
+    const single = railSetup({ spec: { ...SINGLE, maxSpeed: 200 }, headway: 30, trains: 8 })
+    const double = railSetup({ spec: DOUBLE, headway: 30, trains: 8 })
+    expect(loadOf(single)).toBeGreaterThan(10 * loadOf(double))
+  })
+
+  it('zaehlt beide Linien einer gemeinsamen Trasse', () => {
+    // Die Strecke gehoert keiner Linie. Zwei Linien darauf belegen sie zusammen.
+    const one = railSetup({ spec: DOUBLE, headway: 60, trains: 4 })
+    const pattern = [...one.patterns.values()][0]!
+    const line = [...one.lines.values()][0]!
+
+    const bought = applyCommand(one, { kind: 'buy_vehicle', classId: 'emu_regional', units: 4 })
+    if (!bought.ok) throw new Error(bought.reason)
+    const second = applyCommand(bought.state, {
+      kind: 'create_line',
+      line: { ...line, name: 'Zweite Linie' },
+    })
+    if (!second.ok) throw new Error(second.reason)
+    const created = [...second.state.lines.values()].at(-1)!
+    const fresh = [...second.state.fleet.values()].slice(-4).map((v) => v.id)
+    const patterned = applyCommand(second.state, {
+      kind: 'set_pattern',
+      pattern: { ...pattern, lineId: created.id, vehicleIds: fresh },
+    })
+    if (!patterned.ok) throw new Error(patterned.reason)
+
+    expect(loadOf(patterned.state)).toBeCloseTo(2 * loadOf(one), 6)
   })
 })

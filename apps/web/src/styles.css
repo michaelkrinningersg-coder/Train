@@ -282,6 +282,33 @@ body,
   font-size: 13px;
 }
 
+/* Balken fuer einen Anteil von 0 bis 100 %. Die Farbe wiederholt, was die
+   Laenge schon sagt — wer Farben nicht unterscheidet, sieht den Balken. */
+.loadbar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--hairline);
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.loadbar__fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.loadbar__fill--pos {
+  background: var(--pos, #3ba55d);
+}
+
+.loadbar__fill--warn {
+  background: #d9a441;
+}
+
+.loadbar__fill--neg {
+  background: var(--neg, #d95f5f);
+}
+
 /* Drei Zahlen nebeneinander statt untereinander — fuer Zwischenstaende,
    die begleiten sollen, ohne das Panel zu verlaengern. */
 .facts--strip {

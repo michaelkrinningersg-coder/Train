@@ -32,6 +32,7 @@ export function QualityFacts({ result }: { readonly result: LineDayResult }): Re
   const transferShare = result.totalPassengers > 0 ? transfers / result.totalPassengers : 0
   const missed = result.missedConnections ?? 0
   const held = result.holdDelaySec ?? 0
+  const stranded = result.strandedTransfers ?? 0
 
   return (
     <>
@@ -52,6 +53,12 @@ export function QualityFacts({ result }: { readonly result: LineDayResult }): Re
           <dd className="num neg">{Math.round(missed).toLocaleString('de-DE')}</dd>
         </div>
       )}
+      {stranded >= 1 && (
+        <div title="Umsteiger, die diese Linie nicht mehr mitnehmen konnte. Sie sind bereits mit dem Zubringer angereist und kommen an ihrem Ziel gar nicht mehr an.">
+          <dt>gestrandete Umsteiger</dt>
+          <dd className="num neg">{Math.round(stranded).toLocaleString('de-DE')}</dd>
+        </div>
+      )}
       {held > 0 && (
         <div title="Verspätung, die allein daraus entsteht, dass diese Linie auf Zubringer gewartet hat.">
           <dt>davon Anschlusswarten</dt>
@@ -67,6 +74,7 @@ export function QualityNote({ result }: { readonly result: LineDayResult }): Rea
   const satisfaction = result.satisfaction ?? 1
   const missed = result.missedConnections ?? 0
   const missedShare = result.totalPassengers > 0 ? missed / result.totalPassengers : 0
+  const stranded = result.strandedTransfers ?? 0
 
   return (
     <>
@@ -75,6 +83,13 @@ export function QualityNote({ result }: { readonly result: LineDayResult }): Rea
         <p className="warn small">
           ⚠ {Math.round(missedShare * 100)} % der Fahrgäste erreichen ihren Anschluss an diese Linie nicht. Entweder
           mehr Puffer legen oder die Linie warten lassen.
+        </p>
+      )}
+      {stranded >= 1 && (
+        <p className="warn small">
+          ⚠ {Math.round(stranded).toLocaleString('de-DE')} Umsteiger bekommen hier keinen Platz mehr. Sie sind mit dem
+          Zubringer schon unterwegs und stranden am Umsteigebahnhof — das trifft die Zufriedenheit härter als eine
+          Fahrt, die gar nicht erst zustande kommt.
         </p>
       )}
     </>

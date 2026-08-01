@@ -87,6 +87,9 @@ function computeDemandArcs(state: GameState, demand: DemandMatrix): DemandArc[] 
     })
 }
 
+/** Welche Auslastung die Karte zeigt. */
+export type LoadView = 'off' | 'trains' | 'tracks'
+
 /** Ein Abschnitt zwischen zwei Halten, mit der Auslastung von gestern. */
 export interface LoadLink {
   readonly lineId: LineId
@@ -138,6 +141,38 @@ export function loadLinks(state: GameState): LoadLink[] {
   return out.sort((x, y) => x.load - y.load)
 }
 
+/**
+ * Dieselbe Darstellung, aber für die **Trassen** statt für die Züge.
+ *
+ * Auf der Karte sehen beide gleich aus, und das ist Absicht: es ist derselbe
+ * Blick auf denselben Korridor, nur mit einer anderen Frage. Voll besetzte
+ * Züge auf einer halbleeren Trasse heißen „dichter fahren“; leere Züge auf
+ * einer vollen Trasse heißen „nicht noch eine Fahrt dazu“.
+ */
+export function trackLoadLinks(state: GameState): LoadLink[] {
+  const loads = state.lastDay?.trackLoad
+  if (!loads) return []
+
+  const out: LoadLink[] = []
+  const nameOf = (nodeId: string): string =>
+    [...state.network.stations.values()].find((s) => s.nodeId === nodeId)?.name ?? 'Abzweig'
+
+  for (const track of state.network.tracks.values()) {
+    const load = loads[track.id]
+    if (load === undefined || load <= 0) continue
+    out.push({
+      // Eine Strecke gehoert keiner Linie - der Klick waehlt deshalb nichts aus.
+      lineId: '' as LineId,
+      lineName: `${track.tracks} Gleis${track.tracks === 1 ? '' : 'e'}, ${track.maxSpeed} km/h`,
+      from: nameOf(track.from),
+      to: nameOf(track.to),
+      load,
+      path: track.geometry.map((p) => [p[0], p[1]] as [number, number]),
+    })
+  }
+  return out.sort((x, y) => x.load - y.load)
+}
+
 /** Was die Städteschichten brauchen — bewusst ohne den Spielzustand. */
 export interface CityLayerContext {
   readonly cities: readonly City[]
@@ -156,8 +191,8 @@ export interface LayerContext {
   readonly selectedLineId: LineId | null
   readonly draft: readonly StationId[]
   readonly showDemand: boolean
-  /** Auslastungs-Heatmap ueber den eigenen Linien. */
-  readonly showLoad: boolean
+  /** Auslastungs-Heatmap: Zuege, Trassen oder nichts. */
+  readonly loadView: LoadView
   readonly tone: Tone
   readonly selectedTrackId: TrackId | null
   /** Entwurf einer Strecke: Startknoten, Stuetzpunkte und Zeigerposition. */
@@ -428,8 +463,8 @@ export function buildLayers(ctx: LayerContext): Layer[] {
 
   // Ueber den Linien, damit der Engpass nicht unter seiner eigenen Linie
   // verschwindet, aber unter Staedten und Beschriftung.
-  if (ctx.showLoad) {
-    const links = loadLinks(state)
+  if (ctx.loadView !== 'off') {
+    const links = ctx.loadView === 'tracks' ? trackLoadLinks(state) : loadLinks(state)
     if (links.length > 0) {
       layers.push(
         new PathLayer<LoadLink>({
@@ -456,7 +491,7 @@ export function buildLayers(ctx: LayerContext): Layer[] {
           jointRounded: true,
           pickable: true,
           onClick: ({ object }) => {
-            if (object) ctx.onPickLine(object.lineId)
+            if (object?.lineId) ctx.onPickLine(object.lineId)
             return true
           },
         }),

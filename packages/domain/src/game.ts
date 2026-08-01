@@ -120,6 +120,15 @@ export interface LineDayResult {
    * und die Relation merkt es sich in ihrer Zufriedenheit.
    */
   readonly missedConnections?: number
+  /**
+   * Umsteiger, die diese Linie stehen liess, weil kein Platz mehr war.
+   *
+   * Anders als ein verpasster Anschluss ist das kein spaeteres Ankommen,
+   * sondern gar keines: der Fahrgast hat den Zubringer schon besetzt und
+   * strandet am Umsteigebahnhof. Fuer die Relation ist es der schlimmste
+   * Ausgang, den es gibt.
+   */
+  readonly strandedTransfers?: number
 }
 
 export interface DayResult {
@@ -129,6 +138,14 @@ export interface DayResult {
   readonly costs: Money
   readonly profit: Money
   readonly passengers: number
+  /**
+   * Auslastung der Trassen, je Strecke, in Anteilen der Kapazitaet.
+   *
+   * Sie gehoert nicht zu einer Linie: eine Strecke wird von allen Linien
+   * zusammen befahren. Deshalb steht sie beim Tag und nicht beim Linienergebnis.
+   * In der Historie wird sie mit den Linien zusammen weggekuerzt.
+   */
+  readonly trackLoad?: Readonly<Record<string, number>>
 }
 
 export interface GameState {

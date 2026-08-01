@@ -17,7 +17,7 @@ export function TopBar(): React.JSX.Element | null {
   const setSpeed = useGame((s) => s.setSpeed)
   const step = useGame((s) => s.step)
   const showDemand = useGame((s) => s.showDemand)
-  const showLoad = useGame((s) => s.showLoad)
+  const loadView = useGame((s) => s.loadView)
   const toggleLoad = useGame((s) => s.toggleLoad)
   const toggleDemand = useGame((s) => s.toggleDemand)
   const setShowSaves = useGame((s) => s.setShowSaves)
@@ -72,11 +72,17 @@ export function TopBar(): React.JSX.Element | null {
 
       <button
         type="button"
-        className={`chip${showLoad ? ' chip--on' : ''}`}
+        className={`chip${loadView !== 'off' ? ' chip--on' : ''}`}
         onClick={toggleLoad}
-        title="Auslastung je Abschnitt aus dem letzten Betriebstag"
+        title={
+          loadView === 'off'
+            ? 'Auslastung des letzten Betriebstags einblenden — erst die Züge, dann die Trassen'
+            : loadView === 'trains'
+              ? 'Wie voll die Züge sind. Weiter zu den Trassen.'
+              : 'Wie voll die Trassen sind — Zugfahrten je Stunde gegen die Kapazität. Weiter: aus.'
+        }
       >
-        Auslastung
+        {loadView === 'tracks' ? 'Gleisauslastung' : 'Auslastung'}
       </button>
 
       <div className="speed" role="group" aria-label="Geschwindigkeit">

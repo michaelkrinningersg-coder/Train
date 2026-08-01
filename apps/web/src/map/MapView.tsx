@@ -31,7 +31,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
   const selectedLineId = useGame((s) => s.selectedLineId)
   const draft = useGame((s) => s.draft)
   const showDemand = useGame((s) => s.showDemand)
-  const showLoad = useGame((s) => s.showLoad)
+  const loadView = useGame((s) => s.loadView)
   const focus = useGame((s) => s.focus)
   const mapMode = useGame((s) => s.mapMode)
   const selectedTrackId = useGame((s) => s.selectedTrackId)
@@ -111,9 +111,25 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       if (store.mapMode === 'draw-track') {
         // Ein Klick auf einen Bahnhof setzt Start oder Ziel, alles andere ist
         // ein Stuetzpunkt der Trasse.
-        const station = nearestRailStation(store, point, e.point, map)
+        const station = nearestStation(store, e.point, map, 'rail')
         if (station) store.trackClickNode(station.nodeId)
         else store.trackAddWaypoint(point)
+        return
+      }
+
+      if (store.mapMode === 'draw-line') {
+        // Gerastet wird auf den naechsten *Halt*, nicht auf die naechste Stadt.
+        // Im Landesmassstab liegen Staedte dicht an dicht - ein Klick auf
+        // Frankfurt traf Offenbach, obwohl dort weit und breit kein Bahnhof
+        // steht. Haltestellen sind duenn gesaet, und nur um sie geht es hier.
+        const mode = store.draftMode === 'rail' ? 'rail' : 'bus'
+        const station = nearestStation(store, e.point, map, mode)
+        if (station?.stationId) {
+          store.toggleDraftStop(station.stationId)
+        } else if (picked && 'population' in picked.object) {
+          const city = picked.object as City
+          store.notify(`${city.name} hat ${mode === 'rail' ? 'noch keinen Bahnhof' : 'noch keine Haltestelle'}.`)
+        }
         return
       }
 
@@ -199,22 +215,13 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
             store.selectCity(null)
             return
           }
-          // Im Zeichenmodus ist ein Klick auf eine erschlossene Stadt das
-          // Hinzufuegen zur Linie, nicht das Oeffnen der Stadtdetails. Der
-          // Modus kommt aus der Referenz und nicht aus der Abhaengigkeitsliste,
-          // damit ein Moduswechsel die Staedteschichten nicht neu baut.
-          if (actions.current.mapMode === 'draw-line') {
-            const rail = store.draftMode === 'rail'
-            const stop = [...(store.state?.network.stations.values() ?? [])].find(
-              (s) => s.cityId === city.id && (rail ? s.mode !== 'bus' : s.mode !== 'rail'),
-            )
-            if (stop) store.toggleDraftStop(stop.id)
-            else store.notify(`${city.name} hat ${rail ? 'noch keinen Bahnhof' : 'noch keine Haltestelle'}.`)
-            return
-          }
-          // In den Bauwerkzeugen wertet die Kartenebene den Klick selbst aus.
-          // Das Stadtpanel duerfte hier nicht aufgehen: es legt sich ueber
-          // genau den Kartenausschnitt, in dem gerade weitergebaut wird.
+          // In den Bauwerkzeugen wertet der Kartenklick den Treffer selbst aus:
+          // dort wird auf Halte gerastet, nicht auf Staedte. Das Stadtpanel
+          // duerfte hier ohnehin nicht aufgehen - es legt sich ueber genau den
+          // Ausschnitt, in dem gerade weitergebaut wird, und verschluckt den
+          // naechsten Klick. Der Modus kommt aus der Referenz und nicht aus der
+          // Abhaengigkeitsliste, damit ein Moduswechsel die Staedteschichten
+          // nicht neu baut.
           if (actions.current.mapMode !== 'idle') return
           store.selectCity(city.id)
         },
@@ -234,7 +241,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       selectedLineId,
       draft,
       showDemand,
-      showLoad,
+      loadView,
       tone: basemap.tone,
       selectedTrackId,
       trackDraft: trackDraft ? { from: trackDraft.from, waypoints: trackDraft.waypoints } : null,
@@ -243,7 +250,7 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
       onPickLine: (id) => useGame.getState().selectLine(id),
       onPickCity: () => undefined,
     })
-  }, [state, demand, cities, zoom, selectedCityId, selectedLineId, draft, showDemand, showLoad, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
+  }, [state, demand, cities, zoom, selectedCityId, selectedLineId, draft, showDemand, loadView, basemap.tone, selectedTrackId, trackDraft, hoverPoint, mapMode])
 
   const layers = useMemo(
     () => [...cityLayers.below, ...networkLayers, ...cityLayers.above],
@@ -270,28 +277,35 @@ export function MapView({ view }: MapViewProps): React.JSX.Element {
  * nicht ueber deck.gl-Picking, weil die Bahnhofspunkte klein sind und beim
  * Trassenziehen ein grosszuegigerer Fangbereich viel angenehmer ist.
  */
-function nearestRailStation(
+/**
+ * Der naechste Halt zum Zeiger, in Bildschirmpixeln gemessen.
+ *
+ * Bildschirmnaehe und nicht geografische Naehe: was zusammen aussieht, soll
+ * sich auch zusammen anfuehlen, und zwar in jeder Zoomstufe gleich.
+ */
+function nearestStation(
   store: ReturnType<typeof useGame.getState>,
-  point: [number, number],
   screen: { x: number; y: number },
   map: maplibregl.Map,
-): { nodeId: import('@game/domain').NodeId } | null {
+  mode: 'rail' | 'bus',
+): { nodeId: import('@game/domain').NodeId; stationId: import('@game/domain').StationId } | null {
   const state = store.state
   if (!state) return null
 
   const SNAP_PX = 18
-  let best: { nodeId: import('@game/domain').NodeId; distance: number } | null = null
+  let best: { nodeId: import('@game/domain').NodeId; stationId: import('@game/domain').StationId; distance: number } | null = null
 
   for (const station of state.network.stations.values()) {
-    if (station.mode === 'bus') continue
+    // Ein Bahnhof taugt auch als Bushalt nicht und umgekehrt - beim Bus zaehlt
+    // alles ausser reinen Bahnhoefen, bei der Bahn alles ausser Bushaltestellen.
+    if (mode === 'rail' ? station.mode === 'bus' : station.mode === 'rail') continue
     const projected = map.project([station.position[0], station.position[1]])
     const dx = projected.x - screen.x
     const dy = projected.y - screen.y
     const distance = Math.hypot(dx, dy)
     if (distance <= SNAP_PX && (!best || distance < best.distance)) {
-      best = { nodeId: station.nodeId, distance }
+      best = { nodeId: station.nodeId, stationId: station.id, distance }
     }
   }
-  void point
-  return best ? { nodeId: best.nodeId } : null
+  return best ? { nodeId: best.nodeId, stationId: best.stationId } : null
 }
