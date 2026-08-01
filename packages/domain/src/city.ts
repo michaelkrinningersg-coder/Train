@@ -92,6 +92,46 @@ export interface City {
 }
 
 /**
+ * Eine Einrichtung, die entsteht, wächst oder verschwindet.
+ *
+ * Ein Spiel läuft über Jahrzehnte, und in Jahrzehnten ändert sich, wofür eine
+ * Stadt gut ist. Das Zechensterben im Ruhrgebiet und der Ausbau der
+ * Fachhochschulen sind keine Randnotiz, sondern genau die Kräfte, die eine
+ * Relation aufblühen oder verdorren lassen — und ein Netz, das darauf nicht
+ * reagiert, ist nach zwanzig Jahren am Bedarf vorbei gebaut.
+ *
+ * Der Wandel steht als **Liste von Ereignissen** im Spielstand und nicht als
+ * veränderte Städteliste. Das hat zwei Gründe: die Liste ist winzig, während
+ * die Städte ein Drittel des Zustands ausmachen — und Haupt- und Rechenthread
+ * halten ihre Städte getrennt, können aber dieselbe Liste anwenden und kommen
+ * damit garantiert auf denselben Stand.
+ */
+export interface FacilityChange {
+  readonly day: number
+  readonly cityId: CityId
+  readonly type: FacilityType
+  /** Neue Größe. **0 bedeutet: die Einrichtung verschwindet.** */
+  readonly size: 0 | 1 | 2 | 3
+  /** Was in der Meldung steht. */
+  readonly note: string
+}
+
+/**
+ * Einen Wandel auf eine Stadt anwenden. Reine Funktion, beide Threads rufen
+ * sie mit derselben Liste auf.
+ */
+export function applyFacilityChange(city: City, change: FacilityChange): City {
+  const rest = city.facilities.filter((f) => f.type !== change.type)
+  if (change.size === 0) return { ...city, facilities: rest }
+
+  const existing = city.facilities.find((f) => f.type === change.type)
+  const facility: Facility = existing
+    ? { ...existing, size: change.size }
+    : { type: change.type, size: change.size }
+  return { ...city, facilities: [...rest, facility] }
+}
+
+/**
  * Stadtradius aus der Einwohnerzahl. ~7 km bei 100k, ~22 km bei 1 Mio.
  * Siehe docs/05-DATENPIPELINE.md Abschnitt 1.
  */

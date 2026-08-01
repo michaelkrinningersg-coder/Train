@@ -1,4 +1,5 @@
 import {
+  applyFacilityChange,
   DAYS_ALL,
   DEFAULT_BUS_FARE,
   cityId,
@@ -187,6 +188,42 @@ describe('Spielstände', () => {
     const loaded = readSave(legacy)
     expect(loaded.lines.size).toBeGreaterThan(0)
     for (const line of loaded.lines.values()) expect(line.connectionHoldSec).toBe(0)
+  })
+
+  it('trägt den Strukturwandel mit und stellt die Städte danach wieder her', () => {
+    const before: GameState = {
+      ...played(1),
+      facilityChanges: [
+        { day: 1, cityId: [...played(1).cities.keys()][0]!, type: 'university', size: 2, note: 'Prüfung' },
+      ],
+    }
+    // Die Staedte selbst werden gespeichert, die Liste daneben - beim Laden
+    // muessen beide wieder zusammenpassen.
+    const after = roundTrip({
+      ...before,
+      cities: new Map(
+        [...before.cities.entries()].map(([id, c]) => [
+          id,
+          id === before.facilityChanges[0]!.cityId
+            ? applyFacilityChange(c, before.facilityChanges[0]!)
+            : c,
+        ]),
+      ),
+    })
+
+    expect(after.facilityChanges).toEqual(before.facilityChanges)
+    const changed = after.cities.get(before.facilityChanges[0]!.cityId)!
+    expect(changed.facilities.find((f) => f.type === 'university')?.size).toBe(2)
+    // Die Potenziale werden beim Laden neu gerechnet - und zwar aus den
+    // *geaenderten* Einrichtungen.
+    expect(changed.potential?.student.destination).toBeGreaterThan(0)
+  })
+
+  it('liest einen Spielstand aus Format 4, in dem die Städte noch stillstanden', () => {
+    const save = makeSave(played(3), 'Alt', '1990-01-04T00:00:00.000Z')
+    const { facilityChanges: _gone, ...state } = save.state
+    const loaded = readSave({ ...save, version: 4, state })
+    expect(loaded.facilityChanges).toEqual([])
   })
 
   it('trägt Beschriftung und Zeitstempel mit', () => {

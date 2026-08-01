@@ -1,5 +1,6 @@
 import type {
   City,
+  FacilityChange,
   DayResult,
   GameState,
   LedgerEntry,
@@ -41,12 +42,12 @@ import { withPotentials } from '@game/demand'
  */
 
 /**
- * Format 2 kennt die Anschlusssicherung je Linie, Format 3 den Auftrag. Ältere
- * Stände haben die Felder nicht; sie werden beim Laden so gelesen, wie sie sich
- * verhalten haben — niemand wartet auf niemanden, und gespielt wurde ohne
- * Auftrag.
+ * Format 2 kennt die Anschlusssicherung je Linie, Format 3 den Auftrag,
+ * Format 5 den Strukturwandel. Ältere Stände haben die Felder nicht; sie werden
+ * beim Laden so gelesen, wie sie sich verhalten haben — niemand wartet auf
+ * niemanden, gespielt wurde ohne Auftrag, und die Städte standen still.
  */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 /** Was ein `Map`-Wert selbst mitbringt, muss nicht als Schlüssel danebenstehen. */
 type ById<T> = readonly T[]
@@ -72,6 +73,8 @@ export interface SerialisedState {
   readonly lastDay: DayResult | null
   /** Nur die Summen — siehe Dateikopf. Der letzte Tag steht in `lastDay`. */
   readonly history: readonly DayResult[]
+  /** Strukturwandel. Fehlt in Formaten vor 5. */
+  readonly facilityChanges?: readonly FacilityChange[]
 }
 
 export interface SaveGame {
@@ -102,6 +105,7 @@ export function serialiseState(state: GameState): SerialisedState {
     ledger: state.ledger,
     lastDay: state.lastDay,
     history: state.history.map(summarise),
+    facilityChanges: state.facilityChanges,
   }
 }
 
@@ -148,6 +152,7 @@ export function deserialiseState(data: SerialisedState): GameState {
     ledger: data.ledger,
     lastDay: data.lastDay,
     history: data.history,
+    facilityChanges: data.facilityChanges ?? [],
   }
 }
 
@@ -200,6 +205,10 @@ function migrate(state: SerialisedState, from: number): SerialisedState {
         current = liftV3toV4(current)
         version = 4
         break
+      case 4:
+        current = liftV4toV5(current)
+        version = 5
+        break
       default:
         version = SAVE_VERSION
     }
@@ -237,6 +246,15 @@ function liftV2toV3(state: SerialisedState): SerialisedState {
  */
 function liftV3toV4(state: SerialisedState): SerialisedState {
   return { ...state, scenarioStartedOnDay: (state as Partial<SerialisedState>).scenarioStartedOnDay ?? 0 }
+}
+
+/**
+ * Format 4 kannte keinen Strukturwandel — dort blieben die Städte, wie sie
+ * waren. Eine leere Liste stellt genau das wieder her: die Städte des
+ * Spielstands sind die Ausgangsstädte, und ab jetzt geht es weiter.
+ */
+function liftV4toV5(state: SerialisedState): SerialisedState {
+  return { ...state, facilityChanges: (state as Partial<SerialisedState>).facilityChanges ?? [] }
 }
 
 export function makeSave(state: GameState, label: string, savedAt: string): SaveGame {

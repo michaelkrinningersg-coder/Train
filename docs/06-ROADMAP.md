@@ -637,6 +637,127 @@ als eigener Punkt aus.
 
 ---
 
+## Phase 5f — Streckenbau im Landesmaßstab (erledigt)
+
+**Kettenbau.** Die Nord-Süd-Achse besteht aus sieben Streckenabschnitten. Bisher
+musste für jeden einzeln „Strecke bauen" gedrückt und der Bahnhof zweimal
+angeklickt werden — 21 Klicks für eine Trasse, die eine einzige Entscheidung
+ist. Jetzt wird der Zielbahnhof nach jedem Abschluss zum neuen Startbahnhof.
+Im Browser gemessen: Hamburg – München, 753 km, **11 Klicks statt 21**.
+
+**Zwei Dinge, die dabei auffielen** — beide waren keine Kosmetik:
+
+- In den Bauwerkzeugen ging zusätzlich das Stadtpanel auf; deck.gl wertet den
+  Klick auf die Städteebene unabhängig vom Kartenklick aus. Das Panel legte sich
+  über genau den Ausschnitt, in dem als nächstes gebaut wird, und verschluckte
+  den nächsten Klick. Im Test blieb dadurch der letzte Abschnitt der Achse
+  ungebaut.
+- Beim Zeichnen einer **Linie** wurde auf die nächste *Stadt* gerastet, beim
+  Streckenbau auf den nächsten *Bahnhof*. Im Landesmaßstab liegen Städte dicht
+  an dicht: ein Klick auf Frankfurt traf Offenbach, wo weit und breit kein
+  Bahnhof steht. Beide Werkzeuge rasten jetzt auf Halte.
+
+---
+
+## Phase 5g — Die verbliebenen Modelllücken (erledigt)
+
+### Reihenfolge am Bahnsteig
+
+Bis hierher wurde jeder Abschnitt für sich rationiert, und wer ihn durchfuhr,
+wurde am schwächsten Glied anteilig gekürzt — der Fernreisende aus Hamburg
+verlor also mitten in Kassel seinen Platz an einen Zusteiger. Real ist es
+andersherum. Der Zug fährt die Halte jetzt der Reihe nach ab: erst aussteigen,
+dann einsteigen, so weit der frei gewordene Platz reicht. **Wer sitzt, bleibt
+sitzen.**
+
+Für eine Fernachse entscheidet das, ob die Überfüllung die langen oder die
+kurzen Reisen trifft. Die gemeldete Auslastung bleibt die *Nachfrage* gegen die
+Kapazität und darf weiter über 100 % gehen — sonst wäre ein hoffnungslos
+überfüllter Zug in der Anzeige nicht von einem gerade eben ausgelasteten zu
+unterscheiden.
+
+### Gestrandete Umsteiger
+
+Jede Linie rechnet ihr Teilstück für sich ab — sie kann gar nicht anders, denn
+sie kennt die anderen nicht. Bei einer Kette mit Umstieg galt der, der auf dem
+zweiten Teilstück hängen blieb, deshalb als *halb bedient*. In Wahrheit ist er
+**gestrandet**: er hat den Zubringer besetzt und sein Ziel nie gesehen.
+
+Die Teilstücke tragen jetzt eine Kettenkennung; der Tagesabschluss setzt sie
+wieder zu einer Reise zusammen. Angekommen ist der kleinste Anteil über alle
+Teilstücke, die Differenz zählt bei der Linie, die sie stehen ließ. Gerechnet
+wird auf Tagessummen — die Ganglinie je Kette und Stunde mitzuführen wäre bei
+zehntausenden Ketten ein Vielfaches des Speichers, den der ganze Tag braucht.
+
+### Gleisauslastung
+
+Die Heatmap zeigte, wie voll die *Züge* sind. Wie voll die *Trasse* ist, war
+nirgends abzulesen — dabei hängt daran die teuerste Investition im Spiel. Volle
+Züge auf halbleerer Trasse heißen „dichter fahren", leere Züge auf voller Trasse
+heißen „nicht noch eine Fahrt dazu".
+
+Neu ist `trackLoads`: Zugfahrten in der stärksten Stunde je Richtung, gemessen
+an der Kapazität, über alle Linien einer Strecke zusammen. Bei Mischverkehr
+zählt der langsamste und längste Zug — ein langsamer Zug zwischen zwei schnellen
+kostet mehr Trasse, als er selbst braucht.
+
+Dabei fiel auf, dass `capacityPerHour` einer **eingleisigen** Strecke dieselbe
+Richtungskapazität gab wie einer zweigleisigen. Eingleisig muss der Gegenzug
+aber den ganzen Abschnitt abwarten. Gemessen an der Nord-Süd-Achse:
+
+| Ausbau | Trassenauslastung | Pünktlichkeit | Fahrgäste |
+|---|---|---|---|
+| eingleisig, 60′ | **149–183 %** | 0 % | 347 |
+| zweigleisig, 60′ | 4 % | 100 % | 4 114 |
+| zweigleisig, 30′ | 9 % | 99 % | 6 456 |
+
+Die 0 % Pünktlichkeit standen vorher unkommentiert da. Jetzt sagt eine Zahl,
+warum.
+
+### Strukturwandel
+
+Die Landkarte war eingefroren: dieselben Hochschulen, dieselben Arbeitgeber im
+Jahr 2020 wie 1990. Für ein Spiel über dreißig Jahre war das die größte
+verbliebene Unwahrheit im Nachfragemodell — ein Netz sollte nicht einmal richtig
+gebaut und dann verwaltet werden, sondern **nachziehen müssen**.
+
+Zwei Kräfte, beide aus der Zeit, in der das Spiel spielt: der große Arbeitgeber,
+der abbaut, schließt oder sich anderswo ansiedelt, und der Hochschulausbau in
+mittelgroßen Städten. Gerollt wird am 1. Januar aus `(seed, Jahr, Stadt)` — nie
+aus `Math.random()`.
+
+**Der Entwurf sah zuerst das Zechensterben über `industrial_cluster` vor.** Beim
+Nachzählen im Datensatz hatte keine einzige der 694 deutschen Städte diese
+Einrichtung; die Pipeline vergibt sie nicht. Ein Modellzweig, der nie feuert,
+ist schlimmer als keiner, weil ihn niemand vermisst. `major_employer` gibt es
+93-mal und beschreibt dieselbe Kraft.
+
+Gemessen über 30 Jahre (`pnpm structure`):
+
+```
+53 Ereignisse in 30 Jahren (1,8 je Jahr)
+13 Schließungen · 25 Ab- und Ansiedlungen · 15 neue Hochschulen
+
+Nachfrage insgesamt: 3.250.852 → 3.250.878 Reisen/Tag
+Einpendler nach Fürth: 11.566 → 9.957 je Tag
+```
+
+Die Gesamtnachfrage bleibt konstant — das Gravitationsmodell normiert je Quelle,
+und das ist so gewollt. Was sich ändert, ist die **Verteilung**: Fürth verliert
+ein Siebtel seiner Einpendler, andere Städte gewinnen. Eine Linie, die für
+Fürths Pendler gebaut wurde, trägt nach zwanzig Jahren spürbar weniger.
+
+Die Änderungen stehen als **Liste** im Spielstand, nicht als veränderte
+Städteliste: die Liste ist winzig, während die Städte ein Drittel des Zustands
+ausmachen — und Haupt- und Rechenthread halten ihre Städte getrennt, wenden aber
+dieselbe Liste an und kommen damit garantiert auf denselben Stand. Die
+Nachfragematrix wird neu gebaut, wenn eine Änderung greift; das kostet für
+Deutschland rund eine Sekunde, einmal auf 365 Betriebstage.
+
+Speicherformat **5**.
+
+---
+
 ## Phase 5 — Europa (2–3 Wochen)
 
 - Pipeline auf Mitteleuropa, dann Europa hochziehen

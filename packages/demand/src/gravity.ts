@@ -33,6 +33,16 @@ export interface DemandMatrix {
   /** Schneller Zugriff ueber "from|to". */
   readonly byKey: ReadonlyMap<string, ODPair>
   readonly totalTripsPerDay: number
+  /**
+   * Womit diese Matrix gebaut wurde.
+   *
+   * Nicht Zierde: aendern sich die Staedte im Lauf des Spiels, muss die Matrix
+   * neu gebaut werden - und zwar mit derselben Schwelle wie beim ersten Mal.
+   * Sonst waere die Nachfrage nach einem Strukturwandel nicht deshalb anders,
+   * weil eine Zeche geschlossen hat, sondern weil ploetzlich mehr Kleinstpaare
+   * mitzaehlen.
+   */
+  readonly minTripsPerDay: number
 }
 
 export const odKey = (from: CityId, to: CityId): string => `${from}|${to}`
@@ -190,5 +200,5 @@ export function buildDemandMatrix(cities: readonly City[], options: GravityOptio
   }
 
   pairs.sort((a, b) => b.totalTrips - a.totalTrips)
-  return { pairs, byKey, totalTripsPerDay: total }
+  return { pairs, byKey, totalTripsPerDay: total, minTripsPerDay: minTrips }
 }

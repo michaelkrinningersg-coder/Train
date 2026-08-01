@@ -30,6 +30,15 @@ import { advanceDays } from '@game/sim'
  * Städten, ist mit 141 000 Relationen groß und wäre als Nachricht teurer als
  * ihre Berechnung. Der Hauptthread baut seine eigene, weil Stadtpanel und
  * Bildfahrplan sie brauchen — beide Läufe laufen nebeneinander.
+ *
+ * ## Städte, die sich doch ändern
+ *
+ * Seit es den Strukturwandel gibt, stimmt „über ein ganzes Spiel unverändert"
+ * nicht mehr ganz. Die Änderungen sind aber winzig und stehen als Liste im
+ * Zustand, der ohnehin hin- und hergeht: beide Seiten wenden dieselbe Liste an
+ * und kommen damit garantiert auf denselben Stand. Die Alternative — die
+ * Städte wieder mitzuschicken — würde einen seltenen Fall mit einem ständigen
+ * Preis bezahlen.
  */
 
 /** Der Zustand ohne die Städte — alles, was sich von Tag zu Tag ändern kann. */
@@ -68,6 +77,16 @@ self.onmessage = (event: MessageEvent<SimRequest>): void => {
 
     const full: GameState = { ...request.state, cities }
     const next = advanceDays(full, demand, request.days)
+
+    // Hat der Strukturwandel zugeschlagen, gelten ab jetzt andere Staedte und
+    // eine andere Matrix. `advanceDays` hat innerhalb des Sprungs schon damit
+    // gerechnet; hier wird der Stand fuer die naechsten Sprunge festgehalten.
+    if (next.cities !== cities) {
+      const enriched = withPotentials([...next.cities.values()])
+      cities = new Map(enriched.map((c) => [c.id, c]))
+      demand = buildDemandMatrix(enriched, { minTripsPerDay: 1 })
+    }
+
     const { cities: _constant, ...mobile } = next
     post({ kind: 'advanced', id: request.id, state: mobile })
   } catch (error) {

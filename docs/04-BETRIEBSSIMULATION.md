@@ -357,29 +357,51 @@ Stunde**:
 
 ```
 je Stunde h und Fahrtrichtung:
-    belegung[abschnitt] = Σ nachfrage aller Gruppen, die diesen Abschnitt durchfahren
-    faktor[abschnitt]   = min(1, sitze[h] / belegung[abschnitt])
-
-    je Gruppe:  mitgenommen = nachfrage · min über alle durchfahrenen faktor[…]
+    besetzt = 0
+    je Halt in Fahrtreihenfolge:
+        besetzt -= aussteigende an diesem Halt
+        frei     = sitze[h] − besetzt
+        faktor   = min(1, frei / nachfrage der hier Einsteigenden)
+        besetzt += nachfrage der hier Einsteigenden · faktor
 ```
 
 Zwei Eigenschaften folgen daraus, und beide entsprechen dem Betrieb:
 
 - **Getrennte Abschnitte teilen sich keine Plätze.** Ein 100-Sitzer schafft 100 Fahrgäste von
   A nach B *und* 100 von B nach C — 200 insgesamt, nicht 100.
-- **Rationiert wird nur, wo es eng ist.** Eine Gruppe wird von dem schlechtesten Abschnitt
-  begrenzt, den sie durchfährt. Wer eine Station auf freier Strecke fährt, kommt mit, auch
-  wenn zwei Abschnitte weiter niemand mehr zusteigt.
+- **Wer sitzt, bleibt sitzen.** Rationiert wird am Bahnsteig, nicht im Zug. Ist der Zug ab
+  Hamburg voll, bleiben die Zusteiger in Kassel stehen — der Fernreisende verliert seinen
+  Platz nicht. Bis Phase 5g war es umgekehrt: jeder Abschnitt wurde für sich rationiert, und
+  eine durchgehende Gruppe wurde am schwächsten Glied anteilig gekürzt. Für eine Fernachse
+  entscheidet dieser Unterschied, ob die Überfüllung die langen oder die kurzen Reisen trifft.
 
 Was daraus im UI wird: `linkLoadFactors` zeigt die Spitzenauslastung je Abschnitt. Genau dort
 sieht der Spieler, ob ihm ein längerer Zug hilft (ein Abschnitt über 100 %) oder eine geteilte
 Linie (nur die Mitte voll, die Enden leer).
 
+Die gemeldete Auslastung (`linkLoadFactors`) misst weiterhin die **Nachfrage** gegen die
+Kapazität und darf über 100 % gehen. Sonst wäre ein hoffnungslos überfüllter Zug in der
+Anzeige nicht von einem gerade eben ausgelasteten zu unterscheiden.
+
 Nachfrage außerhalb der Betriebszeit zählt als **stehen geblieben**, nicht als Überlastung —
 sonst wäre jede Linie nachts unendlich überfüllt. Sie zählt auch nicht gegen die Zufriedenheit
-(siehe [03 §6a](03-NACHFRAGEMODELL.md#6a-zufriedenheit-das-gedächtnis-der-nachfrage)). Nicht
-modelliert ist die Reihenfolge am Bahnsteig: real entscheidet, wer zuerst da ist, ob ein
-Fernreisender oder ein Kurzstreckenfahrer den letzten Platz bekommt.
+(siehe [03 §6a](03-NACHFRAGEMODELL.md#6a-zufriedenheit-das-gedächtnis-der-nachfrage)).
+
+### Gestrandete Umsteiger
+
+Jede Linie rechnet ihr Teilstück für sich ab. Bei einer **Reisekette mit Umstieg** genügt das
+nicht: wer in Fulda in den vollen Zug nicht mehr hineinkommt, ist nicht halb gefahren, sondern
+**gestrandet** — er hat den Zubringer besetzt und sein Ziel nie gesehen.
+
+Die Teilstücke tragen deshalb seit Phase 5g eine Kettenkennung. Der Tagesabschluss setzt sie
+wieder zu einer Reise zusammen: angekommen ist der kleinste Anteil über alle Teilstücke, und
+die Differenz zum Teilstück davor sind die Gestrandeten. Sie zählen bei der Linie, die sie
+stehen ließ — dort entscheidet der Spieler über die Kapazität.
+
+Gerechnet wird auf **Tagessummen**, nicht je Stunde: die Ganglinie je Kette und Stunde
+mitzuführen wäre bei zehntausenden Ketten ein Vielfaches des Speichers, den der ganze Tag
+sonst braucht. Eine Kette, die morgens hält und abends reißt, erscheint dadurch als eine, die
+den ganzen Tag halb hält.
 
 Seit Phase 4a hat Überfüllung zwei Nachwirkungen: sie **verlängert die Haltezeit** (siehe
 Abschnitt 5) und sie **kostet Stammkunden**. Wer wiederholt keinen Platz bekommt, weicht aufs
@@ -412,9 +434,34 @@ die Reihenfolge trotzdem, und die Strichstärke sagt dasselbe noch einmal — ü
 wächst sie weiter, während die Farbe am dunklen Ende stehen bleibt. Der Unterschied zwischen
 120 und 180 Prozent ist keiner, den man auf der Karte lesen will.
 
-Was weiterhin fehlt: die **Streckenauslastung** in Prozent der theoretischen Kapazität — also
-wie viele Trassen eine Strecke noch hergibt. Die Heatmap zeigt die Auslastung der *Züge*, nicht
-die der *Gleise*.
+### Gleisauslastung
+
+Seit Phase 5g gibt es daneben die **Trassenauslastung**: Zugfahrten in der stärksten Stunde je
+Richtung, gemessen an `capacityPerHour`, über alle Linien einer Strecke zusammen. Der Schalter
+„Auslastung" schaltet durch *aus → Züge → Gleise*; das Streckendetail zeigt einen Balken.
+
+Es sind zwei verschiedene Fragen, und sie zu verwechseln ist die teuerste Fehlentscheidung,
+die das Spiel anbietet. Volle Züge auf halbleerer Trasse heißen „dichter fahren". Leere Züge
+auf voller Trasse heißen „nicht noch eine Fahrt dazu, sondern ein zweites Gleis".
+
+Bei Mischverkehr zählt der **langsamste und längste** Zug. Das ist keine Bequemlichkeit: ein
+langsamer Zug zwischen zwei schnellen kostet mehr Trasse, als er selbst braucht, weil er die
+Lücke dahinter mitverbraucht.
+
+Eingleisige Strecken werden **anders gerechnet** als zweigleisige. Zwei Züge derselben Richtung
+dürfen im Blockabstand folgen, aber ein Gegenzug darf erst hinein, wenn der Abschnitt ganz frei
+ist — bei ausgeglichenem Verkehr passt in eine Stunde also nur, was zweimal die volle
+Abschnittsfahrt hergibt. Auf einem 70-km-Abschnitt sind das ein bis zwei Züge je Richtung,
+ganz gleich wie kurz die Blöcke sind. Genau deshalb ist eine Überholstelle dort oft mehr wert
+als jede Signaltechnik: sie teilt den Abschnitt.
+
+Gemessen an der Nord-Süd-Achse Hamburg–München:
+
+| Ausbau | Trassenauslastung | Pünktlichkeit | Fahrgäste |
+|---|---|---|---|
+| eingleisig, 60′ | **149–183 %** | 0 % | 347 |
+| zweigleisig, 60′ | 4 % | 100 % | 4 114 |
+| zweigleisig, 30′ | 9 % | 99 % | 6 456 |
 
 ---
 

@@ -66,6 +66,50 @@ mit `ω_k` als Größendegression:
 Einrichtungsfaktoren siehe [00-KONZEPT §4](00-KONZEPT.md#4-städte-und-einrichtungen). Sie wirken
 **nur auf `A`**, nie auf `O`.
 
+### 2a. Strukturwandel: Einrichtungen über Jahrzehnte
+
+Seit Phase 5g sind die Einrichtungen nicht mehr eingefroren. Ein Spiel läuft über dreißig
+Jahre, und in dreißig Jahren ändert sich, wofür eine Stadt gut ist — das Werk schließt, die
+Fachhochschule kommt. Ein Netz soll nicht einmal richtig gebaut und dann verwaltet werden,
+sondern **nachziehen müssen**.
+
+Zwei Kräfte, beide aus der Zeit, in der das Spiel spielt:
+
+- **Der große Arbeitgeber** (`major_employer`) baut ab, schließt, oder siedelt sich anderswo
+  an. Das trifft den Pendlerverkehr — den Verkehr, der ein Netz trägt.
+- **Hochschulausbau**: mittelgroße Städte ohne Hochschule bekommen eine. Studentenverkehr ist
+  ein anderes Muster als Pendlerverkehr: andere Zeiten, andere Ziele.
+
+Gerollt wird am 1. Januar, deterministisch aus `(seed, Jahr, Stadt)` — nie aus
+`Math.random()`. Zwei Läufe desselben Spielstands ergeben denselben Wandel. Die Raten sind so
+gesetzt, dass für Deutschland rund **1,8 Ereignisse im Jahr** herauskommen; häufiger wäre kein
+Wandel mehr, sondern Rauschen, in dem der Spieler nicht mehr unterscheiden kann, ob seine
+Linie schlecht liegt oder sich gerade wieder etwas verschoben hat.
+
+Über 30 Jahre gemessen (`pnpm structure`):
+
+```
+53 Ereignisse · 13 Schließungen · 25 Ab- und Ansiedlungen · 15 neue Hochschulen
+
+Nachfrage insgesamt: 3.250.852 → 3.250.878 Reisen/Tag
+Einpendler nach Fürth: 11.566 → 9.957 je Tag
+```
+
+Die **Gesamtnachfrage bleibt konstant** — die Normierung in Stufe 2 sorgt dafür, dass jede
+Stadt exakt ihr Quellpotenzial verteilt, und Einrichtungen wirken nur auf `A`. Was sich ändert,
+ist die Verteilung: Fürth verliert ein Siebtel seiner Einpendler, andere Städte gewinnen. Eine
+Linie, die für Fürths Pendler gebaut wurde, trägt nach zwanzig Jahren spürbar weniger.
+
+Beim Entwurf war das Zechensterben über `industrial_cluster` vorgesehen. Beim Nachzählen im
+Datensatz hatte **keine einzige** der 694 deutschen Städte diese Einrichtung — die Pipeline
+vergibt sie nicht. Ein Modellzweig, der nie feuert, ist schlimmer als keiner, weil ihn niemand
+vermisst.
+
+Die Änderungen stehen als **Liste** im Spielstand, nicht als veränderte Städteliste: Haupt-
+und Rechenthread halten ihre Städte getrennt, wenden aber dieselbe Liste an und kommen damit
+garantiert auf denselben Stand. Die Nachfragematrix wird neu gebaut, wenn eine Änderung greift
+— rund eine Sekunde für Deutschland, einmal auf 365 Betriebstage.
+
 ---
 
 ## 3. Stufe 2 — Verteilung (Gravitationsmodell)

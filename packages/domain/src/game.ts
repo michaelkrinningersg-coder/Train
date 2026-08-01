@@ -1,4 +1,4 @@
-import type { City } from './city.js'
+import type { City, FacilityChange } from './city.js'
 import type { Vehicle } from './fleet.js'
 import type {
   BlockId,
@@ -211,6 +211,13 @@ export interface GameState {
   readonly lastDay: DayResult | null
   /** Gleitende Historie fuer die Finanzansicht. */
   readonly history: readonly DayResult[]
+  /**
+   * Strukturwandel: was aus den Staedten ueber die Jahre geworden ist.
+   *
+   * Nur die Aenderungen, nicht der Stand. Wer die Liste hat, kann die
+   * Ausgangsstaedte darauf bringen - und beide Threads tun genau das.
+   */
+  readonly facilityChanges: readonly FacilityChange[]
 }
 
 export interface TrackSpec {

@@ -2,18 +2,20 @@ import {
   DAYS_ALL,
   DEFAULT_BUS_FARE,
   DEFAULT_RUNTIME_RESERVE,
+  applyFacilityChange,
   cityId,
   cityRadiusKm,
   type City,
   type GameState,
   type Line,
 } from '@game/domain'
-import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
+import { buildDemandMatrix, cityPotentials, withPotentials, type DemandMatrix } from '@game/demand'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { advanceDay, advanceDays } from './advance.js'
 import { applyCommand } from './commands.js'
 import { effectiveHeadwayMin, lineMetrics, vehiclesNeeded } from './lineMetrics.js'
 import { createGame } from './state.js'
+import { applyChanges, isStructureDay, rollStructuralChanges } from './structure.js'
 
 const city = (name: string, population: number, lng: number, lat: number): City => ({
   id: cityId(name),
@@ -313,5 +315,113 @@ describe('Abrechnung', () => {
     const monday = advanceDay(state, demand).lastDay!.passengers
     const saturday = advanceDays(state, demand, 6).lastDay!.passengers
     expect(saturday).toBeLessThan(monday)
+  })
+})
+
+describe('Strukturwandel', () => {
+  /** Eine Stadt mit großem Arbeitgeber, groß genug für alle Regeln. */
+  const withEmployer = (size: 1 | 2 | 3): City[] =>
+    withPotentials([
+      { ...city('Werkstadt', 200_000, 11.0, 48.3), facilities: [{ type: 'major_employer', size }] },
+      city('Nachbarstadt', 150_000, 11.4, 48.5),
+    ])
+
+  const gameOn = (cities: readonly City[], day: number): GameState => ({
+    ...createGame({ cities, startingCash: 0 }),
+    day,
+  })
+
+  /** 1. Januar 1991 — der erste Jahreswechsel nach dem Spielbeginn. */
+  const NEW_YEAR = 365
+
+  it('rollt nur am Jahreswechsel', () => {
+    expect(isStructureDay(NEW_YEAR)).toBe(true)
+    expect(isStructureDay(NEW_YEAR + 1)).toBe(false)
+    expect(isStructureDay(NEW_YEAR - 1)).toBe(false)
+  })
+
+  it('wirft bei gleichem Zustand immer dasselbe', () => {
+    const state = gameOn(withEmployer(2), NEW_YEAR)
+    expect(rollStructuralChanges(state)).toEqual(rollStructuralChanges(state))
+  })
+
+  it('haengt am Startwert des Spiels — ein anderer Spielstand, ein anderer Wandel', () => {
+    // Genug Staedte, damit der Vergleich nicht davon abhaengt, ob in dreissig
+    // Jahren ueberhaupt etwas passiert: 200 Werkstaedte ergeben rund 1,6
+    // Ereignisse im Jahr.
+    const many = withPotentials(
+      Array.from({ length: 200 }, (_, i) => ({
+        ...city(`Werkstadt ${i}`, 200_000, 11 + i * 0.01, 48.3),
+        facilities: [{ type: 'major_employer' as const, size: 3 as const }],
+      })),
+    )
+
+    const collect = (seed: number): string => {
+      const base: GameState = { ...gameOn(many, 0), seed }
+      const notes: string[] = []
+      // Tagweise, weil ein Jahr nicht 365 Tage hat: mit `day = jahr * 365`
+      // liefe der 1. Januar an den Schaltjahren vorbei und es wuerde nie
+      // gerollt.
+      for (let day = 0; day < 30 * 366; day++) {
+        for (const change of rollStructuralChanges({ ...base, day })) notes.push(`${day} ${change.note}`)
+      }
+      return notes.join('|')
+    }
+
+    const first = collect(1)
+    expect(first).not.toBe('')
+    expect(first).not.toBe(collect(2))
+  })
+
+  it('nimmt dem Arbeitgeber je Ereignis eine Stufe', () => {
+    const cities = withEmployer(2)
+    const change = { day: 0, cityId: cities[0]!.id, type: 'major_employer' as const, size: 1 as const, note: '' }
+    const next = applyFacilityChange(cities[0]!, change)
+    expect(next.facilities).toEqual([{ type: 'major_employer', size: 1 }])
+  })
+
+  it('loescht die Einrichtung bei Groesse 0', () => {
+    const cities = withEmployer(1)
+    const change = { day: 0, cityId: cities[0]!.id, type: 'major_employer' as const, size: 0 as const, note: '' }
+    expect(applyFacilityChange(cities[0]!, change).facilities).toEqual([])
+  })
+
+  it('senkt mit dem Arbeitgeber die Anziehungskraft fuer Pendler', () => {
+    const before = withEmployer(3)[0]!
+    const after = applyFacilityChange(before, {
+      day: 0,
+      cityId: before.id,
+      type: 'major_employer',
+      size: 0,
+      note: '',
+    })
+    const potential = (c: City): number => cityPotentials(c).commuter.destination
+    expect(potential(after)).toBeLessThan(potential(before))
+  })
+
+  it('schreibt den Wandel in den Spielstand und in die Staedte', () => {
+    // So lange laufen lassen, bis irgendwo etwas passiert - mit zwei Staedten
+    // dauert das, deshalb ueber viele Jahre und mit sicherem Treffer.
+    const cities = withEmployer(3)
+    let state = gameOn(cities, 0)
+    const matrix = buildDemandMatrix(cities, { minTripsPerDay: 0 })
+
+    let years = 0
+    while (state.facilityChanges.length === 0 && years < 400) {
+      state = advanceDays(state, matrix, 365)
+      years++
+    }
+
+    expect(state.facilityChanges.length).toBeGreaterThan(0)
+    const change = state.facilityChanges[0]!
+    const city = state.cities.get(change.cityId)!
+    const facility = city.facilities.find((f) => f.type === change.type)
+    expect(facility?.size ?? 0).toBe(change.size)
+  })
+
+  it('laesst die Staedte in Ruhe, wenn nichts passiert ist', () => {
+    const cities = withEmployer(2)
+    const map = new Map(cities.map((c) => [c.id, c]))
+    expect(applyChanges(map, [])).toBeNull()
   })
 })

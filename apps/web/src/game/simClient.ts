@@ -1,6 +1,6 @@
 import type { City, GameState } from '@game/domain'
 import { buildDemandMatrix, withPotentials, type DemandMatrix } from '@game/demand'
-import { advanceDays } from '@game/sim'
+import { advanceDays, applyChanges } from '@game/sim'
 import type { SimRequest, SimResponse } from './sim.worker.js'
 
 /**
@@ -41,7 +41,12 @@ function inlineClient(): SimClient {
       // Auch hier ein Mikrotask, damit der Aufrufer in beiden Faellen dieselbe
       // Nebenlaeufigkeit sieht - sonst faende ein Fehler nur im Worker statt.
       await Promise.resolve()
-      return advanceDays(state, demand, days)
+      const next = advanceDays(state, demand, days)
+      // Strukturwandel: dieselbe Nachfuehrung wie im Worker.
+      if (next.cities !== state.cities) {
+        demand = buildDemandMatrix(withPotentials([...next.cities.values()]), { minTripsPerDay: 1 })
+      }
+      return next
     },
     dispose: () => {
       demand = null
@@ -104,16 +109,30 @@ export function createSimClient(): SimClient {
     available: true,
 
     init: async (list) => {
-      cities = new Map(list.map((c) => [c.id, c]))
+      cities = new Map(withPotentials(list).map((c) => [c.id, c]))
       await send({ kind: 'init', cities: list })
     },
 
     advance: async (state, days) => {
-      // Die Staedte bleiben hier: sie aendern sich nie und sind ein Drittel des
-      // Zustands.
+      // Die Staedte bleiben hier: sie sind ein Drittel des Zustands und aendern
+      // sich fast nie.
       const { cities: _constant, ...mobile } = state
       const reply = await send({ kind: 'advance', state: mobile, days })
       if (reply.kind !== 'advanced') throw new Error('Unerwartete Antwort des Rechenthreads.')
+
+      // „Fast nie" ist der Strukturwandel. Der Worker hat ihn schon angewandt,
+      // schickt aber nur die *Liste* zurueck - dieselbe Liste auf dieselben
+      // Ausgangsstaedte ergibt zwangslaeufig denselben Stand, und das ist
+      // billiger, als 694 Staedte je Betriebstag ueber die Grenze zu tragen.
+      const fresh = reply.state.facilityChanges.slice(state.facilityChanges.length)
+      if (fresh.length > 0) {
+        const updated = applyChanges(cities, fresh)
+        if (updated) {
+          // Die Potenziale haengen an den Einrichtungen und muessen mit.
+          cities = new Map(withPotentials([...updated.values()]).map((c) => [c.id, c]))
+        }
+      }
+
       return { ...reply.state, cities }
     },
 

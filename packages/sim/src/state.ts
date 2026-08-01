@@ -36,6 +36,7 @@ export function createGame(options: NewGameOptions): GameState {
     ledger: [],
     lastDay: null,
     history: [],
+    facilityChanges: [],
   }
 }
 

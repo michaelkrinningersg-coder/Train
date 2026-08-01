@@ -13,7 +13,9 @@ import {
   vehicleSpec,
   vehicleUpkeepPerDay,
 } from '@game/economy'
+import { buildDemandMatrix, withPotentials } from '@game/demand'
 import { simulateDay } from './day.js'
+import { applyChanges, rollStructuralChanges } from './structure.js'
 import { railOverhead } from './railDay.js'
 import { networkUpkeepPerDay } from './railCommands.js'
 
@@ -174,6 +176,11 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     }
   }
 
+  // Strukturwandel wird fuer den *kommenden* Tag gerollt: die Aenderung gilt ab
+  // morgen, damit der eben abgerechnete Betriebstag noch die Staedte hatte, mit
+  // denen er gerechnet wurde.
+  const structural = rollStructuralChanges({ ...state, day: nextDay })
+
   return {
     ...state,
     day: nextDay,
@@ -186,6 +193,8 @@ export function advanceDay(state: GameState, demand: DemandMatrix): GameState {
     ledger: trimLedger([...state.ledger, ...dated], nextDay),
     lastDay: dayResult,
     history: appendHistory(state.history, dayResult),
+    cities: applyChanges(state.cities, structural) ?? state.cities,
+    facilityChanges: structural.length > 0 ? [...state.facilityChanges, ...structural] : state.facilityChanges,
   }
 }
 
@@ -211,8 +220,31 @@ export function appendHistory(history: readonly DayResult[], day: DayResult): Da
   return [...older, day].slice(-HISTORY_DAYS)
 }
 
+/**
+ * Mehrere Betriebstage am Stück.
+ *
+ * Die Nachfragematrix wird **unterwegs neu gebaut**, wenn der Strukturwandel
+ * eine Stadt verändert hat. Anders ginge es nicht: die Matrix hängt an den
+ * Potenzialen, die Potenziale an den Einrichtungen, und wer eine Zeche
+ * schließt, dessen Pendlerströme sind am nächsten Tag andere. Sie stattdessen
+ * beim Aufrufer zu erneuern hieße, den Rest des Sprungs mit der Landkarte von
+ * gestern zu rechnen.
+ *
+ * Das kostet für Deutschland rund eine Sekunde — einmal im Spieljahr, also
+ * einmal auf 365 Betriebstage. Der Aufrufer erkennt an `facilityChanges`, dass
+ * er seine eigene Kopie ebenfalls erneuern muss.
+ */
 export function advanceDays(state: GameState, demand: DemandMatrix, days: number): GameState {
   let current = state
-  for (let i = 0; i < days; i++) current = advanceDay(current, demand)
+  let matrix = demand
+
+  for (let i = 0; i < days; i++) {
+    const before = current.facilityChanges.length
+    current = advanceDay(current, matrix)
+    if (current.facilityChanges.length > before) {
+      matrix = buildDemandMatrix(withPotentials([...current.cities.values()]), { minTripsPerDay: demand.minTripsPerDay })
+    }
+  }
+
   return current
 }

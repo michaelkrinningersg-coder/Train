@@ -349,7 +349,22 @@ export const useGame = create<GameStore>((set, get) => ({
           const result = applyCommand(next, command, { elevation: get().elevation ?? undefined })
           if (result.ok) next = result.state
         }
-        set({ state: next })
+        // Strukturwandel: der Rechenthread hat mit der neuen Landkarte schon
+        // gerechnet, die Anzeige haengt noch an der alten. Stadtpanel,
+        // Nachfragebögen und Bildfahrplan lesen aus *dieser* Matrix.
+        const fresh = next.facilityChanges.slice(state.facilityChanges.length)
+        if (fresh.length > 0) {
+          set({
+            state: next,
+            demand: buildDemandMatrix([...next.cities.values()], { minTripsPerDay: 1 }),
+            // Nur die letzte Meldung: an einem Jahreswechsel koennen mehrere
+            // Ereignisse zusammenfallen, und drei Meldungen uebereinander liest
+            // niemand. Nachschlagen laesst sich alles im Stadtpanel.
+            message: fresh.length === 1 ? fresh[0]!.note : `${fresh.length} Städte haben sich verändert.`,
+          })
+        } else {
+          set({ state: next })
+        }
 
         // Autosave alle AUTOSAVE_EVERY_DAYS Spieltage. Bewusst ohne `await`:
         // ein langsamer Schreibvorgang darf die Spieluhr nicht anhalten, und
